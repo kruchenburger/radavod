@@ -49,7 +49,7 @@ export function useMaps(
         if (branch !== null) people.set(branch, (people.get(branch) ?? 0) + 1);
       }
       // With fewer pages in a row the map is smaller, and the names of the pages are not.
-      const room = perRow === null ? 1.1 : perRow < 4 ? 1.9 : 1.4;
+      const room = perRow === null ? 1.3 : perRow < 4 ? 1.9 : 1.6;
       return {
         snapshot,
         levels,

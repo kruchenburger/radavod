@@ -207,8 +207,12 @@ function Label({ row: { as, life, isSelf, y }, snapshot, words, line, at }: Labe
   const { given, surname } = words.fullName(person.name && { ...person.name, patronymic: null });
   const isDirect = kinOf(snapshot).lineOf(line).has(person.id);
   const style = isDirect ? "nameDirect" : "name";
-  const details = `${words.years(person)} ${words.branch(person.branch)}`;
-  const wide = measure(`${given} ${surname} `, style) + measure(details, "detail") * 1.05;
+  const years = `${words.years(person)} `;
+  const widthOf = (details: string): number =>
+    measure(`${given} ${surname} `, style) + measure(details, "detail") * 1.05;
+  // Where there is no room the branch stays, since the bar only has its ink. The years are below.
+  const isRoomy = widthOf(years + words.branch(person.branch)) <= at.width - at.first;
+  const wide = widthOf((isRoomy ? years : "") + words.branch(person.branch));
   const from = bar === null ? at.middle : at.place(bar.start.outer);
   const left = Math.max(at.first, Math.min(from, at.width - wide));
   return (
@@ -221,7 +225,7 @@ function Label({ row: { as, life, isSelf, y }, snapshot, words, line, at }: Labe
         {given} <span style={{ color: words.ink(person.branch) }}>{surname}</span>
       </span>{" "}
       <span className={classes.detail}>
-        {words.years(person)}{" "}
+        {isRoomy && years}
         <b style={{ color: words.ink(person.branch) }}>{words.branch(person.branch)}</b>
       </span>
     </p>
