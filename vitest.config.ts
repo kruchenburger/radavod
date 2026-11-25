@@ -20,7 +20,7 @@ export default defineConfig({
         test: {
           name: "guards",
           environment: "node",
-          include: ["guards/**/*.test.ts"],
+          include: ["guards/**/*.test.ts", "examples/**/*.test.ts"],
           exclude: ["guards/**/fixtures/**"],
         },
       },

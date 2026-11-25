@@ -1,0 +1,14 @@
+{
+  "examples/dates.ts": [],
+  "examples/family.json": [],
+  "examples/family.ts": [],
+  "examples/generate.test.ts": [],
+  "examples/generate.ts": [],
+  "examples/hard-cases.ts": [],
+  "examples/kin.ts": [],
+  "examples/names.ts": [],
+  "examples/problems.ts": [],
+  "examples/random.ts": [],
+  "examples/tree.ts": [],
+  "examples/write.ts": []
+}

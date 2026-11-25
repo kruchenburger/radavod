@@ -27,6 +27,8 @@
     "test": "vitest run",
     "lint": "oxlint",
     "typecheck": "tsc --noEmit && tsc --noEmit -p tsconfig.node.json",
-    "guard:ddd": "node guards/ddd/cli.ts"
+    "guard:ddd": "node guards/ddd/cli.ts",
+    "guard:data": "node guards/data/cli.ts",
+    "examples": "node examples/write.ts"
   }
 }

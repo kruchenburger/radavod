@@ -31,3 +31,4 @@ jobs:
       - run: pnpm typecheck
       - run: pnpm test
       - run: pnpm guard:ddd
+      - run: pnpm guard:data

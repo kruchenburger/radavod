@@ -19,6 +19,8 @@ pnpm test
 pnpm typecheck
 pnpm lint
 pnpm guard:ddd
+pnpm guard:data
+pnpm examples                          # writes examples/family.json
 ```
 
 ## Architecture
@@ -28,6 +30,16 @@ Seven bounded contexts in `src/contexts`. `.agents/skills/ddd-steward/SKILL.md` 
 `pnpm guard:ddd` fails on a forbidden import, an import dependency-cruiser cannot see, a module outside its place, a table without an owner, and a scan that missed a file. There are no exceptions. `guards/ddd/fixtures` holds one case per folder, most of them broken on purpose; do not fix them.
 
 dependency-cruiser parses with swc, because TypeScript 7 has no compiler API.
+
+## Example family
+
+`examples/` holds an invented family of 300. `generateFamily(seed, size)` makes it and `examples/family.json` is its output for seed 1; a test compares them, so change the generator and run `pnpm examples`. Every invented name is in `examples/names.ts`. The app never imports `examples/`, and its types are not the domain model.
+
+## Data guard
+
+`pnpm guard:data` reads every tracked or staged file and fails on GEDCOM (by name or content), the backup marker in double quotes, SQLite and archives, whatever the file is called. It fails when it scans nothing or cannot read a file, so submodules and Git LFS do not work here. A file in `examples/` must be listed in `guards/data/examples.json`, with the rules it may break.
+
+The guard has no other exception. Its broken examples are built by `guards/data/fixtures.ts` in temporary repositories and are never files here. Code that needs the backup marker spells it in backticks. What the guard cannot see is listed above `check` in `guards/data/guard.ts`.
 
 ## Settings
 
@@ -43,7 +55,7 @@ Local workerd has no jurisdictions, so tests run with `none`.
 ## Rules
 
 - English in code, comments, commits and the changelog.
-- Test first. Tests live in `test/`, guard tests next to their guard.
+- Test first. Tests live in `test/`, guard and example tests next to what they test.
 - A real family's data never enters the repository. Examples use invented people.
 - Dependencies that ship must be MIT, ISC, BSD or Apache-2.0. Development tools may bring other licenses, for example lightningcss (MPL-2.0) and sharp's libvips (LGPL-3.0).
 - pnpm runs no install script of a dependency (`pnpm-workspace.yaml`).
