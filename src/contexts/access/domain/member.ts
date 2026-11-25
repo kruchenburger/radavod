@@ -37,6 +37,8 @@ export interface AccessReader {
   members(): Member[];
   invitation(id: string): Invitation | null;
   invitationByHash(hash: string): Invitation | null;
+  /** Every invitation that is kept: a family gives few. */
+  invitations(): Invitation[];
   /** The recovery links of a member that are not spent. */
   recoveriesOf(member: MemberId): Invitation[];
   /** Whether a setup code, by its hash, ever let a keeper in. */
@@ -182,4 +184,19 @@ export function deleteAccount(reader: AccessReader, id: MemberId): Result<Change
       ...writes("member", id, member.value, null),
     ],
   };
+}
+
+/** Members and invitations tied to people erased from the tree are tied to nobody now. */
+export function withoutPeople(reader: AccessReader, people: readonly PersonId[]): Change {
+  const gone = new Set<string>(people);
+  return [
+    ...reader
+      .members()
+      .filter(({ person }) => person !== null && gone.has(person))
+      .flatMap((one) => writes("member", one.id, one, { ...one, person: null })),
+    ...reader
+      .invitations()
+      .filter(({ person }) => person !== null && gone.has(person))
+      .flatMap((one) => writes("invitation", one.id, one, { ...one, person: null })),
+  ];
 }

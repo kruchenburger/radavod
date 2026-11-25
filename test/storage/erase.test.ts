@@ -22,6 +22,7 @@ import {
   citation,
   event,
   form,
+  idOf,
   inTree,
   person,
   source,
@@ -619,6 +620,18 @@ describe("the ledger of erasures", () => {
       family(tree);
       // Each object asks with a stub of its own.
       const stub = env.ACCESS.getByName(name);
+      // A member and an invitation are tied to her.
+      const keeper = idOf("member", "ann");
+      const key = (id: string) => ({ id, kind: "passkey" as const, label: "", publicKey: "k" });
+      const now = Date.now();
+      const first = { member: { id: keeper, name: "Ann" }, credential: key("a"), now, code: "c" };
+      expect((await stub.setUp(first)).ok).toBe(true);
+      for (const id of ["i1", "i2"]) {
+        const input = { id, hash: id, role: "reader" as const, person: person("ada"), now };
+        expect((await stub.invite(keeper, input)).ok).toBe(true);
+      }
+      const joined = { hash: "i1", now, member: { id: idOf("member", "ada"), name: "A" } };
+      expect((await stub.redeem({ ...joined, credential: key("b") })).ok).toBe(true);
       const there: Ledger = {
         remember: (ids) => stub.remember(ids),
         all: () => stub.erased(),
@@ -637,7 +650,8 @@ describe("the ledger of erasures", () => {
       const rows = Object.fromEntries(
         tables.map(({ name }) => [name, storage.sql.exec(`SELECT * FROM ${name}`).toArray()]),
       );
-      // Of all the rows of both objects, her identifier is in the ledger and nowhere else.
+      // Of all the rows of both objects, her identifier is in the ledger and nowhere else: the
+      // member and the invitation tied to her are tied to nobody now.
       expect(found(rows, said)).toEqual([`access_erased: ${person("ada")}`]);
     });
   });
