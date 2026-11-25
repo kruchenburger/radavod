@@ -1,16 +1,13 @@
 import { spawnSync } from "node:child_process";
-import { mkdirSync, mkdtempSync, readdirSync, rmSync, writeFileSync } from "node:fs";
-import { tmpdir } from "node:os";
-import { dirname, join } from "node:path";
+import { mkdirSync, readdirSync, rmSync, writeFileSync } from "node:fs";
+import { join } from "node:path";
 import { fileURLToPath } from "node:url";
-import { afterEach, beforeAll, expect, it } from "vitest";
+import { beforeAll, expect, it } from "vitest";
 import listed from "./examples.json" with { type: "json" };
 import { bad, contents, type Files, good } from "./fixtures.ts";
 import { check, type Report, type Violation } from "./guard.ts";
 import { rules } from "./rules.ts";
-
-// Inside a git hook these point at the real repository.
-for (const key of Object.keys(process.env)) if (key.startsWith("GIT_")) delete process.env[key];
+import { git, stage, temporaryFolder } from "./temporary.ts";
 
 const repository = fileURLToPath(new URL("../..", import.meta.url));
 const gedcomInA = [{ rule: "gedcom-content", file: "a.txt" }];
@@ -166,33 +163,3 @@ it.each<[string, Files, number, string]>([
   expect(run.stdout + run.stderr).toContain(output);
   expect(run.status).toBe(code);
 });
-
-const folders: string[] = [];
-
-afterEach(() => {
-  for (const folder of folders.splice(0)) rmSync(folder, { recursive: true, force: true });
-});
-
-function temporaryFolder(): string {
-  const folder = mkdtempSync(join(tmpdir(), "guard-data-"));
-  folders.push(folder);
-  return folder;
-}
-
-/** A new repository with the files staged and nothing committed. */
-function stage(files: Files): string {
-  const root = temporaryFolder();
-  git(root, "init", "--quiet");
-  for (const [file, content] of Object.entries(files)) {
-    mkdirSync(dirname(join(root, file)), { recursive: true });
-    writeFileSync(join(root, file), content);
-  }
-  if (Object.keys(files).length > 0) git(root, "-c", "core.autocrlf=false", "add", "--force", ".");
-  return root;
-}
-
-function git(root: string, ...args: string[]): string {
-  const { status, stdout, stderr } = spawnSync("git", args, { cwd: root, encoding: "utf8" });
-  if (status !== 0) throw new Error(stderr);
-  return stdout;
-}

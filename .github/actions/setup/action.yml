@@ -1,0 +1,14 @@
+name: Setup
+description: Node, pnpm and the dependencies from the lockfile
+runs:
+  using: composite
+  steps:
+    - uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
+      with:
+        node-version: 26
+        package-manager-cache: false
+    # Node 26 ships without corepack. It installs the pnpm named in package.json and checks its hash.
+    - run: npm install --global corepack@0.36.0 && corepack enable pnpm
+      shell: bash
+    - run: pnpm install --frozen-lockfile
+      shell: bash

@@ -34,6 +34,7 @@ const bad: [fixture: string, rule: string][] = [
   ["web-imports-adapters", "web-reaches-no-adapters"],
   ["web-reaches-adapters", "web-reaches-no-adapters"],
   ["web-imports-worker", "web-knows-no-server"],
+  ["web-imports-dev-tool", "ships-no-dev-tool"],
   ["server-imports-web", "server-knows-no-web"],
   ["unresolved-import", "every-import-resolves"],
   ["outside-module", "stays-in-src-and-web"],
