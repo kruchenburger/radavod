@@ -83,13 +83,19 @@ describe("patches", () => {
     expect(paths({ names }, { names: names.toReversed() })).toEqual(["names/"]);
     expect(paths({ title: { ru: "", en: "" } }, { title: { ru: "x", en: "" } })).toEqual(["title"]);
     expect(paths({ order: [] }, { order: ["a"] })).toEqual(["order"]);
+    expect(paths(null, { names, sex: "" })).toEqual([""]);
+    // Of what is lists only, nothing there is the same as nothing in them.
+    const life = (before: unknown, after: unknown) =>
+      patchesOf({ kind: "life", id: "p", before, after }).map(({ path }) => path);
+    expect(life(null, { events: names })).toEqual(["events/n1", "events/n2"]);
+    expect(life({ events: names }, null)).toEqual(["events/n1", "events/n2"]);
     expect(paths(null, { names })).toEqual([""]);
     expect(paths({ a: 1, b: 2 }, { b: 2, a: 1 })).toEqual([]);
-    expect(patchesOf(changed(null, { names }))[0]).toEqual({
+    expect(patchesOf(changed(null, { names, sex: "" }))[0]).toEqual({
       aggregate: "person/p",
       path: "",
       before: null,
-      after: { names },
+      after: { names, sex: "" },
     });
   });
 });

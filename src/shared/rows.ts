@@ -47,6 +47,10 @@ export interface Kept {
   current(kind: string, id: string): number | string | null | undefined;
   /** Writes everything that was saved, each row once, and tells what was changed. */
   flush(version: number): Written[];
+  /** What somebody wrote in an aggregate, null when it is not there, undefined of another context. */
+  authored(kind: string, id: string): unknown;
+  /** Everything somebody wrote. It reads every row. */
+  everything(): { kind: string; id: string; value: unknown }[];
 }
 
 type Aggregate<Id> = { id: Id; version: number };
@@ -93,6 +97,18 @@ export class Rows<Id extends string, Value extends Aggregate<Id>> {
       if (!this.#known.has(row.id)) this.#load(row.id, row);
     }
     return [...this.#known.values()].flatMap(({ now }) => now ?? []);
+  }
+
+  authored(id: Id): unknown {
+    return this.#authored(this.get(id));
+  }
+
+  /** What was written in the aggregates found in the table, which are all. */
+  authoredAmong(found: readonly (RawRow & { id: Id })[]) {
+    return this.among(found).flatMap((value) => {
+      const authored = this.#authored(value);
+      return authored === null ? [] : [{ kind: this.#kind, id: value.id, value: authored }];
+    });
   }
 
   flush(version: number): Written[] {

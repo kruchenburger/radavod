@@ -1,12 +1,36 @@
 import { type Evidence, evidenceOver, sqliteEvidence } from "../contexts/evidence";
-import { type Act, aggregateOf, journalOver, sqliteJournal } from "../contexts/history";
+import {
+  type Act,
+  aggregateOf,
+  type Journal,
+  journalOver,
+  sqliteJournal,
+  sqliteTrash,
+  type Trash,
+} from "../contexts/history";
 import { type Kinship, kinshipOver, sqliteKinship } from "../contexts/kinship";
 import { type Life, lifeOver, sqliteLife } from "../contexts/life";
 import { type Places, placesOver, sqlitePlaces } from "../contexts/places";
 import type { Result } from "../kernel/result";
-import type { Kept } from "../shared/rows";
+import type { State } from "../shared/reverse";
+import type { Kept, Written } from "../shared/rows";
 
-export type Contexts = { kinship: Kinship; places: Places; evidence: Evidence; life: Life };
+export type Contexts = {
+  kinship: Kinship;
+  places: Places;
+  evidence: Evidence;
+  life: Life;
+  history: History;
+};
+
+/** The journal and what somebody wrote in the tree, as the journal tells it. */
+export type History = Pick<Journal, "last" | "entry" | "entries" | "entriesOf"> & {
+  /** What was written in an aggregate, as "kind/id", null when it is not there. */
+  authored(aggregate: string): unknown;
+  /** Everything that was written. It reads every row. */
+  state(): State;
+  trash: Trash;
+};
 
 /** What can be asked without a change. */
 export type Reading = {
@@ -14,6 +38,7 @@ export type Reading = {
   places: Pick<Places, "get" | "nameOn" | "affiliationOn">;
   evidence: Pick<Evidence, "source" | "citationsOf" | "countFor">;
   life: Pick<Life, "event" | "eventsOf" | "main" | "countAt" | "warnings">;
+  history: Omit<History, "trash"> & { trash: Pick<Trash, "get" | "everybody"> };
 };
 
 export type Command = Act & {
@@ -33,6 +58,13 @@ export type StaleVersion = {
   current: number | string | null;
 };
 
+export type Telling = {
+  /** What the entry tells of what was written. */
+  tell: (written: readonly Written[]) => Written[];
+  /** Comes last in the transaction, after the entry is written. */
+  last: (sql: SqlStorage) => void;
+};
+
 export interface UnitOfWork {
   /**
    * Runs one scenario in one transaction with one journal entry. Commands see what earlier ones of
@@ -42,7 +74,11 @@ export interface UnitOfWork {
   run<T, E extends { code: string }>(
     command: Command,
     work: (contexts: Contexts) => Result<T, E>,
+    /** For what must not be told in the journal as it is. */
+    telling?: Telling,
   ): Result<{ value: T; changed: Changed[] }, E | StaleVersion>;
+  /** What a scenario would answer. Nothing of it is kept. */
+  preview<T, E extends { code: string }>(work: (contexts: Contexts) => Result<T, E>): Result<T, E>;
   read<T>(work: (contexts: Reading) => T): T;
 }
 
@@ -61,10 +97,10 @@ export function unitOfWork(
     }
   };
   return {
-    run: (command, work) =>
+    run: (command, work, telling) =>
       alone(() =>
         storage.transactionSync(() => {
-          const { kept, contexts } = open(storage.sql);
+          const { kept, contexts, journal } = open(storage.sql);
           for (const [aggregate, seen] of Object.entries(command.expected)) {
             const current = currentOf(kept, aggregate);
             if (current !== seen) {
@@ -74,14 +110,16 @@ export function unitOfWork(
           const result = work(contexts);
           if (!result.ok) return result;
 
-          const journal = journalOver(sqliteJournal(storage.sql));
           const version = journal.next();
           const written = kept.flatMap((one) => one.flush(version));
-          if (written.length > 0) journal.write(version, command, written);
+          const told = telling ? telling.tell(written) : written;
+          if (written.length > 0) journal.write(version, command, told);
+          telling?.last(storage.sql);
           const changed = written.map((one) => ({ aggregate: aggregateOf(one), version }));
           return { ok: true, value: { value: result.value, changed } };
         }),
       ),
+    preview: (work) => alone(() => work(open(storage.sql).contexts)),
     read: (work) => alone(() => work(open(storage.sql).contexts)),
   };
 }
@@ -101,10 +139,32 @@ function open(sql: SqlStorage) {
     places: sqlitePlaces(sql),
     evidence: sqliteEvidence(sql),
     life: sqliteLife(sql),
+    trash: sqliteTrash(sql),
   };
   const kinship = kinshipOver(stores.kinship);
   const places = placesOver(stores.places);
   const evidence = evidenceOver(stores.evidence);
   const life = lifeOver(stores.life, kinship, places);
-  return { kept: Object.values(stores), contexts: { kinship, places, evidence, life } };
+  const journal = journalOver(sqliteJournal(sql));
+  const kept: Kept[] = Object.values(stores);
+  const history: History = {
+    trash: stores.trash,
+    last: () => journal.last(),
+    entry: (number) => journal.entry(number),
+    entries: (page) => journal.entries(page),
+    entriesOf: (subject) => journal.entriesOf(subject),
+    authored(aggregate) {
+      const [kind = "", id = ""] = aggregate.split("/");
+      const value = kept.map((one) => one.authored(kind, id)).find((one) => one !== undefined);
+      if (value === undefined) throw new Error("unknown-aggregate");
+      return value;
+    },
+    state: () =>
+      Object.fromEntries(
+        kept
+          .flatMap((one) => one.everything())
+          .map(({ kind, id, value }) => [aggregateOf({ kind, id }), value]),
+      ),
+  };
+  return { kept, journal, contexts: { kinship, places, evidence, life, history } };
 }

@@ -48,6 +48,12 @@ A scenario runs in `unitOfWork.run` (`src/scenarios/unit-of-work.ts`): one trans
 
 Each context has its tables and its adapter, which parses every row by a strict schema, `src/shared/rows.ts` reads and writes the rows, and `src/shared/values.ts` has the schemas of the kernel. A change of the tables is a new step in `src/worker/schema.ts`; a step that is out is never edited, and the tables and the rows of `test/storage/schema-1.ts` are frozen. `test/budgets.test.ts` counts rows over 5 000 invented people.
 
+## History
+
+The journal is never thinned, and any version can be rebuilt from it: `src/shared/reverse.ts` takes patches back, for the server and the browser. Undo, a return to a version and starting over put authored values back through `putBack` of each context, which works out the mirrors and refuses the impossible. A checkpoint is for speed and may be thrown away. A person in the trash lies in `history_trash` with every link, and a restore runs the ordinary commands, so its preview is the restore itself, not kept.
+
+An erasure is remembered in `FamilyAccess` first, then takes the person out of the tree, the trash and the whole journal in one transaction (`src/scenarios/erase.ts`). In the journal "erased" stands where others were tied to them. A new table or text that can name a person must be covered by `test/storage/erase.test.ts`, which looks into every raw row of both objects.
+
 ## Texts
 
 Every text a person reads is in `web/i18n/ru.ts` and `web/i18n/en.ts`, reached through `t`. Words come from `docs/glossary.md`, wording from `.agents/skills/copy-steward/SKILL.md`. Read both before you add or change a text. Errors and API answers carry codes, not sentences.

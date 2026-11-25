@@ -76,12 +76,14 @@ export function sqliteKinship(sql: SqlStorage): KinshipStore & Kept {
 }
 
 class SqliteKinship implements KinshipStore, Kept {
+  readonly #sql: SqlStorage;
   readonly #people: Rows<PersonId, PersonRecord>;
   readonly #unions: Rows<UnionId, UnionRecord>;
   readonly #branches: Rows<BranchId, Branch>;
   readonly #members: Membership;
 
   constructor(sql: SqlStorage) {
+    this.#sql = sql;
     this.#members = new Membership(sql);
     this.#people = new Rows<PersonId, PersonRecord>(
       "person",
@@ -192,6 +194,26 @@ class SqliteKinship implements KinshipStore, Kept {
     return undefined;
   }
 
+  authored(kind: string, id: string): unknown {
+    if (kind === "person" && isId("person", id)) return this.#people.authored(id);
+    if (kind === "union" && isId("union", id)) return this.#unions.authored(id);
+    if (kind === "branch" && isId("branch", id)) return this.#branches.authored(id);
+    return this.current(kind, id);
+  }
+
+  everything() {
+    type Row<Id> = RawRow & { id: Id };
+    const people = this.#sql.exec<Row<PersonId>>("SELECT id, version, data FROM kinship_person");
+    const unions = this.#sql.exec<Row<UnionId>>("SELECT id, version, data FROM kinship_union");
+    const branches = this.#sql.exec<Row<BranchId>>("SELECT id, version, data FROM kinship_branch");
+    return [
+      ...this.#people.authoredAmong(people.toArray()),
+      ...this.#unions.authoredAmong(unions.toArray()),
+      ...this.#branches.authoredAmong(branches.toArray()),
+      ...this.#members.everyone(),
+    ];
+  }
+
   flush(version: number): Written[] {
     return [
       ...this.#people.flush(version),
@@ -230,6 +252,14 @@ class Membership {
       else members.unions.push(member);
     }
     return members;
+  }
+
+  everyone() {
+    return [...this.#all].map(([id, value]) => ({
+      kind: isPerson(id) ? "person-branch" : "union-branch",
+      id,
+      value,
+    }));
   }
 
   move(kind: "person-branch" | "union-branch", id: PersonId | UnionId, to: BranchId | null): void {

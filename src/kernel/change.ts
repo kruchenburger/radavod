@@ -6,6 +6,11 @@ export type Write<Kind extends string, Id, Value> = {
   after: Value | null;
 };
 
+/** Aggregates of lists only, as "kind/id": there nothing in them is the same as no aggregate. */
+export function isOfLists(aggregate: string): boolean {
+  return /^(?:life|cited)\//u.test(aggregate);
+}
+
 /** The write of an aggregate, or none when nothing differs. */
 export function writes<Kind extends string, Id, Value>(
   kind: Kind,

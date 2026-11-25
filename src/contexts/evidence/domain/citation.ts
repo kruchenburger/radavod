@@ -9,7 +9,7 @@ import {
   missing,
 } from "../../../kernel/refusal";
 import type { Result } from "../../../kernel/result";
-import type { SourceChange, SourceReader } from "./source";
+import type { Source, SourceChange, SourceReader } from "./source";
 
 /** A source behind a fact. The fact is known by its identifier only. */
 export type Citation = {
@@ -36,6 +36,40 @@ export interface EvidenceReader extends SourceReader {
 
 /** A citation taken back, with how many are left behind its fact. */
 export type Uncited = { change: Change; left: number; fact: FactRef };
+
+/** A source or the citations of a subject as they were, or null when there were none. */
+export type EvidenceTarget =
+  | { kind: "source"; id: SourceId; value: Omit<Source, "id" | "version"> | null }
+  | { kind: "cited"; id: SubjectId; value: Pick<Cited, "citations"> | null };
+
+/** Puts citations as they were, and the sources that were there. */
+export function putCitationsBack(
+  reader: EvidenceReader,
+  targets: readonly EvidenceTarget[],
+): Result<Change, Missing> {
+  const change: Change = [];
+  const sources = new Set<SourceId>();
+  for (const target of targets) {
+    if (target.kind === "source" && target.value !== null) {
+      sources.add(target.id);
+      const stored = reader.source(target.id);
+      const after = { ...target.value, id: target.id, version: stored?.version ?? 0 };
+      change.push(...writes("source", target.id, stored, after));
+    }
+  }
+  for (const target of targets) {
+    if (target.kind !== "cited") continue;
+    const citations = target.value?.citations ?? [];
+    const lost = citations.find(
+      ({ source }) => !sources.has(source) && reader.source(source) === null,
+    );
+    if (lost !== undefined) return missing(lost.source);
+    const stored = reader.citedOf(target.id);
+    const after = target.value && { ...target.value, id: target.id, version: stored?.version ?? 0 };
+    change.push(...writes("cited", target.id, stored, after));
+  }
+  return { ok: true, value: change };
+}
 
 /** Removes a source nothing is known from. */
 export function removeSource(

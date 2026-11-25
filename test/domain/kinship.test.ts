@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { type Parentage, probablyDead } from "../../src/contexts/kinship";
+import { type FamilyTarget, type Parentage, probablyDead } from "../../src/contexts/kinship";
 import type { NameForm } from "../../src/kernel/name-form";
 import { sortKey, parseFuzzyDate } from "../../src/kernel/fuzzy-date";
 import { branch, Family, person, union } from "./memory-kinship";
@@ -622,6 +622,43 @@ describe("a branch", () => {
     expect(family.apply({ do: "edit-branch", id: branch("x"), patch: {} })).toEqual(
       refused("missing", { id: branch("x") }),
     );
+  });
+});
+
+describe("a family put back", () => {
+  it("must be possible as any other", () => {
+    const family = new Family("a", "b", "child");
+    family.withUnion("ab", "a", "b");
+    family.withParent("child", "a", { union: union("ab") });
+    const back = (target: FamilyTarget) => family.kinship.putBack([target]);
+    const couple = (...partners: [string, string]): FamilyTarget => ({
+      kind: "union",
+      id: union("ab"),
+      value: {
+        partners: [person(partners[0]), person(partners[1])],
+        kind: "civil",
+        certainty: "hypothesis",
+      },
+    });
+    expect(back(couple("a", "a"))).toEqual(refused("same-person"));
+    expect(back(couple("a", "x"))).toEqual(refused("missing", { id: person("x") }));
+    expect(back(couple("b", "child"))).toEqual(refused("not-a-partner"));
+    expect(back({ kind: "union", id: union("ab"), value: null })).toEqual(
+      refused("in-use", { count: 1 }),
+    );
+    expect(back({ kind: "person-branch", id: person("a"), value: branch("x") })).toEqual(
+      refused("missing", { id: branch("x") }),
+    );
+    for (const [kind, id] of [
+      ["person-branch", person("x")],
+      ["union-branch", union("x")],
+    ] as const) {
+      const target = { kind, id, value: branch("x") } as FamilyTarget;
+      expect(back(target)).toEqual(refused("missing", { id }));
+    }
+    expect(back(couple("a", "child")).ok).toBe(true);
+    expect(family.get("b").unions).toEqual([]);
+    expect(family.get("child").unions).toEqual([union("ab")]);
   });
 });
 

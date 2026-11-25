@@ -5,6 +5,7 @@ import type { LifeEvent } from "../src/contexts/life";
 import { parseFuzzyDate } from "../src/kernel/fuzzy-date";
 import type { PersonId, UnionId } from "../src/kernel/id";
 import type { Contexts } from "../src/scenarios/unit-of-work";
+import { eraseHere } from "../src/scenarios/erase";
 import { fill, rowsOf } from "./storage/schema-1";
 import {
   accepted,
@@ -12,6 +13,7 @@ import {
   addParent,
   addPerson,
   addUnion,
+  anna,
   branch,
   citation,
   event,
@@ -185,11 +187,43 @@ describe("rows over 5 000 people", () => {
         accepted(c.life.remove(guests[0] as PersonId, wedding.id)),
       );
 
+      tree.do((c) => {
+        for (const who of ["gone", "first", "second"]) addPerson(c, who);
+        addUnion(c, "one", "gone", "first");
+        addUnion(c, "two", "gone", "second");
+        for (let i = 0; i < 10; i++) {
+          addPerson(c, `child ${i}`);
+          const of = i < 5 ? "one" : "two";
+          addParent(c, `child ${i}`, "gone", { union: union(of) });
+        }
+        accepted(c.life.add(birth(person("gone"), "new e4")));
+      });
+      for (let i = 0; i < 45; i++) {
+        tree.do((c) =>
+          accepted(
+            c.kinship.apply({
+              do: "put-name",
+              person: person("gone"),
+              name: form("n1", { given: `Верес ${i}`, surname: "Исчезнувший" }),
+            }),
+          ),
+        );
+      }
+      const act = { actor: anna, now: 1 };
+      numbers["erase a person with 10 children, 2 unions and 46 entries"] = {
+        ...tree.count(() => {
+          accepted(eraseHere(tree.work, act, person("gone"), () => event("new e5")));
+        }),
+        limit: 80,
+      };
+
       for (const [what, { written, read, limit }] of Object.entries(numbers)) {
         expect(written, what).toBeGreaterThan(0);
         expect(written, what).toBeLessThanOrEqual(limit);
         // Reading is cheap, but not the whole family: only a branch walks down its line.
-        expect(read, what).toBeLessThan(what.includes("300") ? 2000 : 150);
+        expect(read, what).toBeLessThan(
+          /300/.test(what) ? 2000 : /erase/.test(what) ? 40_000 : 150,
+        );
       }
     }),
   );

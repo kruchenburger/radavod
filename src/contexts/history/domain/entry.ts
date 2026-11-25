@@ -1,4 +1,4 @@
-import { differ } from "../../../kernel/change";
+import { differ, isOfLists } from "../../../kernel/change";
 import { isId, type MemberId } from "../../../kernel/id";
 
 /** One edit: who, when, by what scenario, and what was before and after. Entries are never removed. */
@@ -13,7 +13,8 @@ export type NewEntry = { at: number; by: MemberId; scenario: string; patches: Pa
  * One thing that changed in an aggregate. The path leads to a field or, in lists of things with
  * identifiers, to a field of one of them: "names/n1/given". An empty path is the whole aggregate,
  * "names/n1" a whole name, and "names/" the order of the names. Values are whole: null stands for an
- * aggregate or a thing that is not there.
+ * aggregate or a thing that is not there. An aggregate of lists only, as the events of a person, is told
+ * thing by thing from the first one to the last.
  */
 export type Patch = { aggregate: string; path: string; before: unknown; after: unknown };
 
@@ -26,7 +27,8 @@ export function aggregateOf({ kind, id }: Pick<Changed, "kind" | "id">): string 
 
 export function patchesOf(changed: Changed): Patch[] {
   const aggregate = aggregateOf(changed);
-  return wholesOf(changed.before, changed.after).map((patch) => ({ aggregate, ...patch }));
+  const lists = isOfLists(aggregate);
+  return wholesOf(changed.before, changed.after, lists).map((patch) => ({ aggregate, ...patch }));
 }
 
 /**
@@ -57,11 +59,22 @@ function peopleIn(value: unknown): string[] {
 
 type Difference = Omit<Patch, "aggregate">;
 
-function wholesOf(before: unknown, after: unknown): Difference[] {
+function wholesOf(before: unknown, after: unknown, lists: boolean): Difference[] {
+  if (lists && before === null && isLists(after)) return wholesOf(emptied(after), after, lists);
+  if (lists && after === null && isLists(before)) return wholesOf(before, emptied(before), lists);
   if (!isObject(before) || !isObject(after)) return [{ path: "", before, after }];
   return fieldsOf(before, after).flatMap(([path, was, is]) =>
     hasIds(was) && hasIds(is) ? thingsOf(path, was, is) : [{ path, before: was, after: is }],
   );
+}
+
+/** Whether there is nothing but lists of things: then nothing there is the same as nothing in them. */
+function isLists(value: unknown): value is Record<string, Thing[]> {
+  return isObject(value) && Object.values(value).every(hasIds);
+}
+
+function emptied(lists: Record<string, Thing[]>): Record<string, Thing[]> {
+  return Object.fromEntries(Object.keys(lists).map((list) => [list, []]));
 }
 
 /** Lists of things with identifiers, compared thing by thing. */

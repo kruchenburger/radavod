@@ -9,15 +9,15 @@ The steward answers two questions about every change: which context owns this, a
 
 ## Contexts
 
-| Context    | Owns                                         | Main rules                                                                                                                       | May import                                         |
-| ---------- | -------------------------------------------- | -------------------------------------------------------------------------------------------------------------------------------- | -------------------------------------------------- |
-| `kinship`  | Person, sex, names, parentage, union, branch | No cycle through blood or adoptive parentage, versions included. At most two main blood parents, any others are kept as versions | nothing                                            |
-| `life`     | Events, participants, occupations, notes     | An event has a kind, a date, a place and participants with roles. Birth and death may have several versions, one of them main    | `kinship`, `places`                                |
-| `places`   | Place, its names, historical affiliation     | A name and an affiliation have a period. Coordinates are optional                                                                | nothing                                            |
-| `evidence` | Source and the citations of facts            | A fact is known by its identifier only. A relative's story is a source too                                                       | nothing                                            |
-| `access`   | Member, role, invitation, passkey, session   | The last keeper cannot be lowered, revoked or deleted. An invitation works once                                                  | nothing                                            |
-| `history`  | Edit journal, trash                          | An edit has an author, a time, a before and an after                                                                             | nothing                                            |
-| `exchange` | GEDCOM import and export, the full copy      | Import shows what will change before it changes it                                                                               | `kinship`, `life`, `places`, `evidence`, `history` |
+| Context    | Owns                                                       | Main rules                                                                                                                       | May import                                         |
+| ---------- | ---------------------------------------------------------- | -------------------------------------------------------------------------------------------------------------------------------- | -------------------------------------------------- |
+| `kinship`  | Person, sex, names, parentage, union, branch               | No cycle through blood or adoptive parentage, versions included. At most two main blood parents, any others are kept as versions | nothing                                            |
+| `life`     | Events, participants, occupations, notes                   | An event has a kind, a date, a place and participants with roles. Birth and death may have several versions, one of them main    | `kinship`, `places`                                |
+| `places`   | Place, its names, historical affiliation                   | A name and an affiliation have a period. Coordinates are optional                                                                | nothing                                            |
+| `evidence` | Source and the citations of facts                          | A fact is known by its identifier only. A relative's story is a source too                                                       | nothing                                            |
+| `access`   | Member, role, invitation, passkey, session, who was erased | The last keeper cannot be lowered, revoked or deleted. An invitation works once                                                  | nothing                                            |
+| `history`  | Edit journal, trash                                        | An edit has an author, a time, a before and an after                                                                             | nothing                                            |
+| `exchange` | GEDCOM import and export, the full copy                    | Import shows what will change before it changes it                                                                               | `kinship`, `life`, `places`, `evidence`, `history` |
 
 A union (who, with whom, of what kind) belongs to `kinship`. A wedding or a divorce, with its date and place, belongs to `life` and refers to the union.
 

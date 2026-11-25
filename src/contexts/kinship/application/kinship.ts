@@ -13,6 +13,12 @@ import {
 } from "../domain/branch";
 import type { Change, FamilyGraph } from "../domain/family-graph";
 import {
+  type FamilyTarget,
+  type PutBackError,
+  putFamilyBack,
+  removePerson,
+} from "../domain/put-back";
+import {
   addParent,
   editParent,
   type ParentageError,
@@ -46,6 +52,7 @@ import type { KinshipStore } from "./ports";
 export type KinshipCommand =
   | { do: "add-person"; person: NewPerson; branch: BranchId | null }
   | { do: "edit-person"; id: PersonId; patch: PersonPatch }
+  | { do: "remove-person"; id: PersonId }
   | { do: "put-name"; person: PersonId; name: NameForm }
   | { do: "remove-name"; person: PersonId; id: string }
   | { do: "order-children"; person: PersonId; order: PersonId[] }
@@ -60,7 +67,7 @@ export type KinshipCommand =
   | { do: "remove-branch"; id: BranchId }
   | ({ do: "assign-branch" } & Assignment);
 
-export type KinshipError = ParentageError | UnionError | NotAChild;
+export type KinshipError = ParentageError | UnionError | NotAChild | PutBackError;
 
 export interface Kinship {
   get(id: PersonId): Person | null;
@@ -70,19 +77,22 @@ export interface Kinship {
   relatives(id: PersonId): PersonId[];
   /** Stores what the rules make of a command. One that is refused or changes nothing is not. */
   apply(command: KinshipCommand): Result<Change, KinshipError>;
+  /** Puts aggregates as they were, with what follows from them. */
+  putBack(targets: readonly FamilyTarget[]): Result<Change, KinshipError>;
 }
 
 export function kinshipOver(store: KinshipStore): Kinship {
+  const saved = (result: Result<Change, KinshipError>) => {
+    if (result.ok && result.value.length > 0) store.save(result.value);
+    return result;
+  };
   return {
     get: (id) => store.person(id),
     union: (id) => store.union(id),
     branch: (id) => store.branch(id),
     relatives: (id) => relativesOf(store, id),
-    apply(command) {
-      const result = resultOf(store, command);
-      if (result.ok && result.value.length > 0) store.save(result.value);
-      return result;
-    },
+    apply: (command) => saved(resultOf(store, command)),
+    putBack: (targets) => saved(putFamilyBack(store, targets)),
   };
 }
 
@@ -92,6 +102,8 @@ function resultOf(g: FamilyGraph, command: KinshipCommand): Result<Change, Kinsh
       return addPerson(g, command.person, command.branch);
     case "edit-person":
       return editPerson(g, command.id, command.patch);
+    case "remove-person":
+      return removePerson(g, command.id);
     case "put-name":
       return putName(g, command.person, command.name);
     case "remove-name":

@@ -58,7 +58,7 @@ export function removeParent(g: FamilyGraph, child: PersonId, id: string): Resul
 }
 
 /** Why a child cannot have a parentage beside the others, or null. */
-function refusalOf(
+export function refusalOf(
   g: FamilyGraph,
   child: PersonId,
   parentage: Parentage,

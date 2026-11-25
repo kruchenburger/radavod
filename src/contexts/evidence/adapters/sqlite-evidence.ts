@@ -113,6 +113,25 @@ class SqliteEvidence implements EvidenceStore, Kept {
     return isId("person", id) || isId("union", id) ? this.#cited.version(id) : undefined;
   }
 
+  authored(kind: string, id: string): unknown {
+    if (kind === "source" && isId("source", id)) return this.#sources.authored(id);
+    if (kind !== "cited") return undefined;
+    return isId("person", id) || isId("union", id) ? this.#cited.authored(id) : undefined;
+  }
+
+  everything() {
+    const sources = this.#sql.exec<RawRow & { id: SourceId }>(
+      "SELECT id, version, data FROM evidence_source",
+    );
+    const cited = this.#sql.exec<RawRow & { id: SubjectId }>(
+      "SELECT id, version, data FROM evidence_subject",
+    );
+    return [
+      ...this.#sources.authoredAmong(sources.toArray()),
+      ...this.#cited.authoredAmong(cited.toArray()),
+    ];
+  }
+
   flush(version: number): Written[] {
     return [...this.#sources.flush(version), ...this.#cited.flush(version)];
   }

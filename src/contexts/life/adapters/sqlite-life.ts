@@ -106,6 +106,17 @@ class SqliteLife implements LifeStore, Kept {
     return kind === "life" && isId("person", id) ? this.#lives.version(id) : undefined;
   }
 
+  authored(kind: string, id: string): unknown {
+    return kind === "life" && isId("person", id) ? this.#lives.authored(id) : undefined;
+  }
+
+  everything() {
+    const rows = this.#sql.exec<RawRow & { id: PersonId }>(
+      "SELECT id, version, data FROM life_subject",
+    );
+    return this.#lives.authoredAmong(rows.toArray());
+  }
+
   flush(version: number): Written[] {
     return this.#lives.flush(version);
   }
