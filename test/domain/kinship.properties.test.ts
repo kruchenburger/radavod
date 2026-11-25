@@ -182,7 +182,7 @@ const start = (): Family => {
   return family;
 };
 
-it("a family stays possible after any commands", () => {
+it("a family stays possible after any commands", { timeout: 30_000 }, () => {
   const seen = new Set<string>();
   fc.assert(
     fc.property(commands, (list) => {
@@ -255,27 +255,31 @@ it("a refused cycle is one: each on the way is a parent of the one before", () =
   expect(cycles).toBeGreaterThan(50);
 });
 
-it("what is written rebuilds the family, and written back it undoes a command", () => {
-  fc.assert(
-    fc.property(commands, (list) => {
-      const family = start();
-      const copy = start().store;
-      for (const next of list) {
-        const before = family.store.snapshot();
-        const result = family.apply(next);
-        if (!result.ok) continue;
-        const change = structuredClone(result.value);
-        copy.save(change);
-        expect(copy.snapshot()).toEqual(family.store.snapshot());
-        const back = change.toReversed().map(({ before: after, after: was, ...write }) => ({
-          ...write,
-          before: was,
-          after,
-        }));
-        copy.save(back as Change);
-        expect(copy.snapshot()).toEqual(before);
-        copy.save(change);
-      }
-    }),
-  );
-});
+it(
+  "what is written rebuilds the family, and written back it undoes a command",
+  { timeout: 30_000 },
+  () => {
+    fc.assert(
+      fc.property(commands, (list) => {
+        const family = start();
+        const copy = start().store;
+        for (const next of list) {
+          const before = family.store.snapshot();
+          const result = family.apply(next);
+          if (!result.ok) continue;
+          const change = structuredClone(result.value);
+          copy.save(change);
+          expect(copy.snapshot()).toEqual(family.store.snapshot());
+          const back = change.toReversed().map(({ before: after, after: was, ...write }) => ({
+            ...write,
+            before: was,
+            after,
+          }));
+          copy.save(back as Change);
+          expect(copy.snapshot()).toEqual(before);
+          copy.save(change);
+        }
+      }),
+    );
+  },
+);

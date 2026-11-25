@@ -133,8 +133,8 @@ const longLife = 110;
 
 /**
  * Whether somebody nobody calls living or dead was born over 110 years ago. It is shown and never
- * stored. `now` is in milliseconds. `birth` is the sort key of the birth, which is its first possible
- * day: give it only for an exact date and for "about", and only when no death is recorded.
+ * stored. `now` is in milliseconds. `birth` is the sort key of the birth, so a year counts from its
+ * first day: give it only for an exact date and for "about", and only when no death is recorded.
  */
 export function probablyDead({ living }: Person, birth: number | null, now: number): boolean {
   if (living !== "unknown" || birth === null) return false;
