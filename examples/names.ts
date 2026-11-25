@@ -256,46 +256,46 @@ const surname = (
 /** The ten branches, in the order of the founders. */
 export const branches: { name: Text; surname: Surname }[] = [
   {
-    name: { ru: "Ольхуничи", en: "The Olkhunich family" },
+    name: { ru: "Ольхуничи", en: "Olkhuniches" },
     surname: surname("orthodox", "Ольхунич", "Альхуніч", "Olkhunich"),
   },
   {
-    name: { ru: "Вересуничи", en: "The Veresunich family" },
+    name: { ru: "Вересуничи", en: "Veresuniches" },
     surname: surname("catholic", "Вересунич", "Верасуніч", "Veresunich", "Wieresunicz"),
   },
   {
-    name: { ru: "Журавени", en: "The Zhuraven family" },
+    name: { ru: "Журавени", en: "Zhuravens" },
     surname: surname("orthodox", "Журавень", "Журавень", "Zhuraven"),
   },
   {
-    name: { ru: "Калинени", en: "The Kalinen family" },
+    name: { ru: "Калинени", en: "Kalinens" },
     surname: surname("orthodox", "Калинень", "Калінень", "Kalinen"),
   },
   {
-    name: { ru: "Лозовени", en: "The Lozoven family" },
+    name: { ru: "Лозовени", en: "Lozovens" },
     surname: surname("catholic", "Лозовень", "Лазавень", "Lozoven", "Łozowień"),
   },
   {
-    name: { ru: "Мятлики", en: "The Myatlik family" },
+    name: { ru: "Мятлики", en: "Myatliks" },
     surname: surname("orthodox", "Мятлик", "Мятлік", "Myatlik"),
   },
   {
-    name: { ru: "Лаздутисы", en: "The Lazdutis family" },
+    name: { ru: "Лаздутисы", en: "Lazdutises" },
     surname: {
       ...surname("lithuanian", "Лаздутис", "Лаздуціс", "Lazdutis", "Łazdutis"),
       lt: { male: "Lazdutis", maiden: "Lazdutytė", married: "Lazdutienė" },
     },
   },
   {
-    name: { ru: "Сосенники", en: "The Sosennik family" },
+    name: { ru: "Сосенники", en: "Sosenniks" },
     surname: surname("orthodox", "Сосенник", "Сасеннік", "Sosennik"),
   },
   {
-    name: { ru: "Осочники", en: "The Osochnik family" },
+    name: { ru: "Осочники", en: "Osochniks" },
     surname: surname("catholic", "Осочник", "Асочнік", "Osochnik", "Osocznik"),
   },
   {
-    name: { ru: "Вайсройзы", en: "The Vaysroyz family" },
+    name: { ru: "Вайсройзы", en: "Vaysroyzes" },
     surname: {
       tradition: "jewish",
       ru: ["Вайсройз", "Вайсройз"],
