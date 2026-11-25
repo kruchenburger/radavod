@@ -33,6 +33,7 @@
     "@types/react-dom": "^19.3.0",
     "@vitejs/plugin-react": "^6.3.0",
     "dependency-cruiser": "^18.9.0",
+    "fast-check": "^4.11.0",
     "jsdom": "^31.0.1",
     "oxc-parser": "^0.160.0",
     "oxlint": "^1.95.0",
@@ -44,8 +45,9 @@
     "yaml": "^2.9.1"
   },
   "scripts": {
-    "build": "vite build",
+    "build": "vite build && node examples/write-sample.ts dist/client",
     "test": "vitest run",
+    "bench": "vitest bench --run --project web",
     "test:e2e": "playwright test",
     "lint": "oxlint",
     "format": "prettier --write .",
