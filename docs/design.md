@@ -148,7 +148,7 @@ One page per branch: `surface`, a head with the name of the branch in its ink an
 - Rows are generations, aligned inside a page. A couple is two lines joined by a thin vertical. Brothers and sisters without a union and children stand as a column; the order of birth stays. This keeps the far view between 2:1 and 2.5:1 for ten and twenty-four branches.
 - A person is shown once, on the page of the couple: the husband's branch, or the branch the couple was given. In the birth family stands a reference in italic: the given name and the branch to look in. On the other page a couple whose parents are elsewhere has the same kind of reference above it.
 - **Between pages only the direct line is drawn.** It leaves through the gap under its row, runs in the gutters, and enters through the gap above the row of the child. It never crosses a person. Lines in one gutter keep 6 to 8 px apart.
-- Far: every person is a bar as long as the name, in the branch ink, `noBranch` at half strength, a reference is a hollow bar. Names of the pages do not shrink with the drawing. Closer: names. Near: names, years, and the branch when it differs from the page.
+- Far: every person is a bar as long as the name, in the branch ink, without a branch in `rule`, a reference is a hollow bar. Names of the pages do not shrink with the drawing. Closer: names. Near: names, years, and the branch when it differs from the page.
 - The chosen person is set in `paper` on `ink`.
 - Pressing a page in the far view moves closer to it. The place on the map is in the address.
 
@@ -179,7 +179,7 @@ The person first, 9 px high, with the span of the life as `surface` down through
 | What is known        | How it is drawn                                            |
 | -------------------- | ---------------------------------------------------------- |
 | A year               | The bar ends with a cap in `ink`                           |
-| About a year         | Three years of dashes before the bar, no cap               |
+| About a year         | Three years of dashes at that end, no cap                  |
 | Two sources disagree | Dashes between the two years, no cap, "?" after the year   |
 | One end unknown      | The bar stops at the last known event with "?", no cap     |
 | Living               | The bar runs to the line of today, no cap                  |
