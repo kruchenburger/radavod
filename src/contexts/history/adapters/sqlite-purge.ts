@@ -23,7 +23,7 @@ export function purge(
   const known = namesOverTime(
     [...entries.values()].map((parts) => parts.flatMap(({ entry }) => entry.patches)),
     id,
-    (value, { path, after }) => takeBack(value, { path, before: after }),
+    (value, { aggregate, path, after }) => takeBack(value, { aggregate, path, before: after }),
   );
   const names = wholeNames([...forms, ...known]);
   for (const { number, part, entry } of partsWith(sql, [id, ...names])) {

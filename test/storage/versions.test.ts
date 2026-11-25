@@ -6,7 +6,7 @@ import { parseFuzzyDate } from "../../src/kernel/fuzzy-date";
 import type { Result } from "../../src/kernel/result";
 import { restoreTo } from "../../src/scenarios/restore-to";
 import { startOver } from "../../src/scenarios/start-over";
-import { eraseForever } from "../../src/scenarios/erase";
+import { eraseForever, eraseHere } from "../../src/scenarios/erase";
 import { restore, trash } from "../../src/scenarios/trash";
 import { undo } from "../../src/scenarios/undo";
 import type { Contexts } from "../../src/scenarios/unit-of-work";
@@ -89,6 +89,7 @@ describe("an undo", () => {
       family(tree);
       tree.do((c) => accepted(c.kinship.apply(edit("ada", { sex: "female" }))));
       tree.do((c) => accepted(c.kinship.apply(edit("ada", { sex: "male" }))));
+      tree.do((c) => accepted(c.kinship.apply(edit("eve", { sex: "male" }))));
       tree.do((c) => accepted(c.kinship.apply(edit("ada", { living: "no" }))));
       const rows = tree.rows();
       expect(tree.run((c) => undo(c, 2))).toEqual({
@@ -265,6 +266,137 @@ describe("an undo", () => {
       drop("kid", "more");
       tree.do((c) => addParent(c, "ada", "kid"));
       expect(tree.run((c) => undo(c, 3))).toEqual(refused("cycle"));
+    }));
+
+  it("leaves a name shown, one main birth, and those who take part elsewhere", () =>
+    inTree((tree) => {
+      family(tree);
+      tree.do((c) =>
+        accepted(c.kinship.apply({ do: "put-name", person: person("ada"), name: form("n2") })),
+      );
+      tree.do((c) => accepted(c.kinship.apply(edit("ada", { mainName: "n2" }))));
+      accepted(tree.run((c) => undo(c, 2)));
+      expect(tree.read((c) => c.kinship.get(person("ada"))?.mainName)).toBe("n1");
+
+      const birth = (name: string, main: boolean): LifeEvent => ({
+        ...wedding({ id: event(name), kind: "birth", main }),
+        participants: [{ person: person("ada"), role: "principal" }],
+      });
+      tree.do((c) => accepted(c.life.add(birth("one", true))));
+      const first = head(tree);
+      tree.do((c) => accepted(c.life.add(birth("two", false))));
+      tree.do((c) =>
+        accepted(
+          c.life.add(
+            wedding({
+              participants: [
+                { person: person("eve"), role: "principal" },
+                { person: person("ada"), role: "witness" },
+              ],
+            }),
+          ),
+        ),
+      );
+      accepted(tree.run((c) => undo(c, first)));
+      expect(tree.read((c) => c.life.main(person("ada"), "birth")?.id)).toBe(event("two"));
+      accepted(tree.run((c) => restoreTo(c, first - 1)));
+      tree.do((c) =>
+        accepted(
+          c.life.add(
+            wedding({
+              participants: [
+                { person: person("eve"), role: "principal" },
+                { person: person("ada"), role: "witness" },
+              ],
+            }),
+          ),
+        ),
+      );
+      tree.do((c) => accepted(c.life.add(birth("one", true))));
+      accepted(tree.run((c) => undo(c, c.history.last())));
+      expect(tree.read((c) => c.life.eventsOf(person("ada")).map(({ kind }) => kind))).toEqual([
+        "wedding",
+      ]);
+    }));
+
+  it("is refused when what it would name again has gone", () =>
+    inTree((tree) => {
+      family(tree);
+      tree.do((c) => {
+        addBranch(c, "green");
+        accepted(
+          c.places.add({ id: place("town"), names: [], affiliations: [], coordinates: null }),
+        );
+        accepted(
+          c.evidence.addSource({
+            id: source("book"),
+            kind: "book",
+            title: "",
+            repository: "",
+            note: "",
+          }),
+        );
+        addUnion(c, "u", "ada", "eve");
+      });
+      const fact = { subject: person("ada"), fact: "name:n1" };
+      const give = (to: string | null) => ({
+        do: "assign-branch" as const,
+        person: person("ada"),
+        branch: to === null ? null : branch(to),
+        descendants: false,
+        overwrite: false,
+      });
+      tree.do((c) => {
+        accepted(c.life.add(wedding({ place: place("town") })));
+        accepted(
+          c.evidence.cite({
+            id: citation("c"),
+            source: source("book"),
+            fact,
+            page: "",
+            quote: "",
+          }),
+        );
+        accepted(c.kinship.apply(give("green")));
+      });
+      const taken: ((c: Contexts) => unknown)[] = [
+        (c) => c.life.remove(person("ada"), event("wedding")),
+        (c) => c.evidence.uncite(fact, citation("c")),
+        (c) => c.kinship.apply(give(null)),
+      ];
+      const numbers = taken.map((take) => {
+        tree.do(take);
+        return head(tree);
+      });
+      tree.do((c) => {
+        accepted(c.places.remove(place("town")));
+        accepted(c.evidence.removeSource(source("book")));
+        accepted(c.kinship.apply({ do: "remove-branch", id: branch("green") }));
+      });
+      const gone = [place("town"), source("book"), branch("green")];
+      for (const [i, number] of numbers.entries()) {
+        expect(tree.run((c) => undo(c, number))).toEqual(refused("missing", { id: gone[i] }));
+      }
+    }));
+
+  it("of a union is refused while a child is of it", () =>
+    inTree((tree) => {
+      family(tree);
+      tree.do((c) => addUnion(c, "u", "ada", "eve"));
+      tree.do((c) => addParent(c, "kid", "ada", { union: union("u") }));
+      expect(tree.run((c) => undo(c, 2))).toEqual(refused("in-use"));
+    }));
+
+  it("of a part of somebody who is gone is refused", () =>
+    inTree((tree) => {
+      family(tree);
+      tree.do((c) =>
+        accepted(c.kinship.apply({ do: "remove-name", person: person("kid"), id: "n1" })),
+      );
+      tree.do((c) => accepted(c.kinship.apply({ do: "remove-person", id: person("kid") })));
+      expect(tree.run((c) => undo(c, 2))).toEqual(
+        refused("changed-since", { path: "names/n1", by: 3 }),
+      );
     }));
 
   it("of an entry that is not there is refused", () =>
@@ -623,10 +755,25 @@ describe("versions", () => {
       tree.do((c) => addPerson(c, "ada"));
       for (let i = 0; i < 30; i++) {
         tree.do((c) => accepted(c.kinship.apply(edit("ada", { sex: i % 2 ? "male" : "female" }))));
-        if (i === 2) await all.checkpoint();
+        if (i === 2 || i === 25) await all.checkpoint();
       }
       const { read } = await tree.countAsync(() => all.at(2));
       expect(read).toBeLessThan(10);
+    }));
+
+  it("get no checkpoint of somebody who was erased while it was made", () =>
+    inTree(async (tree) => {
+      const all = versions(tree);
+      tree.do((c) => addPerson(c, "ada"));
+      tree.do((c) => addPerson(c, "eve"));
+      const making = all.checkpoint();
+      const gone = eraseHere(tree.work, { actor: anna, now: 5 }, person("ada"), () => event("x"));
+      expect(gone.ok).toBe(true);
+      await making;
+      expect(tree.rows().history_checkpoint).toEqual([]);
+      await all.checkpoint();
+      expect(tree.rows().history_checkpoint).toHaveLength(1);
+      expect(await all.at(head(tree))).toEqual(stateOf(tree));
     }));
 
   it("get a checkpoint every 500 entries, and not more than are needed for speed", () =>

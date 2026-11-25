@@ -1,7 +1,7 @@
 import { differ } from "../kernel/change";
 import { type Missing, missing } from "../kernel/refusal";
 import type { Result } from "../kernel/result";
-import { ERASED, isOrder, type Patch, takeBack, valueAt } from "../shared/reverse";
+import { ERASED, isOfLists, isOrder, type Patch, takeBack, valueAt } from "../shared/reverse";
 import { putBack, type PutBackError } from "./put-back";
 import type { Contexts } from "./unit-of-work";
 
@@ -24,7 +24,8 @@ export function undo(c: Contexts, number: number): Result<object, UndoError> {
   for (const patch of entry.patches) {
     const { aggregate, path, after } = patch;
     const current = c.history.authored(aggregate);
-    if (!isOrder(path) && differ(valueAt(current, path), after)) {
+    const isGone = current === null && path !== "" && !isOfLists(aggregate);
+    if (isGone || (!isOrder(path) && differ(valueAt(current, path), after))) {
       const by = changedBy(c, number, patch);
       return { ok: false, error: { code: "changed-since", aggregate, path, by } };
     }

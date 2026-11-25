@@ -44,18 +44,25 @@ export function isOrder(path: string): boolean {
   return path.endsWith("/");
 }
 
+/** Aggregates of lists only: there they are not there when there is nothing in them. */
+export function isOfLists(aggregate: string): boolean {
+  return /^(?:life|cited)\//u.test(aggregate);
+}
+
 /** An aggregate without one change. Patches of an entry are taken back in their order. */
-export function takeBack(
-  value: unknown,
-  { path, before }: Pick<Patch, "path" | "before">,
-): unknown {
+export function takeBack(value: unknown, patch: Omit<Patch, "after">): unknown {
+  const { aggregate, path, before } = patch;
   if (path === "") return before;
-  const fields = fieldsOf(value);
-  if (fields === null) return value;
+  if (value === null && !isOfLists(aggregate)) return null;
+  const fields = fieldsOf(value) ?? {};
   const [field = "", id, part] = path.split("/");
   if (id === undefined) return { ...fields, [field]: before };
-  const things = thingsOf(fields[field]);
-  return { ...fields, [field]: listBack(things, id, part, before) };
+  const lists = { ...fields, [field]: listBack(thingsOf(fields[field]), id, part, before) };
+  return isOfLists(aggregate) && hasNothing(lists) ? null : lists;
+}
+
+function hasNothing(lists: Fields): boolean {
+  return Object.values(lists).every((one) => Array.isArray(one) && one.length === 0);
 }
 
 function listBack(things: Thing[], id: string, part: string | undefined, before: unknown): Thing[] {

@@ -180,6 +180,15 @@ describe("a person in the trash", () => {
       expect(tree.rows().history_trash).toEqual([]);
     }));
 
+  it("is not looked at inside a scenario", () =>
+    inTree((tree) => {
+      family(tree);
+      drop(tree, "ada");
+      expect(() => tree.do(() => previewRestore(tree.work, person("ada")))).toThrow(
+        "nested-scenario",
+      );
+    }));
+
   it("is refused when not there, and restored only from the trash", () =>
     inTree((tree) => {
       family(tree);
@@ -212,6 +221,31 @@ describe("a restore after the tree went on", () => {
       const links = tree.read((c) => c.kinship.get(person("kid"))?.parents) ?? [];
       expect(links.find(({ parent }) => parent === person("ada"))?.main).toBe(false);
       expect(links.filter(({ main }) => main)).toHaveLength(2);
+    }));
+
+  it("leaves a child in the union it got since", () =>
+    inTree((tree) => {
+      family(tree);
+      drop(tree, "ada");
+      tree.do((c) => {
+        addUnion(c, "v", "eve", "other");
+        accepted(
+          c.kinship.apply({
+            do: "edit-parent",
+            child: person("kid"),
+            id: "eve",
+            patch: { union: union("v") },
+          }),
+        );
+      });
+      restoreAsPreviewed(tree, "ada");
+      const links = tree.read((c) => c.kinship.get(person("kid"))?.parents) ?? [];
+      expect(links.map(({ parent, union: of }) => [parent, of]).sort()).toEqual(
+        [
+          [person("eve"), union("v")],
+          [person("ada"), union("u")],
+        ].sort(),
+      );
     }));
 
   it("drops what would be a cycle", () =>
@@ -295,6 +329,10 @@ describe("a restore after the tree went on", () => {
         drop(tree, second);
         const waits = restoreAsPreviewed(tree, order[0] ?? "");
         expect(waits.dropped).toEqual([]);
+        // The links lie with whoever went first.
+        const waiting = waits.waiting.map(({ other }) => other);
+        if (order[0] === first) expect(waiting).toContain(person(order[1] ?? ""));
+        else expect(waiting).toEqual([]);
         expect(restoreAsPreviewed(tree, order[1] ?? "")).toMatchObject({
           dropped: [],
           waiting: [],

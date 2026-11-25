@@ -237,6 +237,37 @@ describe("an erased person", () => {
       });
     }));
 
+  it("leaves a wedding with the other, whatever their role, and in the trash too", () =>
+    inTree(async (tree) => {
+      family(tree);
+      tree.do((c) => {
+        accepted(
+          c.life.add(told("church", "divorce", ["ada", "principal"], ["eve", "бывший муж"])),
+        );
+        accepted(
+          c.evidence.cite({
+            id: citation("c7"),
+            source: source("book"),
+            fact: { subject: person("ada"), fact: `event:${event("church")}` },
+            page: "7",
+            quote: "",
+          }),
+        );
+      });
+      accepted(tree.run((c) => trash(c, person("eve"), act)));
+      accepted(await erase(tree, "ada"));
+      accepted(tree.run((c) => restore(c, person("eve"))));
+      tree.read((c) => {
+        const events = c.life.eventsOf(person("eve"));
+        expect(events.map(({ kind }) => kind).sort()).toEqual(["divorce", "wedding"]);
+        const cited = c.evidence.citationsOf(person("eve"));
+        expect(cited.map(({ page }) => page).sort()).toEqual(["7", "c2"]);
+        for (const { fact } of cited) {
+          expect(events.map(({ id }) => `event:${id}`)).toContain(fact.fact);
+        }
+      });
+    }));
+
   it("comes back by no version, no undo and no return", () =>
     inTree(async (tree) => {
       family(tree);
@@ -253,9 +284,12 @@ describe("an erased person", () => {
       expect(past[`person/${person("kid")}`]?.parents).toMatchObject([
         { parent: "unknown", union: null },
       ]);
-      expect(tree.run((c) => undo(c, last + 1))).toMatchObject({
-        error: { code: "irreversible" },
-      });
+      // The erasure itself, what was only about her, and what tied others to her.
+      for (const number of [last + 1, 2, 1]) {
+        expect(tree.run((c) => undo(c, number))).toMatchObject({
+          error: { code: "irreversible" },
+        });
+      }
       for (const number of [1, 5, last]) {
         accepted(tree.run((c) => restoreTo(c, number)));
         expect(found(tree.rows(), said)).toEqual([]);
@@ -316,7 +350,7 @@ describe("an erased person", () => {
   it("is found as a whole word, and not by a given name and a patronymic others have", () =>
     inTree(async (tree) => {
       family(tree);
-      const note = "Нимфадора Заозёрнаяя и Нимфадора Гурьевна Вереснева";
+      const note = "Нимфадора Заозёрнаяя, ЛжеНимфадора Заозёрная и Нимфадора Гурьевна Вереснева";
       const write = (text: string) =>
         tree.do((c) =>
           accepted(
@@ -327,7 +361,7 @@ describe("an erased person", () => {
           ),
         );
       write(note);
-      write("«Заозёрная Нимфадора», сказала она");
+      write("«Заозёрная Нимфадора», сказала она. Нимфадора Гурьевна Заозёрная.");
       write("");
       const last = tree.read((c) => c.history.last());
       const { mentions } = accepted(await erase(tree, "ada"));
@@ -335,7 +369,7 @@ describe("an erased person", () => {
       const text = tree.read((c) => JSON.stringify(c.history.entry(last - 2)));
       expect(text).toContain(note);
       const after = tree.read((c) => JSON.stringify(c.history.entry(last)));
-      expect(after).toContain("«erased», сказала она");
+      expect(after).toContain("«erased», сказала она. erased.");
     }));
 
   it("is known by every name they ever had whole, edited part by part", () =>
@@ -408,6 +442,22 @@ describe("an erased person", () => {
       tree.do((c) => addPerson(c, "ada"));
       tree.do((c) => accepted(c.life.add(told("birth", "birth", ["ada", "principal"]))));
       tree.do((c) => accepted(c.life.remove(person("ada"), event("birth"))));
+      const fact = { subject: person("ada"), fact: "name:n1" };
+      tree.do((c) => {
+        accepted(
+          c.evidence.addSource({
+            id: source("book"),
+            kind: "book",
+            title: "",
+            repository: "",
+            note: "",
+          }),
+        );
+        accepted(
+          c.evidence.cite({ id: citation("c"), source: source("book"), fact, page: "", quote: "" }),
+        );
+      });
+      tree.do((c) => accepted(c.evidence.uncite(fact, citation("c"))));
       accepted(tree.run((c) => undo(c, 1)));
       accepted(await erase(tree, "ada"));
       expect(found(tree.rows(), [person("ada")])).toEqual([]);
@@ -416,7 +466,7 @@ describe("an erased person", () => {
   it("may have any signs in the name", () =>
     inTree(async (tree) => {
       family(tree);
-      const odd = form("n9", { given: "Анна-Мария (Нюра)", surname: "О'Верес-Дуб [1]" });
+      const odd = form("n9", { given: 'Анна-Мария (Нюра) "\\"', surname: "О'Верес-Дуб [1]" });
       tree.do((c) =>
         accepted(c.kinship.apply({ do: "put-name", person: person("ada"), name: odd })),
       );
@@ -424,14 +474,14 @@ describe("an erased person", () => {
         accepted(
           c.life.edit(person("guest"), {
             ...told("baptism", "baptism", ["guest", "principal"]),
-            note: "Анна-Мария (Нюра) О'Верес-Дуб [1]",
+            note: `${odd.given} ${odd.surname}`,
           }),
         ),
       );
       const { mentions } = accepted(await erase(tree, "ada"));
       expect(mentions).toEqual([`life/${person("guest")}`]);
       const { life_subject, ...rows } = tree.rows();
-      expect(found(rows, ["Анна-Мария (Нюра) О'Верес-Дуб [1]"])).toEqual([]);
+      expect(found(rows, ["Анна-Мария", "О'Верес-Дуб"])).toEqual([]);
       expect(life_subject).not.toEqual([]);
     }));
 
