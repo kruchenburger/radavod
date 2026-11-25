@@ -89,6 +89,7 @@ const command: fc.Arbitrary<KinshipCommand> = fc.oneof(
     patch: fc.record({ partners, branch: maybe(branchId), certainty }, { requiredKeys: [] }),
   }),
   fc.record({ do: fc.constant("remove-union" as const), id: unionId }),
+  fc.record({ do: fc.constant("remove-person" as const), id: anyone }),
   fc.record({ do: fc.constant("remove-branch" as const), id: branchId }),
   fc.record({
     do: fc.constant("add-branch" as const),
@@ -201,14 +202,12 @@ const start = (): Family => {
 };
 
 it("a family stays possible after any commands", { timeout: 30_000 }, () => {
-  const seen = new Set<string>();
   fc.assert(
     fc.property(commands, (list) => {
       const family = start();
       for (const next of list) {
         const before = family.store.snapshot();
         const result = family.apply(next);
-        seen.add(result.ok ? next.do : result.error.code);
         if (!result.ok) {
           expect(family.store.snapshot()).toEqual(before);
           continue;
@@ -219,7 +218,16 @@ it("a family stays possible after any commands", { timeout: 30_000 }, () => {
     }),
     { numRuns: 300 },
   );
-  // The commands are not refused out of hand, and each refusal is met.
+  // The commands are not refused out of hand, and each refusal is met. The same ones every time: a rare
+  // refusal is not met by every few hundred.
+  const seen = new Set<string>();
+  for (const list of fc.sample(commands, { seed: 1, numRuns: 300 })) {
+    const family = start();
+    for (const next of list) {
+      const result = family.apply(next);
+      seen.add(result.ok ? next.do : result.error.code);
+    }
+  }
   expect([...seen].sort()).toEqual(
     [
       "add-branch",
@@ -232,6 +240,7 @@ it("a family stays possible after any commands", { timeout: 30_000 }, () => {
       "edit-parent",
       "edit-person",
       "edit-union",
+      "in-use",
       "missing",
       "not-a-child",
       "not-a-partner",
@@ -240,6 +249,7 @@ it("a family stays possible after any commands", { timeout: 30_000 }, () => {
       "remove-branch",
       "remove-name",
       "remove-parent",
+      "remove-person",
       "remove-union",
       "same-person",
       "third-main-blood-parent",
