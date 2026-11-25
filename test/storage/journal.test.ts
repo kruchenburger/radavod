@@ -125,6 +125,10 @@ describe("the journal", () => {
       const act = { actor: anna, now: 5, scenario: "edit-person" };
       journal.write(1, act, []);
       expect(() => journal.write(1, act, [])).toThrow();
+      // And what could not be read back is not written.
+      expect(() => journal.write(2, { ...act, scenario: "" }, [])).toThrow();
+      expect(() => journal.write(2, { ...act, actor: "anna" as typeof anna }, [])).toThrow();
+      expect(journal.next()).toBe(2);
     }));
 
   it("names a corrupt row and does not quote it", () =>

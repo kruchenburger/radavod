@@ -139,6 +139,25 @@ describe("a scenario", () => {
       });
     }));
 
+  it("writes only what changed, whatever it read", () =>
+    inTree((tree) => {
+      tree.do((c) => {
+        for (const who of ["ada", "eve", "kid"]) addPerson(c, who);
+        addParent(c, "kid", "eve");
+      });
+      const { written } = tree.count(() =>
+        tree.do((c) => {
+          for (const who of ["eve", "kid"]) c.kinship.relatives(person(who));
+          c.kinship.apply({ do: "edit-person", id: person("ada"), patch: { sex: "female" } });
+        }),
+      );
+      // The person, the entry, and where it is found.
+      expect(written).toBe(3);
+      expect(tree.count(() => tree.read((c) => c.kinship.get(person("ada"))))).toMatchObject({
+        written: 0,
+      });
+    }));
+
   it("sees what its own commands did", () =>
     inTree((tree) => {
       tree.do((c) => {
@@ -264,6 +283,7 @@ describe("a version", () => {
       });
       const changed = tree.do((c) => {
         addParent(c, "ada", "eve");
+        addUnion(c, "u", "ada", "eve");
         accepted(
           c.life.add(
             birth("ada", {
@@ -277,13 +297,14 @@ describe("a version", () => {
       });
       expect(changed.map(({ aggregate }) => aggregate)).toEqual([
         `person/${person("ada")}`,
+        `union/${union("u")}`,
         `life/${person("ada")}`,
       ]);
       const [kin, born] = tree.read((c) => [
         c.kinship.get(person("eve")),
         c.life.eventsOf(person("eve")),
       ]);
-      expect(kin).toMatchObject({ version: 1, children: [person("ada")] });
+      expect(kin).toMatchObject({ version: 1, children: [person("ada")], unions: [union("u")] });
       expect(born).toHaveLength(1);
       // An open form of hers goes through.
       tree.do(
@@ -425,6 +446,31 @@ describe("a branch", () => {
       expect(tree.read((c) => c.kinship.branch(branch("green")))).toBeNull();
       expect(tree.read((c) => c.kinship.get(person("ada"))?.branch)).toBeNull();
       expect(tree.rows().kinship_branch).toHaveLength(1);
+    }));
+
+  it("given twice in one scenario is one patch, and given back is none", () =>
+    inTree((tree) => {
+      start(tree);
+      tree.do((c) => {
+        accepted(c.kinship.apply(give("green")));
+        accepted(c.kinship.apply(give("red")));
+      });
+      const [, row] = tree.rows().history_entry as { data: string }[];
+      expect(JSON.parse(row?.data ?? "").patches).toEqual([
+        {
+          aggregate: `person-branch/${person("ada")}`,
+          path: "",
+          before: null,
+          after: branch("red"),
+        },
+      ]);
+      const before = tree.rows();
+      const changed = tree.do((c) => {
+        accepted(c.kinship.apply(give("green")));
+        accepted(c.kinship.apply(give("red")));
+      });
+      expect(changed).toEqual([]);
+      expect(tree.rows()).toEqual(before);
     }));
 
   it("that is new takes a member in the same scenario", () =>
@@ -620,6 +666,24 @@ describe("a place and a source", () => {
             quote: "",
           }),
         );
+        accepted(
+          c.evidence.addSource({
+            id: source("story"),
+            kind: "story",
+            title: "",
+            repository: "",
+            note: "",
+          }),
+        );
+        accepted(
+          c.evidence.cite({
+            id: citation("d"),
+            source: source("story"),
+            fact: { subject: person("ada"), fact: "name:n1" },
+            page: "",
+            quote: "",
+          }),
+        );
       });
       const drop = () => tree.run((c) => removePlace(c, place("town")));
       expect(drop()).toEqual({ ok: false, error: { code: "in-use", count: 2 } });
@@ -636,7 +700,7 @@ describe("a place and a source", () => {
         return removePlace(c, place("town"));
       });
       expect(result.ok).toBe(true);
-      expect(tree.rows()).toMatchObject({ places_place: [], evidence_source: [] });
+      expect(tree.rows()).toMatchObject({ places_place: [], evidence_source: [{}] });
       expect(drop()).toEqual({ ok: false, error: { code: "missing", id: place("town") } });
     }));
 });
