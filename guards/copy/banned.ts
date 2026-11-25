@@ -47,6 +47,7 @@ const statement = [
   "\\p{L}+(?:ется|ются|ится|атся|ятся|лось|лись|лась)",
   "\\p{L}+(?:ает|яет|ают|яют|уют|еют)",
   "\\p{L}{2,}(?:жем|дет|дут)",
+  "вы \\p{L}+[еи]те|мы \\p{L}+[еи]м",
 ];
 
 const rules: { rule: string; locale: Locale; breaks: (text: string) => boolean }[] = [
