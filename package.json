@@ -1,0 +1,32 @@
+{
+  "name": "radavod",
+  "version": "0.0.0",
+  "private": true,
+  "description": "A private family tree site a family runs on its own Cloudflare account",
+  "license": "MIT",
+  "type": "module",
+  "packageManager": "pnpm@12.23.0+sha512.02da94ffaf133f46074322afe552f90d40b5f71ae259aefbccdacc5085b1d617e98d65e0131f5748b9b67445978ee5055d7d59a473f1eef0d504854fefcd5975",
+  "engines": {
+    "node": ">=26"
+  },
+  "dependencies": {
+    "hono": "^4.13.21"
+  },
+  "devDependencies": {
+    "@cloudflare/vitest-plugin": "^1.9.2",
+    "@cloudflare/workers-types": "^5.20261124.1",
+    "@swc/core": "^1.16.22",
+    "@types/node": "^26.6.6",
+    "dependency-cruiser": "^18.9.0",
+    "oxlint": "^1.95.0",
+    "typescript": "7.0.2",
+    "vite": "^8.3.8",
+    "vitest": "4.1.12"
+  },
+  "scripts": {
+    "test": "vitest run",
+    "lint": "oxlint",
+    "typecheck": "tsc --noEmit && tsc --noEmit -p tsconfig.node.json",
+    "guard:ddd": "node guards/ddd/cli.ts"
+  }
+}

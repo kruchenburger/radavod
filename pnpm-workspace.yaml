@@ -1,0 +1,5 @@
+# No dependency needs its install script: the platform binaries come as optional packages.
+allowBuilds:
+  "@swc/core": false
+  esbuild: false
+  workerd: false

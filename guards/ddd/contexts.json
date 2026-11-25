@@ -1,0 +1,9 @@
+{
+  "kinship": [],
+  "life": ["kinship", "places"],
+  "places": [],
+  "evidence": [],
+  "access": [],
+  "history": [],
+  "exchange": ["kinship", "life", "places", "evidence", "history"]
+}
