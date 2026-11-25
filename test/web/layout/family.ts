@@ -56,6 +56,7 @@ export function familyOf({ people, unions = [], branches = [] }: FamilySpec): Tr
   return {
     format: 1,
     version: 1,
+    epoch: "test",
     people: people.map((spec) => personOf(typeof spec === "string" ? { id: spec } : spec)),
     unions: unions.map((partners, i) => ({
       id: `u${i}`,
@@ -96,6 +97,7 @@ export function personOf(spec: PersonSpec): TreePerson {
       certainty: "confirmed",
       ...(parent === null || typeof parent === "string" ? { parent } : parent),
     })),
+    childOrder: [],
     birth: born === undefined ? null : { text: String(born), qualifier: "exact", sort: born * 365 },
     death: null,
     place: null,

@@ -5,7 +5,9 @@ import type { LifeEvent } from "../src/contexts/life";
 import { parseFuzzyDate } from "../src/kernel/fuzzy-date";
 import type { PersonId, UnionId } from "../src/kernel/id";
 import type { Contexts } from "../src/scenarios/unit-of-work";
+import { addRelative } from "../src/scenarios/add-relative";
 import { eraseHere } from "../src/scenarios/erase";
+import { snapshotsOf } from "../src/scenarios/snapshot";
 import { fill, rowsOf } from "./storage/schema-1";
 import {
   accepted,
@@ -35,7 +37,7 @@ type Person = { id: string; data: { parents: Parentage[]; children: string[]; un
 
 describe("rows over 5 000 people", () => {
   it("stay within the budgets", { timeout: 180_000 }, () =>
-    inTree((tree) => {
+    inTree(async (tree) => {
       const family = rowsOf(generateFamily(1, size));
       fill(tree.storage.sql, family);
       const people = family.people as unknown as Person[];
@@ -216,6 +218,41 @@ describe("rows over 5 000 people", () => {
         }),
         limit: 80,
       };
+
+      measure("add a child to a union", 20, (c) =>
+        accepted(
+          addRelative(c, {
+            of: ada,
+            as: "child",
+            person: {
+              id: person("quick"),
+              sex: "unknown",
+              living: "unknown",
+              names: [form("n1")],
+              mainName: null,
+            },
+            union: couple as UnionId,
+          }),
+        ),
+      );
+
+      // The snapshot is made after edits; opening the tree only reads it.
+      const snapshots = snapshotsOf(tree.counted, tree.work);
+      let packed = 0;
+      const started = performance.now();
+      const made = await tree.countAsync(async () => {
+        packed = (await snapshots.rebuild()).body.length;
+      });
+      const took = performance.now() - started;
+      const opened = await tree.countAsync(() => snapshots.snapshot());
+      console.log(
+        `snapshot of ${size}: ${packed} bytes packed, made in ${Math.round(took)} ms`,
+        `reading ${made.read} rows and writing ${made.written}; opened reading ${opened.read}`,
+      );
+      expect(packed).toBeLessThanOrEqual(1_000_000);
+      expect(made.written).toBeLessThanOrEqual(2);
+      expect(opened).toEqual({ read: expect.any(Number), written: 0 });
+      expect(opened.read).toBeLessThanOrEqual(5);
 
       for (const [what, { written, read, limit }] of Object.entries(numbers)) {
         expect(written, what).toBeGreaterThan(0);

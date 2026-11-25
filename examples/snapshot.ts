@@ -1,70 +1,116 @@
-import type {
-  TreeNameForm,
-  TreePerson,
-  TreeSample,
-  TreeSnapshot,
-  TreeYear,
-} from "../src/shared/tree.ts";
+import type { FuzzyDate as KernelDate } from "../src/kernel/fuzzy-date.ts";
+import type { State } from "../src/shared/reverse.ts";
+import { snapshotOf as snapshotOfState, yearOf as yearOfDate } from "../src/shared/snapshot.ts";
+import type { TreeSample, TreeSnapshot, TreeYear } from "../src/shared/tree.ts";
 import { fullestOfLine } from "./start.ts";
-import type { ExampleFamily, FuzzyDate, NameForm, Parentage, PartialDate } from "./family.ts";
+import type { ExampleFamily, FamilyEvent, FuzzyDate, Parentage, PartialDate } from "./family.ts";
 
-/** The invented family as the browser will get a real one. */
-export function snapshotOf(family: ExampleFamily): TreeSnapshot {
-  const parents = new Map<string, TreePerson["parents"]>();
-  const unionOf = unionsOf(family);
-  for (const link of family.parentages) {
-    const { child, ...parentage } = link;
-    const parent = { ...parentage, union: unionOf(link) };
-    parents.set(child, [...(parents.get(child) ?? []), parent]);
-  }
-  const dates = new Map<string, TreeYear | null>();
-  const places = new Map<string, string>();
-  for (const kind of ["birth", "death"] as const) {
-    for (const { kind: found, main, date, place, participants } of family.events) {
-      const person = participants[0]?.person;
-      if (found !== kind || !main || person === undefined) continue;
-      dates.set(`${kind} ${person}`, date === null ? null : yearOf(date));
-      if (place !== null && !places.has(person)) places.set(person, place);
-    }
-  }
-  const began = new Map<string, number | null>();
-  for (const { kind, union, date } of family.events) {
-    if (kind === "wedding" && union !== null && date !== null) began.set(union, yearOf(date).sort);
-  }
-  return {
-    format: 1,
-    version: 1,
-    people: family.people.map(({ id, sex, living, branch, names: [name, ...others] }) => ({
-      id,
+/** The identifier the tree knows a record of the family by. */
+export type IdOf = (kind: string, id: string) => string;
+
+/** The invented family is no tree that was ever edited. */
+export const sampleHead = { version: 0, epoch: "sample" };
+
+/**
+ * The invented family as the tree keeps it: what was written in each aggregate, by "kind/id". The
+ * snapshot is made of it by the code that makes the snapshot of a real tree.
+ */
+export function stateOf(family: ExampleFamily, idOf: IdOf = (_kind, id) => id): State {
+  const person = (id: string) => idOf("person", id);
+  const union = (id: string | null) => (id === null ? null : idOf("union", id));
+  const place = (id: string | null) => (id === null ? null : idOf("place", id));
+  const parents = parentsOf(family);
+  const state: Record<string, unknown> = {};
+  for (const { id, sex, living, branch, names } of family.people) {
+    state[`person/${person(id)}`] = {
       sex,
       living,
-      name: name === undefined ? null : formOf(name),
-      otherNames: others.map(formOf),
-      branch,
-      parents: parents.get(id) ?? [],
-      birth: dates.get(`birth ${id}`) ?? null,
-      death: dates.get(`death ${id}`) ?? null,
-      place: places.get(id) ?? null,
-    })),
-    unions: family.unions.map(({ id, kind, partners: [first, second], certainty }) => ({
-      id,
-      kind,
-      partners: [first, second],
-      began: began.get(id) ?? null,
-      branch: null,
-      certainty,
-    })),
-    branches: family.branches.map(({ id, name, color }) => ({
-      id,
-      title: { ...name },
+      names: names.map((name) => ({
+        ...name,
+        given: name.given ?? "",
+        patronymic: name.patronymic ?? "",
+        surname: name.surname ?? "",
+      })),
+      mainName: names[0]?.id ?? null,
+      parents: (parents.get(id) ?? []).map((link) => ({
+        ...link,
+        parent: link.parent === null ? "unknown" : person(link.parent),
+        union: union(link.union),
+      })),
+      childOrder: [],
+    };
+    if (branch !== null) state[`person-branch/${person(id)}`] = idOf("branch", branch);
+  }
+  for (const { id, kind, partners, certainty } of family.unions) {
+    state[`union/${idOf("union", id)}`] = { partners: partners.map(person), kind, certainty };
+  }
+  for (const { id, name, color } of family.branches) {
+    state[`branch/${idOf("branch", id)}`] = {
+      title: { ru: name.ru, en: name.en },
       color: color - 1,
-    })),
-    places: family.places.map(({ id, names }) => ({
-      id,
-      names: names.map(({ text, language }) => ({ text, language })),
-    })),
-  };
+    };
+  }
+  for (const { id, names, affiliations } of family.places) {
+    state[`place/${idOf("place", id)}`] = {
+      names: names.map(({ text, language, from, to }) => ({
+        text,
+        language,
+        period: periodOf(from, to),
+      })),
+      affiliations: affiliations.map(({ name, from, to }) => ({
+        name: name.ru,
+        period: periodOf(from, to),
+      })),
+      coordinates: null,
+    };
+  }
+  const lives = new Map<string, FamilyEvent[]>();
+  for (const event of family.events) {
+    const home = event.participants[0]?.person;
+    if (home !== undefined) lives.set(home, [...(lives.get(home) ?? []), event]);
+  }
+  for (const [home, events] of lives) {
+    state[`life/${person(home)}`] = {
+      events: events.map((event) => ({
+        id: idOf("event", event.id),
+        kind: event.kind,
+        title: "",
+        date: event.date && dateOf(event.date),
+        place: place(event.place),
+        participants: event.participants.map(({ person: who, role }) => ({
+          person: person(who),
+          role,
+        })),
+        union: union(event.union),
+        main: event.main,
+        certainty: event.certainty,
+        note: "",
+      })),
+    };
+  }
+  return state;
 }
+
+/** The invented family as the browser gets a real tree. */
+export function snapshotOf(family: ExampleFamily): TreeSnapshot {
+  return snapshotOfState(stateOf(family), sampleHead);
+}
+
+/**
+ * The parents of each child, each with the union of the parent with the other parent of the same
+ * kind, when both are known.
+ */
+export function parentsOf(family: ExampleFamily): Map<string, Link[]> {
+  const unionOf = unionsOf(family);
+  const parents = new Map<string, Link[]>();
+  for (const link of family.parentages) {
+    const { child, ...parentage } = link;
+    parents.set(child, [...(parents.get(child) ?? []), { ...parentage, union: unionOf(link) }]);
+  }
+  return parents;
+}
+
+type Link = Omit<Parentage, "child"> & { union: string | null };
 
 /** Finds the union of the parent of a child with the other parent of the same kind. */
 function unionsOf({ parentages, unions }: ExampleFamily) {
@@ -92,19 +138,26 @@ export function sampleOf(family: ExampleFamily): TreeSample {
   return { snapshot: snapshotOf(family), start: fullestOfLine(family, line) ?? line, line };
 }
 
-function formOf(form: NameForm): TreeNameForm {
-  const { kind, language, script, given, patronymic, surname, certainty } = form;
-  return { kind, language, script, given, patronymic, surname, certainty };
+/** A date of the family as the kernel keeps it. */
+export function dateOf({ text, parsed }: FuzzyDate): KernelDate {
+  if (parsed === null) return { text, parsed: null };
+  const { qualifier, calendar, from, to } = parsed;
+  return { text, parsed: { qualifier, calendar, from, ...(to === null ? {} : { to }) } };
 }
 
-export function yearOf({ text, parsed }: FuzzyDate): TreeYear {
-  if (parsed === null) return { text, qualifier: "unread", sort: null };
-  const { qualifier, calendar, from, to } = parsed;
-  return {
-    text: to === null ? String(from.year) : `${from.year}–${to.year}`,
-    qualifier,
-    sort: qualifier === "before" ? null : dayNumber(from, calendar),
-  };
+export function yearOf(date: FuzzyDate): TreeYear {
+  return yearOfDate(dateOf(date));
+}
+
+function periodOf(from: number | null, to: number | null): object {
+  const year = (at: number | null) =>
+    at === null
+      ? null
+      : {
+          text: String(at),
+          parsed: { qualifier: "exact", calendar: "gregorian", from: { year: at } },
+        };
+  return { from: year(from), to: year(to) };
 }
 
 /** The Julian day number of the earliest day a date can mean: one count for both calendars. */

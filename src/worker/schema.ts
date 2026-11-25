@@ -1,5 +1,5 @@
 import { evidenceTables } from "../contexts/evidence";
-import { historyTables, type Migration, upgradeHistory } from "../contexts/history";
+import { addSnapshot, historyTables, type Migration, upgradeHistory } from "../contexts/history";
 import { kinshipTables } from "../contexts/kinship";
 import { lifeTables } from "../contexts/life";
 import { placesTables } from "../contexts/places";
@@ -14,4 +14,5 @@ export const steps: Migration[] = [
     },
   },
   { number: 2, up: upgradeHistory },
+  { number: 3, up: addSnapshot },
 ];

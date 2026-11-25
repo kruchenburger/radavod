@@ -4,6 +4,7 @@ import { takeBack } from "../../../shared/reverse";
 import { BadWrite, CorruptRow, jsonOf } from "../../../shared/rows";
 import { namesOverTime, scrubbed, wholeNames, withoutPerson, wordsOf } from "../domain/erase";
 import { sqliteCheckpoints } from "./sqlite-checkpoints";
+import { sqliteSnapshots } from "./sqlite-snapshot";
 import { entrySchema } from "./sqlite-journal";
 
 /**
@@ -18,9 +19,13 @@ export function purge(
   /** Names of everybody else: a whole name of somebody else is not taken. */
   others: readonly Parts[],
 ): void {
+  // Packed, so nobody can look into it. A new one is made when the tree is opened.
+  sqliteSnapshots(sql).clear();
   const own = partsWith(sql, [id]);
   // Who was erased before is in no entry, and nothing is written again.
   if (own.length === 0 && forms.length === 0) return;
+  // Packed too. New ones are made when it is time.
+  sqliteCheckpoints(sql).clear();
   const entries = Map.groupBy(own, ({ number }) => number);
   const known = namesOverTime(
     [...entries.values()].map((parts) => parts.flatMap(({ entry }) => entry.patches)),
@@ -44,8 +49,6 @@ export function purge(
     if (clean === title) continue;
     sql.exec("UPDATE history_name SET title = ? WHERE number = ?", String(clean), number);
   }
-  // They are packed, so nobody can look into them. New ones are made when it is time.
-  sqliteCheckpoints(sql).clear();
 }
 
 type Parts = Pick<NameForm, "given" | "patronymic" | "surname">;

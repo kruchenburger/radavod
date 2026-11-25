@@ -1,5 +1,5 @@
 import type { ExampleFamily, FamilyEvent, FuzzyDate } from "../../examples/family.ts";
-import { snapshotOf } from "../../examples/snapshot.ts";
+import { parentsOf } from "../../examples/snapshot.ts";
 import { anna, idOf } from "./tree";
 
 /**
@@ -52,14 +52,13 @@ export type Family = {
 export const personId = (id: string) => idOf("person", id);
 
 export function rowsOf(family: ExampleFamily): Family {
-  const snapshot = snapshotOf(family);
   const unionId = (id: string) => idOf("union", id);
   const eventId = (id: string) => idOf("event", id);
   const placeId = (id: string) => idOf("place", id);
   const someone = (id: string | null) => (id === null ? "unknown" : personId(id));
   const homeOf = ({ participants }: FamilyEvent) => participants[0]?.person ?? "";
 
-  const parents = new Map(snapshot.people.map((one) => [one.id, one.parents]));
+  const parents = parentsOf(family);
   const children = groupBy(
     family.parentages.filter(({ parent }) => parent !== null),
     ({ parent }) => parent ?? "",

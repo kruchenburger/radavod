@@ -53,6 +53,7 @@ const person = fc.record({
   living: fc.constantFrom("yes", "no", "unknown"),
   name: fc.option(form),
   otherNames: fc.constant([]),
+  childOrder: fc.constant([]),
   branch: branchId,
   parents: fc.array(
     fc.record({
@@ -89,6 +90,7 @@ const snapshots = fc
     treeSnapshotSchema.parse({
       format: 1,
       version: 0,
+      epoch: "test",
       // Sometimes the last person has the id of the first.
       people: people.map((one, i) => ({
         ...one,

@@ -6,12 +6,13 @@ import type { PlaceTarget } from "../contexts/places";
 import type { PersonId } from "../kernel/id";
 import { inUse } from "../kernel/refusal";
 import type { Result } from "../kernel/result";
+import { type CertaintyError, settle } from "./certainty";
 import type { Contexts } from "./unit-of-work";
 
 /** An aggregate as "kind/id" and its value as the journal has it, null when it is not there. */
 export type Target = { aggregate: string; value: unknown };
 
-export type PutBackError = KinshipError | LifeError | EvidenceError;
+export type PutBackError = KinshipError | LifeError | EvidenceError | CertaintyError;
 
 /**
  * Puts aggregates of several contexts as they were. Each context keeps its rules, and nothing that goes
@@ -55,5 +56,8 @@ export function putBack(c: Contexts, targets: readonly Target[]): Result<object,
   for (const { id, value } of of<{ id: PersonId; value: object | null }>("trash")) {
     c.history.trash.put(id, value && ({ ...value, id, version: 0 } as Trashed));
   }
-  return { ok: true, value: {} };
+  return settle(
+    c,
+    of<{ id: string }>("person", "union", "life", "cited").map(({ id }) => id),
+  );
 }

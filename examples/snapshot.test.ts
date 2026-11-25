@@ -92,7 +92,7 @@ describe("the snapshot of the invented family", () => {
 
   it("carries no citations, no sources and no events", () => {
     expect(Object.keys(snapshot).sort()).toEqual(
-      ["branches", "format", "people", "places", "unions", "version"].sort(),
+      ["branches", "epoch", "format", "people", "places", "unions", "version"].sort(),
     );
   });
 });

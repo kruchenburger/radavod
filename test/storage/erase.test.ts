@@ -8,6 +8,7 @@ import { eraseForever, type Ledger, mentionsOf, reapplyErasures } from "../../sr
 import { restoreTo } from "../../src/scenarios/restore-to";
 import { restore, trash } from "../../src/scenarios/trash";
 import { undo } from "../../src/scenarios/undo";
+import { snapshotsOf } from "../../src/scenarios/snapshot";
 import { versionsOf } from "../../src/scenarios/versions";
 import { sqliteLedger } from "../../src/contexts/access";
 import {
@@ -157,7 +158,7 @@ function found(rows: Record<string, unknown[]>, texts: readonly string[]): strin
 }
 
 describe("an erased person", () => {
-  it("is in no row of the tree: rows, journal, trash, checkpoints, names of versions", () =>
+  it("is in no row of the tree: rows, journal, trash, checkpoints, snapshot, names of versions", () =>
     inTree(async (tree) => {
       family(tree);
       const all = versionsOf(tree.storage, tree.work);
@@ -181,11 +182,15 @@ describe("an erased person", () => {
           }),
         ),
       );
+      // The snapshot is packed: its rows go whole.
+      await snapshotsOf(tree.storage, tree.work).snapshot();
+      expect(tree.rows().history_snapshot).toHaveLength(1);
       expect(found(tree.rows(), said).length).toBeGreaterThan(20);
       const done = accepted(await erase(tree, "ada"));
       expect(done.mentions).toEqual([]);
       expect(found(tree.rows(), said)).toEqual([]);
       expect(tree.rows().history_checkpoint).toEqual([]);
+      expect(tree.rows().history_snapshot).toEqual([]);
       // Her entries are there, with nobody in them.
       expect(tree.read((c) => c.history.entry(2))).toMatchObject({ scenario: "test", patches: [] });
       expect(all.entries({ before: 4, limit: 1 })[0]?.title).toBe("Как нашли [erased]");

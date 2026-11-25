@@ -48,6 +48,12 @@ A scenario runs in `unitOfWork.run` (`src/scenarios/unit-of-work.ts`): one trans
 
 Each context has its tables and its adapter, which parses every row by a strict schema, `src/shared/rows.ts` reads and writes the rows, and `src/shared/values.ts` has the schemas of the kernel. A change of the tables is a new step in `src/worker/schema.ts`; a step that is out is never edited, and the tables and the rows of `test/storage/schema-1.ts` are frozen. `test/budgets.test.ts` counts rows over 5 000 invented people.
 
+Scenarios take inputs by the strict schemas of `src/shared/scenarios.ts`. A fact of one source or a confirmed one needs a citation, and is a hypothesis again when its last citation goes: that rule lives in `src/scenarios/certainty.ts`, the certainty itself with the context of the fact. A fact of an event is made by `factOf` of `life`.
+
+## Snapshot
+
+`src/shared/snapshot.ts` makes the snapshot (`treeSnapshotSchema` of `src/shared/tree.ts`) from what was written in each aggregate: of the last version on the server, of a past one in the browser, of the invented family in the build. `FamilyTree` keeps it packed in `history_snapshot`, makes it again by an alarm after edits or when it is opened behind the tree, and an erasure throws it away. `changesSince` names what the snapshot shows of what changed after a version, or answers "reload" in another epoch and after an erasure.
+
 ## History
 
 The journal is never thinned, and any version can be rebuilt from it: `src/shared/reverse.ts` takes patches back, for the server and the browser. Undo, a return to a version and starting over put authored values back through `putBack` of each context, which works out the mirrors and refuses the impossible. A checkpoint is for speed and may be thrown away. A person in the trash lies in `history_trash` with every link, and a restore runs the ordinary commands, so its preview is the restore itself, not kept.
@@ -68,11 +74,11 @@ Every text a person reads is in `web/i18n/ru.ts` and `web/i18n/en.ts`, reached t
 
 `examples/` holds an invented family of 300. `generateFamily(seed, size)` makes it and `examples/family.json` is its output for seed 1; a test compares them, so change the generator and run `pnpm examples`. Every invented name is in `examples/names.ts`. The app never imports `examples/`, and its types are not the domain model.
 
-`examples/snapshot.ts` turns the family into a tree snapshot. `pnpm build` writes it with the person to begin with (`examples/start.ts`) and the owner of the direct line to `dist/client/sample/tree.json`, and the app fetches it from there.
+`examples/snapshot.ts` turns the family into what a tree keeps, and the snapshot is made of it by the code of a real tree. `pnpm build` writes it with the person to begin with (`examples/start.ts`) and the owner of the direct line to `dist/client/sample/tree.json`, and the app fetches it from there.
 
 ## Tree
 
-`src/shared/tree.ts` is the snapshot of the tree that the server will send. `web/tree/layout` turns it into places: `around` and `aroundNarrow` for the view around a person, `branchMap` for the map, following `docs/design.md`. These are pure functions with no DOM, no clock and no texts; they judge nothing and draw what the snapshot says. `web/tree/map-layouter.ts` runs the map in a worker.
+`src/shared/tree.ts` is the snapshot of the tree that the server sends. `web/tree/layout` turns it into places: `around` and `aroundNarrow` for the view around a person, `branchMap` for the map, following `docs/design.md`. These are pure functions with no DOM, no clock and no texts; they judge nothing and draw what the snapshot says. `web/tree/map-layouter.ts` runs the map in a worker.
 
 `web/sample` holds the screens of the example and `web/sample/places.ts` their addresses: a place, a person and a zoom are in the address, and nothing a person would lose with a link is kept elsewhere. `web/tree/type.ts` measures names in the fonts of the page; lengths of the layout go to styles through `rem`, so the tree grows with the text. `web/tree/map/view.ts` is the math of the map, `paint.ts` its canvas, `map-view.tsx` the links over it.
 

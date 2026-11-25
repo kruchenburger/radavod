@@ -860,7 +860,13 @@ describe("a place and a source", () => {
 });
 
 describe("the object", () => {
-  it("has no method for the outside but a ping", () => {
-    expect(Object.getOwnPropertyNames(FamilyTree.prototype)).toEqual(["constructor", "ping"]);
+  it("gives the outside a ping, the snapshot and what changed, and wakes for nothing else", () => {
+    expect(Object.getOwnPropertyNames(FamilyTree.prototype)).toEqual([
+      "constructor",
+      "ping",
+      "snapshot",
+      "changesSince",
+      "alarm",
+    ]);
   });
 });
