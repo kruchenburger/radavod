@@ -182,9 +182,11 @@ describe("the access of a family in its object", () => {
     const stub = objectOf();
     const now = Date.now();
     await twoKeepers(stub, now);
-    await expect(
-      stub.revoke(member("ann"), member("bob"), now, { [`member/${member("bob")}/x`]: 1 }),
-    ).rejects.toThrow("unknown-aggregate");
+    const aggregate = `member/${member("bob")}/x`;
+    expect(await stub.revoke(member("ann"), member("bob"), now, { [aggregate]: 1 })).toEqual({
+      ok: false,
+      error: { code: "unknown-aggregate", aggregate },
+    });
   });
 
   it("cleans what is over by an alarm, and wakes no more once nothing is left", async () => {
@@ -249,7 +251,10 @@ describe("the access of a family in its object", () => {
     });
     // Recovery links count with them.
     const recovery = { id: "r", hash: "r", member: member("bob"), now };
-    expect((await stub.recover(member("ann"), recovery)).ok).toBe(false);
+    expect(await stub.recover(member("ann"), recovery)).toEqual({
+      ok: false,
+      error: { code: "rate-limited", retryAfter: 86_400 },
+    });
     expect((await stub.invite(member("bob"), more)).ok).toBe(true);
   });
 });

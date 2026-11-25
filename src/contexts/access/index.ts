@@ -7,6 +7,7 @@ export {
   accessOver,
   type Expected,
   type StaleVersion,
+  type UnknownAggregate,
 } from "./application/access";
 export type { ErasureLedger } from "./application/ledger";
 export type { AccessStore } from "./application/ports";

@@ -4,6 +4,7 @@ import {
   type AccessError,
   type Expected,
   type StaleVersion,
+  type UnknownAggregate,
   accessOver,
   type ErasureLedger,
   type Limit,
@@ -24,7 +25,7 @@ import type { Env } from "./env";
 
 const day = 86_400_000;
 
-type Done<T = null> = Result<T, AccessError | StaleVersion>;
+type Done<T = null> = Result<T, AccessError | StaleVersion | UnknownAggregate>;
 
 /** Members and sign-in, kept apart so that rolling the tree back never revives a revoked role. */
 export class FamilyAccess extends DurableObject<Env> {
@@ -149,7 +150,7 @@ export class FamilyAccess extends DurableObject<Env> {
     limit: Exclude<Limit, "invite">,
     key: string,
     now: number,
-  ): Promise<Result<null, RateLimited | StaleVersion>> {
+  ): Promise<Result<null, RateLimited | StaleVersion | UnknownAggregate>> {
     const salted = new TextEncoder().encode(`${sqliteAccess(this.ctx.storage.sql).salt()}:${key}`);
     const digest = new Uint8Array(await crypto.subtle.digest("SHA-256", salted));
     const hashed = Array.from(digest, (byte) => byte.toString(16).padStart(2, "0")).join("");
@@ -180,12 +181,14 @@ export class FamilyAccess extends DurableObject<Env> {
   async #run<T, E extends { code: string }>(
     expected: Expected,
     work: (access: Access) => Result<T, E>,
-  ): Promise<Result<T, E | StaleVersion>> {
-    const done = this.ctx.storage.transactionSync((): Result<T, E | StaleVersion> => {
-      const access = this.#access();
-      const stale = access.stale(expected);
-      return stale === null ? work(access) : { ok: false, error: stale };
-    });
+  ): Promise<Result<T, E | StaleVersion | UnknownAggregate>> {
+    const done = this.ctx.storage.transactionSync(
+      (): Result<T, E | StaleVersion | UnknownAggregate> => {
+        const access = this.#access();
+        const stale = access.stale(expected);
+        return stale === null ? work(access) : { ok: false, error: stale };
+      },
+    );
     if (done.ok) await this.#wake();
     return done;
   }

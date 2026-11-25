@@ -48,6 +48,8 @@ import type { AccessStore } from "./ports";
 export type Expected = Record<string, number>;
 
 export type StaleVersion = { code: "stale-version"; aggregate: string; current: number };
+/** A version of something that is not a member. */
+export type UnknownAggregate = { code: "unknown-aggregate"; aggregate: string };
 
 export type AccessError =
   | RateLimited
@@ -116,7 +118,7 @@ export interface Access {
   /** People erased from the tree are tied to no member and no invitation. */
   forget(people: readonly PersonId[]): void;
   /** The first version a member saw that is not the one kept, or null. */
-  stale(expected: Expected): StaleVersion | null;
+  stale(expected: Expected): StaleVersion | UnknownAggregate | null;
   /** Takes away what is over. */
   clean(now: number): void;
   /** Whether anything is kept that will be over some day. */
@@ -209,9 +211,8 @@ export function accessOver(store: AccessStore): Access {
     stale(expected) {
       for (const [aggregate, seen] of Object.entries(expected)) {
         const [kind, id, more] = aggregate.split("/");
-        // The key came from the code, not from a member.
         if (kind !== "member" || more !== undefined || !isId("member", id)) {
-          throw new Error("unknown-aggregate");
+          return { code: "unknown-aggregate", aggregate };
         }
         const current = store.member(id)?.version ?? 0;
         if (current !== seen) return { code: "stale-version", aggregate, current };
