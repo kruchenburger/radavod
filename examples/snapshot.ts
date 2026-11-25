@@ -5,6 +5,7 @@ import type {
   TreeSnapshot,
   TreeYear,
 } from "../src/shared/tree.ts";
+import { fullestOfLine } from "./start.ts";
 import type { ExampleFamily, FuzzyDate, NameForm, Parentage, PartialDate } from "./family.ts";
 
 /** The invented family as the browser will get a real one. */
@@ -80,11 +81,15 @@ function unionsOf({ parentages, unions }: ExampleFamily) {
       : (ids.get([...(parents.get(groupOf(link)) ?? [])].sort().join(" ")) ?? null);
 }
 
-/** The family with the person to begin with: one of the couple where all branches meet. */
+/**
+ * The family with the direct line of one of the couple where all branches meet, and the person of
+ * that line to begin with.
+ */
 export function sampleOf(family: ExampleFamily): TreeSample {
   const last = family.unions.find(({ id }) => id === family.lastCouple);
   if (last === undefined) throw new Error("no last couple");
-  return { snapshot: snapshotOf(family), start: last.partners[0] };
+  const [line] = last.partners;
+  return { snapshot: snapshotOf(family), start: fullestOfLine(family, line) ?? line, line };
 }
 
 function formOf(form: NameForm): TreeNameForm {

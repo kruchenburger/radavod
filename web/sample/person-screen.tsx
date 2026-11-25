@@ -16,10 +16,10 @@ import { branchesPlace, hrefOf, treePlace } from "./places";
 
 export function PersonScreen({ person: id }: { person: string }) {
   const { t } = useLanguage();
-  const { snapshot, start, words } = useData();
+  const { snapshot, line, words } = useData();
   const heading = useArrival<HTMLHeadingElement>();
   const kin = kinOf(snapshot);
-  const isDirect = useMemo(() => kinOf(snapshot).lineOf(start).has(id), [snapshot, start, id]);
+  const isDirect = useMemo(() => kinOf(snapshot).lineOf(line).has(id), [snapshot, line, id]);
   const person = kin.person(id);
   if (person === undefined) return null;
   const { given, surname } = words.fullName(person.name);
@@ -61,7 +61,7 @@ export function PersonScreen({ person: id }: { person: string }) {
           </Button>
         </div>
       </div>
-      <LifeStripView snapshot={snapshot} person={id} words={words} line={start} />
+      <LifeStripView snapshot={snapshot} person={id} words={words} line={line} />
       <div className={classes.columns}>
         <section>
           <h2>{t("card.kin")}</h2>

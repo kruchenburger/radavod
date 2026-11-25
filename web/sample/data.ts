@@ -25,7 +25,7 @@ async function fetchSample(): Promise<TreeSample | null> {
   }
 }
 
-export type Data = { snapshot: TreeSnapshot; start: string; words: Words };
+export type Data = { snapshot: TreeSnapshot; start: string; line: string; words: Words };
 
 export const DataContext = createContext<Data | null>(null);
 

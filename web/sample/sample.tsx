@@ -41,9 +41,9 @@ export function Sample({ place }: { place: Place }) {
 
 function Screens({ place, sample }: { place: Place; sample: TreeSample }) {
   const { t, locale } = useLanguage();
-  const { snapshot, start } = sample;
+  const { snapshot, start, line } = sample;
   const words = useMemo(() => wordsOf(snapshot, locale), [snapshot, locale]);
-  const data = useMemo(() => ({ snapshot, start, words }), [snapshot, start, words]);
+  const data = useMemo(() => ({ snapshot, start, line, words }), [snapshot, start, line, words]);
   const person = "person" in place ? place.person : null;
   const one = person === null ? undefined : kinOf(snapshot).person(person);
   const isUnknown = person !== null && one === undefined;

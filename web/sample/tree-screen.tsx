@@ -35,7 +35,7 @@ const margin = 28;
 
 export function TreeScreen({ place }: { place: Centred }) {
   const { t, locale } = useLanguage();
-  const { snapshot, start, words } = useData();
+  const { snapshot, line, words } = useData();
   const page = usePage();
   const hint = useId();
   const heading = useId();
@@ -50,7 +50,7 @@ export function TreeScreen({ place }: { place: Centred }) {
     const options = {
       measure,
       wording: cardWords,
-      lineOf: start,
+      lineOf: line,
       siblings,
       open: open === null ? null : keyOf(open, kinOf(snapshot).person(open) !== undefined),
     };
@@ -62,7 +62,7 @@ export function TreeScreen({ place }: { place: Centred }) {
     const reach = isWhole ? {} : half === "ancestors" ? { down: 0 } : { up: 0 };
     const metrics = metricsFor(page.width, isWhole ? 6 : 3);
     return { as: "wide", tree: around(snapshot, focus, { ...options, ...reach, metrics }) };
-  }, [snapshot, focus, cardWords, start, siblings, open, half, isNarrow, isWhole, page.width]);
+  }, [snapshot, focus, cardWords, line, siblings, open, half, isNarrow, isWhole, page.width]);
 
   const one = kinOf(snapshot).person(focus);
   const name = one === undefined ? "" : words.name(one);

@@ -7,7 +7,7 @@ import { describe, expect, it } from "vitest";
 import { treeSampleSchema, treeSnapshotSchema } from "../src/shared/tree.ts";
 import type { FuzzyDate } from "./family.ts";
 import { generateFamily } from "./generate.ts";
-import { dayNumber, snapshotOf, yearOf } from "./snapshot.ts";
+import { dayNumber, sampleOf, snapshotOf, yearOf } from "./snapshot.ts";
 
 const family = generateFamily(1, 300);
 const snapshot = snapshotOf(family);
@@ -161,7 +161,8 @@ it("is written where the app fetches it from", () => {
     const sample = treeSampleSchema.parse(written);
     expect(sample.snapshot).toEqual(snapshot);
     const last = family.unions.find(({ id }) => id === family.lastCouple);
-    expect(last?.partners).toContain(sample.start);
+    expect(last?.partners).toContain(sample.line);
+    expect(sample).toEqual(sampleOf(family));
   } finally {
     rmSync(folder, { recursive: true, force: true });
   }
