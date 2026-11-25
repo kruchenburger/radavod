@@ -84,6 +84,8 @@ export interface UnitOfWork {
 
 export function unitOfWork(
   storage: Pick<DurableObjectStorage, "sql" | "transactionSync">,
+  /** Told after a scenario changed the tree, once its transaction is over. */
+  onChange: (version: number) => void = () => {},
 ): UnitOfWork {
   let isOpen = false;
   /** The contexts of a scenario do not see what another one has not written yet. */
@@ -97,9 +99,13 @@ export function unitOfWork(
     }
   };
   return {
-    run: (command, work, telling) =>
-      alone(() =>
-        storage.transactionSync(() => {
+    run<T, E extends { code: string }>(
+      command: Command,
+      work: (contexts: Contexts) => Result<T, E>,
+      telling?: Telling,
+    ) {
+      const done = alone(() =>
+        storage.transactionSync((): Result<{ value: T; changed: Changed[] }, E | StaleVersion> => {
           const { kept, contexts, journal } = open(storage.sql);
           for (const [aggregate, seen] of Object.entries(command.expected)) {
             const current = currentOf(kept, aggregate);
@@ -118,7 +124,11 @@ export function unitOfWork(
           const changed = written.map((one) => ({ aggregate: aggregateOf(one), version }));
           return { ok: true, value: { value: result.value, changed } };
         }),
-      ),
+      );
+      const [first] = done.ok ? done.value.changed : [];
+      if (first !== undefined) onChange(first.version);
+      return done;
+    },
     preview: (work) => alone(() => work(open(storage.sql).contexts)),
     read: (work) => alone(() => work(open(storage.sql).contexts)),
   };

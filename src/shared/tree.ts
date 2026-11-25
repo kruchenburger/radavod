@@ -53,8 +53,8 @@ const personSchema = z.object({
   otherNames: z.array(nameFormSchema),
   branch: id.nullable(),
   parents: z.array(parentageSchema),
-  /** Children in an order set by hand. The server will send it; nothing reads it yet. */
-  childOrder: z.array(id).optional(),
+  /** Children in an order set by hand. Whoever is not in it stands by birth. Nothing reads it yet. */
+  childOrder: z.array(id),
   /** The main version of the birth and of the death. */
   birth: yearSchema.nullable(),
   death: yearSchema.nullable(),
@@ -91,6 +91,8 @@ export const treeSnapshotSchema = z.object({
   format: z.literal(1),
   /** The edit of the tree it was taken after. */
   version: z.int().nonnegative(),
+  /** Versions are counted anew after a rollback of the database: they hold within an epoch. */
+  epoch: z.string().min(1),
   people: z.array(personSchema),
   unions: z.array(unionSchema),
   branches: z.array(branchSchema),

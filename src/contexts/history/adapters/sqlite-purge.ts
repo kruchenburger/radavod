@@ -4,6 +4,7 @@ import { takeBack } from "../../../shared/reverse";
 import { BadWrite, CorruptRow, jsonOf } from "../../../shared/rows";
 import { namesOverTime, scrubbed, wholeNames, withoutPerson, wordsOf } from "../domain/erase";
 import { sqliteCheckpoints } from "./sqlite-checkpoints";
+import { sqliteSnapshots } from "./sqlite-snapshot";
 import { entrySchema } from "./sqlite-journal";
 
 /**
@@ -46,6 +47,7 @@ export function purge(
   }
   // They are packed, so nobody can look into them. New ones are made when it is time.
   sqliteCheckpoints(sql).clear();
+  sqliteSnapshots(sql).clear();
 }
 
 type Parts = Pick<NameForm, "given" | "patronymic" | "surname">;
