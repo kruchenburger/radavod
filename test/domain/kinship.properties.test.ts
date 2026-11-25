@@ -1,6 +1,6 @@
 import fc from "fast-check";
 import { expect, it } from "vitest";
-import type { KinshipCommand, Parentage } from "../../src/contexts/kinship";
+import type { Change, KinshipCommand, Parentage } from "../../src/contexts/kinship";
 import { branch, Family, type MemoryKinship, person, union } from "./memory-kinship";
 
 const people = ["a", "b", "c", "d", "e"];
@@ -41,6 +41,17 @@ const parentage: fc.Arbitrary<Parentage> = fc.record({
 });
 
 const command: fc.Arbitrary<KinshipCommand> = fc.oneof(
+  fc.record({
+    do: fc.constant("add-person" as const),
+    person: fc.record({
+      id: fc.constantFrom("late", "later", "a").map(person),
+      sex: fc.constant("unknown" as const),
+      living: fc.constant("yes" as const),
+      names: fc.array(name, { maxLength: 2 }),
+      mainName: maybe(fc.constantFrom("n1", "n2")),
+    }),
+    branch: maybe(branchId),
+  }),
   {
     weight: 12,
     arbitrary: fc.record({ do: fc.constant("add-parent" as const), child: anyone, parentage }),
@@ -95,7 +106,7 @@ const command: fc.Arbitrary<KinshipCommand> = fc.oneof(
     do: fc.constant("edit-person" as const),
     id: anyone,
     patch: fc.record(
-      { mainName: maybe(fc.constantFrom("n1", "n2")), living: fc.constant("no" as const) },
+      { mainName: fc.constantFrom("n1", "n2"), living: fc.constant("no" as const) },
       { requiredKeys: [] },
     ),
   }),
@@ -131,7 +142,8 @@ function problems({ people: all, unions, branches }: MemoryKinship): string[] {
     expect([...one.unions].sort()).toEqual(married.sort());
     const ids = names.map((form) => form.id);
     if (new Set(ids).size < ids.length) found.push(`${id} has names of one identifier`);
-    if (mainName !== null && !ids.includes(mainName)) found.push(`${id} shows no name`);
+    const isShown = mainName === null ? ids.length === 0 : ids.includes(mainName);
+    if (!isShown) found.push(`${id} shows no name`);
   }
   for (const { id, partners: two, branch: own } of unions.values()) {
     if (two[0] === two[1]) found.push(`${id} of one person`);
@@ -193,6 +205,7 @@ it("a family stays possible after any commands", () => {
   expect([...seen].sort()).toEqual(
     [
       "add-parent",
+      "add-person",
       "add-union",
       "assign-branch",
       "cycle",
@@ -242,16 +255,27 @@ it("a refused cycle is one: each on the way is a parent of the one before", () =
   expect(cycles).toBeGreaterThan(50);
 });
 
-it("the order of the writes does not matter, and their values rebuild the family", () => {
+it("what is written rebuilds the family, and written back it undoes a command", () => {
   fc.assert(
     fc.property(commands, (list) => {
       const family = start();
       const copy = start().store;
       for (const next of list) {
+        const before = family.store.snapshot();
         const result = family.apply(next);
-        if (result.ok) copy.save(result.value.toReversed());
+        if (!result.ok) continue;
+        const change = structuredClone(result.value);
+        copy.save(change);
+        expect(copy.snapshot()).toEqual(family.store.snapshot());
+        const back = change.toReversed().map(({ before: after, after: was, ...write }) => ({
+          ...write,
+          before: was,
+          after,
+        }));
+        copy.save(back as Change);
+        expect(copy.snapshot()).toEqual(before);
+        copy.save(change);
       }
-      expect(copy.snapshot()).toEqual(family.store.snapshot());
     }),
   );
 });

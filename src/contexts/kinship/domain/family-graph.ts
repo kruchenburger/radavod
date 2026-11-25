@@ -20,16 +20,17 @@ type Write<Kind extends string, Id, Value> = {
   after: Value | null;
 };
 
-/** A branch may have hundreds of members, so who is in it is told apart from the person. */
+/** A branch may be given to hundreds at once, so it is told apart from the person. */
 export type PersonRecord = Omit<Person, "branch">;
 
 /**
- * What a rule makes of the family, each aggregate once and only if it differs. Versions are counted
- * where a change is stored.
+ * What a rule makes of the family, each aggregate once and only if it differs. Written in this order
+ * it makes the family after, and with before for after in the reverse order the family before. Where
+ * it is stored, versions are counted: here they stay as they were.
  */
 export type Change = (
   | Write<"person", PersonId, PersonRecord>
-  | Write<"member", PersonId, BranchId>
+  | Write<"person-branch", PersonId, BranchId>
   | Write<"union", UnionId, Union>
   | Write<"branch", BranchId, Branch>
 )[];
@@ -37,6 +38,7 @@ export type Change = (
 /** Changes to the family that nobody has stored yet. */
 export class Draft {
   readonly #graph: FamilyGraph;
+  readonly #stored = new Map<PersonId, Person | null>();
   readonly #people = new Map<PersonId, Person>();
   readonly #unions = new Map<UnionId, Union | null>();
   readonly #branches = new Map<BranchId, Branch>();
@@ -45,13 +47,18 @@ export class Draft {
     this.#graph = graph;
   }
 
+  /** A person with the changes. Each is read once. */
+  person(id: PersonId): Person | null {
+    return this.#people.get(id) ?? this.#storedPerson(id);
+  }
+
   putPerson(person: Person): void {
     this.#people.set(person.id, person);
   }
 
   /** Changes a person who is there; somebody else's end of a link may be unknown. */
   editPerson(id: PersonId | "unknown", edit: (person: Person) => Partial<Person>): void {
-    const person = id === "unknown" ? null : (this.#people.get(id) ?? this.#graph.person(id));
+    const person = id === "unknown" ? null : this.person(id);
     if (person !== null) this.putPerson({ ...person, ...edit(person) });
   }
 
@@ -70,11 +77,11 @@ export class Draft {
   change(): Change {
     const change: Change = [];
     for (const [id, person] of this.#people) {
-      const stored = this.#graph.person(id);
+      const stored = this.#storedPerson(id);
       const [before, after] = [stored && recordOf(stored), recordOf(person)];
       if (differ(before, after)) change.push({ kind: "person", id, before, after });
       const [from, to] = [stored?.branch ?? null, person.branch];
-      if (from !== to) change.push({ kind: "member", id, before: from, after: to });
+      if (from !== to) change.push({ kind: "person-branch", id, before: from, after: to });
     }
     for (const [id, after] of this.#unions) {
       const before = this.#graph.union(id);
@@ -86,6 +93,14 @@ export class Draft {
     }
     return change;
   }
+
+  #storedPerson(id: PersonId): Person | null {
+    const known = this.#stored.get(id);
+    if (known !== undefined) return known;
+    const person = this.#graph.person(id);
+    this.#stored.set(id, person);
+    return person;
+  }
 }
 
 function recordOf(person: Person): PersonRecord {
@@ -94,7 +109,12 @@ function recordOf(person: Person): PersonRecord {
   return { id, version, sex, living, names, mainName, parents, children, unions, childOrder };
 }
 
-/** Aggregates are plain data that is copied with its keys in order. */
+/** Aggregates are plain data. The order of its keys says nothing. */
 function differ(a: unknown, b: unknown): boolean {
-  return JSON.stringify(a) !== JSON.stringify(b);
+  return JSON.stringify(a, inOrder) !== JSON.stringify(b, inOrder);
+}
+
+function inOrder(_: string, value: unknown): unknown {
+  if (typeof value !== "object" || value === null || Array.isArray(value)) return value;
+  return Object.fromEntries(Object.entries(value).sort(([a], [b]) => (a < b ? -1 : 1)));
 }

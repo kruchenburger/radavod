@@ -523,10 +523,20 @@ describe("a branch", () => {
     assign(family, "son", "green", false);
     const result = assign(family, "top", "green", true, true);
     expect(result.ok && result.value.map(({ kind, id }) => [kind, id])).toEqual([
-      ["member", person("top")],
-      ["member", person("daughter")],
-      ["member", person("grandson")],
+      ["person-branch", person("top")],
+      ["person-branch", person("daughter")],
+      ["person-branch", person("grandson")],
     ]);
+  });
+
+  it("reads everybody once", () => {
+    const family = line();
+    // The grandson descends by two lines.
+    family.withParent("grandson", "daughter", { kind: "unknown" });
+    family.store.read = [];
+    assign(family, "top", "green", true);
+    expect(branches(family)).toMatchObject({ top: "green", grandson: "green" });
+    expect(new Set(family.store.read).size).toBe(family.store.read.length);
   });
 
   it("ends in a circle of unknown kinship", () => {
@@ -618,6 +628,22 @@ describe("a person", () => {
     expect(add([form("n1"), form("n1")], "n1")).toEqual(refused("duplicate"));
   });
 
+  it("shows the first name when nobody chose one", () => {
+    const family = new Family();
+    family.do({
+      do: "add-person",
+      person: {
+        id: person("a"),
+        sex: "unknown",
+        living: "unknown",
+        names: [form("n1"), form("n2")],
+        mainName: null,
+      },
+      branch: null,
+    });
+    expect(family.get("a").mainName).toBe("n1");
+  });
+
   it("shows the first name it gets, and the next one when that is removed", () => {
     const family = new Family("a");
     const put = (name: NameForm) => family.do({ do: "put-name", person: person("a"), name });
@@ -691,6 +717,11 @@ describe("a command that changes nothing", () => {
       [],
     );
     expect(family.do({ do: "order-children", person: person("a"), order: [] })).toEqual([]);
+    family.withBranch("green");
+    const title = { en: "green", ru: "green" };
+    const { saves } = family.store;
+    expect(family.do({ do: "edit-branch", id: branch("green"), patch: { title } })).toEqual([]);
+    expect(family.store.saves).toBe(saves);
   });
 });
 
@@ -704,7 +735,7 @@ describe("somebody is probably dead", () => {
 
   it("when born over 110 years ago and nobody says they live", () => {
     expect(dead("unknown", "24.11.1916")).toBe(true);
-    expect(dead("unknown", "26.11.1916")).toBe(false);
+    expect(dead("unknown", "25.11.1916")).toBe(false);
     expect(dead("unknown", "1885")).toBe(true);
     expect(dead("unknown", "1990")).toBe(false);
   });

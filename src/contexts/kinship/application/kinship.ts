@@ -66,7 +66,7 @@ export interface Kinship {
   branch(id: BranchId): Branch | null;
   /** Everybody a link ties to a person: parents, partners, children. */
   relatives(id: PersonId): PersonId[];
-  /** Stores what the rules make of a command. A refused one stores nothing. */
+  /** Stores what the rules make of a command. One that is refused or changes nothing is not. */
   apply(command: KinshipCommand): Result<Change, KinshipError>;
 }
 
@@ -78,7 +78,7 @@ export function kinshipOver(store: KinshipStore): Kinship {
     relatives: (id) => relativesOf(store, id),
     apply(command) {
       const result = resultOf(store, command);
-      if (result.ok) store.save(result.value);
+      if (result.ok && result.value.length > 0) store.save(result.value);
       return result;
     },
   };

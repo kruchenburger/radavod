@@ -16,10 +16,13 @@ export class MemoryKinship implements KinshipStore {
   readonly people = new Map<PersonId, Person>();
   readonly unions = new Map<UnionId, Union>();
   readonly branches = new Map<BranchId, Branch>();
-  /** Whose parents were asked for. */
+  /** Whose parents were asked for, and who was read. */
   asked: PersonId[] = [];
+  read: PersonId[] = [];
+  saves = 0;
 
   person(id: PersonId): Person | null {
+    this.read.push(id);
     return structuredClone(this.people.get(id) ?? null);
   }
 
@@ -37,6 +40,7 @@ export class MemoryKinship implements KinshipStore {
   }
 
   save(change: Change): void {
+    this.saves++;
     for (const write of structuredClone(change)) {
       switch (write.kind) {
         case "person": {
@@ -45,7 +49,7 @@ export class MemoryKinship implements KinshipStore {
           else this.people.set(write.id, { ...write.after, branch });
           break;
         }
-        case "member": {
+        case "person-branch": {
           const person = this.people.get(write.id);
           if (person === undefined) throw new Error(`no ${write.id}`);
           person.branch = write.after;

@@ -6,7 +6,7 @@ export {
   kinshipOver,
 } from "./application/kinship";
 export type { KinshipStore } from "./application/ports";
-export type { Assignment, Branch, BranchPatch, NewBranch } from "./domain/branch";
+export type { Assignment, Branch, BranchColor, BranchPatch, NewBranch } from "./domain/branch";
 export type { Change, PersonRecord } from "./domain/family-graph";
 export type { ParentagePatch } from "./domain/parentage";
 export {

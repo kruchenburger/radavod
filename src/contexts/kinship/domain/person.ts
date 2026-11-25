@@ -11,12 +11,13 @@ export type Person = {
   sex: "male" | "female" | "other" | "unknown";
   living: "yes" | "no" | "unknown";
   names: NameForm[];
-  /** The identifier of the name shown. */
+  /** The identifier of the name shown. Null only for a person nobody named. */
   mainName: string | null;
   branch: BranchId | null;
   parents: Parentage[];
-  /** Everybody who has this person for a parent, of any kind and version. */
+  /** Everybody who has this person for a parent, of any kind and version: a mirror of their `parents`. */
   children: PersonId[];
+  /** A mirror of the partners of the unions. */
   unions: UnionId[];
   /** Children in an order set by hand. Whoever is not in it stands by birth. */
   childOrder: PersonId[];
@@ -34,8 +35,9 @@ export type Parentage = {
   certainty: Certainty;
 };
 
+/** Without a main name the first one is shown. */
 export type NewPerson = Pick<Person, "id" | "sex" | "living" | "names" | "mainName">;
-export type PersonPatch = Partial<Pick<Person, "sex" | "living" | "mainName">>;
+export type PersonPatch = Partial<Pick<Person, "sex" | "living">> & { mainName?: string };
 export type NotAChild = { code: "not-a-child"; id: PersonId };
 
 export function addPerson(
@@ -47,7 +49,8 @@ export function addPerson(
   if (branch !== null && g.branch(branch) === null) return missing(branch);
   const ids = person.names.map(({ id }) => id);
   if (new Set(ids).size < ids.length) return duplicate;
-  const { id, sex, living, names, mainName } = person;
+  const { id, sex, living, names } = person;
+  const mainName = person.mainName ?? names[0]?.id ?? null;
   if (mainName !== null && !ids.includes(mainName)) return missing(mainName);
   const draft = new Draft(g);
   draft.putPerson({
@@ -126,16 +129,19 @@ export function relativesOf(g: FamilyGraph, id: PersonId): PersonId[] {
 const msInDay = 86_400_000;
 /** The day number of 1 January 1970, by the count of `sortKey`. */
 const epoch = 2_440_588;
-const longLife = 110 * 365.2425;
+const longLife = 110;
 
 /**
- * Whether somebody nobody calls living or dead was born over 110 years ago. `birth` is the sort key
- * of the birth, so give none for one only known to be after a date. `now` is in milliseconds. It is
- * shown and never stored.
+ * Whether somebody nobody calls living or dead was born over 110 years ago. It is shown and never
+ * stored. `now` is in milliseconds. `birth` is the sort key of the birth, which is its first possible
+ * day: give it only for an exact date and for "about", and only when no death is recorded.
  */
 export function probablyDead({ living }: Person, birth: number | null, now: number): boolean {
   if (living !== "unknown" || birth === null) return false;
-  return Math.floor(now / msInDay) + epoch - birth > longLife;
+  const today = new Date(now);
+  const year = today.getUTCFullYear() - longLife;
+  const longAgo = Date.UTC(year, today.getUTCMonth(), today.getUTCDate()) / msInDay + epoch;
+  return birth < longAgo;
 }
 
 function editing<E extends { code: string } = Missing>(

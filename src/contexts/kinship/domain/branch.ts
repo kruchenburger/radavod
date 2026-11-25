@@ -7,10 +7,11 @@ export type Branch = {
   id: BranchId;
   version: number;
   title: { ru: string; en: string };
-  /** Which of the twelve branch inks of docs/design.md, from 0 to 11. */
-  color: number;
+  /** Which of the twelve branch inks of docs/design.md. */
+  color: BranchColor;
 };
 
+export type BranchColor = 0 | 1 | 2 | 3 | 4 | 5 | 6 | 7 | 8 | 9 | 10 | 11;
 export type NewBranch = Omit<Branch, "version">;
 export type BranchPatch = Partial<Omit<Branch, "id" | "version">>;
 
@@ -50,23 +51,23 @@ export function assignBranch(
   g: FamilyGraph,
   { person, branch, descendants, overwrite }: Assignment,
 ): Result<Change, Missing> {
-  const first = g.person(person);
+  const draft = new Draft(g);
+  const first = draft.person(person);
   if (first === null) return missing(person);
   if (branch !== null && g.branch(branch) === null) return missing(branch);
-  const draft = new Draft(g);
   draft.putPerson({ ...first, branch });
   if (!descendants) return { ok: true, value: draft.change() };
 
-  const found = new Set([person]);
-  // A set goes on to what is added while it is walked.
-  for (const id of found) {
-    for (const child of g.person(id)?.children ?? []) {
-      const one = g.person(child);
-      const isChild = one?.parents.some(
+  const found = new Map([[person, first]]);
+  // A map goes on to what is added while it is walked.
+  for (const [id, { children }] of found) {
+    for (const child of children) {
+      const one = draft.person(child);
+      const isDescendant = one?.parents.some(
         ({ parent, kind, main }) => parent === id && main && kind !== "guardianship",
       );
-      if (one === null || !isChild) continue;
-      found.add(child);
+      if (one === null || !isDescendant) continue;
+      found.set(child, one);
       if (overwrite || one.branch === null) draft.putPerson({ ...one, branch });
     }
   }
