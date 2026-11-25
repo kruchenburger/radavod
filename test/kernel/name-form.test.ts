@@ -55,10 +55,14 @@ describe("folded names meet", () => {
     ["D'Arno", "D’Arno"],
     ["O`Dell", "O´Dell"],
     ["ז׳אן", "זאן"],
+    ["ז'אן", "ז׳אן"],
+    ['רמב"ם', "רמב״ם"],
     // Spaces, dashes and what is not seen.
     ["  Анна   Мария ", "анна мария"],
     ["Анна\u00a0Мария", "Анна Мария"],
     ["Верес–Дуб", "Верес-Дуб"],
+    ["Верес−Дуб", "Верес-Дуб"],
+    ["שרה־לאה", "שרה-לאה"],
     ["Вере\u00adсень", "Вересень"],
     ["\u200fשנייבלאט\u200e", "שנייבלאט"],
     // The same letters written in other code points.
@@ -160,6 +164,9 @@ describe("folding", () => {
 
   it("takes a long name and an empty one", () => {
     expect(foldName("Ё".repeat(500))).toBe("е".repeat(500));
+    // A pattern that looks back would take seconds here.
+    expect(foldName(`${"ъ".repeat(50_000)}а`)).toHaveLength(50_001);
+    expect(foldName("ъ".repeat(50_000))).toBe("");
     expect(foldName("")).toBe("");
     expect(foldName("ъ")).toBe("");
   });

@@ -28,9 +28,9 @@ export type NameForm = {
  * | ъ at the end of a word                  | nothing; inside a word ъ is ъ            |
  * | ґ, ł, ø, đ, ð, ı, ß, æ, œ, þ            | as in the map below                      |
  * | װ, ױ, ײ and the points of Yiddish       | the two letters; nothing                 |
- * | apostrophes, the geresh, the gershayim  | nothing                                  |
+ * | apostrophes, the geresh, the gershayim  | nothing; so is a straight quote          |
  * | soft hyphens and other unseen signs     | nothing                                  |
- * | any dash; spaces                        | a hyphen; one space, none at the ends    |
+ * | any dash, the maqaf; spaces             | a hyphen; one space, none at the ends    |
  *
  * No ending is cut, no sound is guessed and no letter of one script is taken for one of another:
  * names that differ by anything not in the table do not meet.
@@ -60,7 +60,7 @@ const same: Record<string, string> = {
 };
 
 const sameLetter = new RegExp(`[${Object.keys(same).join("")}]`, "gu");
-const dropped = /['`´‘’‛ʹʻʼʽ′＇׳״]|\p{Cf}/gu;
+const dropped = /["'`´‘’‛ʹʻʼʽ′＇׳״]|\p{Cf}/gu;
 /** Marks over Latin, Greek and Cyrillic letters and points of Hebrew ones, but for the breve of й. */
 const mark =
   /(?!(?<=и)\u0306)[\u0300-\u036f\u0483-\u0487\u0591-\u05bd\u05bf\u05c1\u05c2\u05c4\u05c5\u05c7]/gu;
@@ -75,8 +75,8 @@ export function foldName(name: string): string {
     .replace(mark, "")
     .replace(sameLetter, (letter) => same[letter] ?? letter)
     .normalize("NFC")
-    .replace(/ъ+(?![\p{L}\p{M}\p{N}])/gu, "")
-    .replace(/[\u2010-\u2015\u2212]/gu, "-")
+    .replace(/(?<!ъ)ъ+(?![\p{L}\p{M}\p{N}])/gu, "")
+    .replace(/[\p{Pd}\u2212\u2043]/gu, "-")
     .replace(/\s+/gu, " ")
     .trim();
 }

@@ -38,10 +38,11 @@ const longest = 120;
  *
  * It does not read: feasts, seasons, centuries, parts of a year or of a decade; a year of fewer than
  * four digits or with a digit missing; a day with no month; 05/12/1885 and 05-12-1885, where either
- * may be the month; 1885/86 and 1885-05; periods ("from ... to ..."); a choice ("1885 or 1886"); two
- * qualifiers at once; one day in both calendars when the first month or year is left out
- * ("20/2 May 1885"); a date with its event ("b. 1885"); a whole date in brackets; other calendars;
- * INT and the phrases of GEDCOM.
+ * may be the month; 1885/86 and 1885-05; periods ("from ... to ...", "1-13 May 1885", "May - June
+ * 1885"); a choice ("1885 or 1886"); two qualifiers at once; one day in both calendars when the two
+ * are not in the month or the year that is written once ("20/2 May 1885", "25 December 1885
+ * (6 January)"); a date with its event ("b. 1885"); a whole date in brackets; other calendars; INT
+ * and the phrases of GEDCOM.
  */
 export function parseFuzzyDate(text: string): FuzzyDate {
   return { text, parsed: text.length > longest ? null : parse(tidy(text)) };
@@ -60,13 +61,11 @@ export function sortKey({ parsed }: FuzzyDate): number | null {
 }
 
 const year = "([1-9]\\d{3})";
-const afterYear = `(?:\\s*(?:${yearWords})\\.?)?`;
-const anyYear = `(?:(?:of|roku|rokiem)\\s+)?${year}${afterYear}`;
+const afterYear = `(?:-(?:й|го|м))?(?:\\s*(?:${yearWords})\\.?)?`;
+const anyYear = `(?:(?:of|roku|rokiem|r\\.)\\s+)?${year}${afterYear}`;
 /** What is written for a day or a month nobody knows. */
-const gap = "[?_*xх…]{1,4}|[-–—]{1,2}";
-/** X alone is October. */
-const monthOrGap = "\\d{1,2}|[?_*…]{1,4}|[xх]{2,4}|[-–—]{1,2}|\\.|[ivx]{1,4}";
-const day = `["«„“]?(\\d{1,2})["»”“]?(?:-?(?:го|га|е|ое|st|nd|rd|th))?(?:\\s+(?:${dayWords}))?`;
+const gap = "[?_*…]{1,4}|[xх]{2,4}|[-–—]{1,2}";
+const day = `["«„“]?(\\d{1,2})["»”“]?(?:-?(?:го|га|ага|е|ое|st|nd|rd|th))?(?:\\s+(?:${dayWords}))?`;
 const dayOrGap = `(?:${day}|["«„“]?(?:${gap}|\\.{2,3})["»”“]?)`;
 const word = "(\\p{L}+)\\.?";
 const space = ",?\\s+";
@@ -82,9 +81,12 @@ const forms: [RegExp, Reader][] = [
   [whole(anyYear), (y) => build(y)],
   // 12.05.1885, ..05.1885, __.__.1885, ..V.1885
   [
-    whole(`(\\d{1,2}|${gap}|\\.)?\\s*\\.\\s*(${monthOrGap})?\\s*\\.\\s*${year}${afterYear}`),
-    (d, m, y) =>
-      /^x?[iv]|^x$/iu.test(m ?? "") ? inWords(y, m, d) : build(y, number(m), number(d)),
+    whole(`(\\d{1,2}|${gap}|\\.)?\\s*\\.\\s*(\\d{1,2}|${gap}|\\.)?\\s*\\.\\s*${year}${afterYear}`),
+    (d, m, y) => build(y, number(m), number(d)),
+  ],
+  [
+    whole(`(?:${gap}|\\.)?\\s*\\.\\s*([ivxіх]{1,4})\\s*\\.\\s*${year}${afterYear}`),
+    (m, y) => inWords(y, m),
   ],
   // 1885-05-12
   [whole(`${year}([-./])(\\d{1,2})\\2(\\d{1,2})`), (y, _, m, d) => build(y, number(m), number(d))],
@@ -118,14 +120,20 @@ const calendars: [Calendar, RegExp][] = [
 
 const opening = (words: string): string => `^(?:${words})(?:\\.\\s*|\\s+)`;
 const qualifiers: ["about" | "before" | "after", RegExp][] = [
-  ["about", new RegExp(`${opening(qualifierWords.about)}|^[~≈]\\s*|^c(?=\\d)`, "iu")],
+  [
+    "about",
+    new RegExp(
+      `${opening(qualifierWords.about)}|^[~≈]\\s*|^c(?!.*[а-я])(?:\\.\\s*|\\s+|(?=\\d))`,
+      "iu",
+    ),
+  ],
   ["before", new RegExp(opening(qualifierWords.before), "iu")],
   ["after", new RegExp(opening(qualifierWords.after), "iu")],
 ];
 const betweenOpening = new RegExp(opening(betweenWords), "iu");
 const and = new RegExp(`^(.+?)\\s(?:${andWords})\\s(.+)$`, "iu");
 const range = whole(
-  `(.+?)\\s?[–—]\\s?(.+)|(.+?)\\s-\\s(.+)|(\\d{4}${afterYear})\\s?-\\s?(\\d{4}${afterYear})`,
+  `(.+?)\\s?[–—]\\s?(.+)|(.+?)\\s-\\s(.+)|(.*\\d{4}${afterYear})\\s?-\\s?(.*\\d{4}${afterYear})`,
 );
 const preposition = new RegExp(`^(?:${prepositions})\\s+`, "iu");
 /** The 1900s may be ten years or a hundred, so they are not read. */
@@ -147,8 +155,12 @@ function parse(text: string): ParsedDate | null {
   for (const [qualifier, words] of qualifiers) {
     if (words.test(text)) return one(qualifier, text.replace(words, ""));
   }
-  if (betweenOpening.test(text)) return split(and, text.replace(betweenOpening, ""), true);
-  return one("exact", text) ?? doubtful(text) ?? ofDecade(text) ?? split(range, text, false);
+  if (betweenOpening.test(text)) {
+    const two = text.replace(betweenOpening, "");
+    return split(and, two, true) ?? split(range, two, false);
+  }
+  const bare = text.replace(preposition, "");
+  return one("exact", text) ?? doubtful(text) ?? ofDecade(bare) ?? split(range, bare, false);
 }
 
 function one(qualifier: "exact" | "about" | "before" | "after", text: string): ParsedDate | null {
@@ -163,7 +175,7 @@ function doubtful(text: string): ParsedDate | null {
 }
 
 function ofDecade(text: string): ParsedDate | null {
-  const [, tens] = decade.exec(text.replace(preposition, "")) ?? [];
+  const [, tens] = decade.exec(text) ?? [];
   if (tens === undefined) return null;
   const first = Number(tens) * 10;
   const to = { year: first + 9 };
@@ -198,24 +210,31 @@ function readPoint(text: string): Point | null {
  */
 function inBothCalendars(text: string): Point | null {
   const pairs: [string, string][] = [];
+  const numbers =
+    /^(.*?)(?<!\d)(\d{1,2}) ?(?:\/ ?(\d{1,2})|\((\d{1,2})\)|\[(\d{1,2})\])(?!\d)(.*)$/u;
+  const [, before = "", a, slashed, round, square, after = ""] = numbers.exec(text) ?? [];
+  if (a !== undefined) {
+    const b = slashed ?? round ?? square ?? "";
+    pairs.push([`${before}${a}${after}`, `${before}${b}${after}`]);
+  }
   for (const { index } of text.matchAll(/\//gu)) {
     pairs.push([text.slice(0, index), text.slice(index + 1)]);
   }
   const brackets = /^([^([]+)(?:\(([^()]+)\)|\[([^[\]]+)\])(.*)$/u.exec(text);
   if (brackets) {
-    const [, first = "", round, square, rest = ""] = brackets;
-    pairs.push([first, `${(round ?? square ?? "").trim()}${rest}`]);
+    const [, first = "", inRound, inSquare, rest = ""] = brackets;
+    pairs.push([first, `${(inRound ?? inSquare ?? "").trim()}${rest}`]);
   }
   for (const [first, second] of pairs) {
     const left = readSide(first.trim());
     const right = readSide(second.trim());
-    const a = left.date ?? completed(left.text, right.text);
-    const b = right.date;
-    if (a === null || b === null) continue;
+    const one = left.date ?? completed(left.text, right.text);
+    const other = right.date ?? completed(right.text, left.text);
+    if (one === null || other === null) continue;
     const isJulianFirst = left.calendar !== "gregorian" && right.calendar !== "julian";
-    if (isJulianFirst && isSameDay(a, b)) return { calendar: "julian", date: a };
+    if (isJulianFirst && isSameDay(one, other)) return { calendar: "julian", date: one };
     const isJulianSecond = left.calendar !== "julian" && right.calendar !== "gregorian";
-    if (isJulianSecond && isSameDay(b, a)) return { calendar: "julian", date: b };
+    if (isJulianSecond && isSameDay(other, one)) return { calendar: "julian", date: other };
   }
   return null;
 }
@@ -230,11 +249,12 @@ function readSide(text: string): Side {
   return { text, date: readDate(text), isAfter: false };
 }
 
-/** The first of two dates with the end of the second: "5" of "5 and 10 May 1885" is "5 May 1885". */
-function completed(first: string, second: string): PartialDate | null {
-  for (const { index } of second.matchAll(/[ .]/gu)) {
-    const date = readDate(first + second.slice(index));
-    if (date !== null) return date;
+/** One of two dates with the end of the other: "5" of "5 and 10 May 1885" is "5 May 1885". */
+function completed(text: string, other: string): PartialDate | null {
+  for (const { index } of other.matchAll(/[ .]/gu)) {
+    const date = readDate(text + other.slice(index));
+    // A month and a year may be common to both, a day is not.
+    if (date !== null && (date.day === undefined || /\d/u.test(text))) return date;
   }
   return null;
 }

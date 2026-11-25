@@ -30,6 +30,7 @@ describe("a day", () => {
     // Roman months of Polish and Belarusian archives.
     "12.V.1885",
     "12 V 1885",
+    "12.V.1885 г.",
     "12-V-1885",
     "12/V/1885 r.",
     // Russian.
@@ -49,12 +50,14 @@ describe("a day", () => {
     "мая 12 дня 1885 года",
     // Belarusian.
     "12 траўня 1885 г.",
+    "12-ага мая 1885",
     "12-га мая 1885 г.",
     // Polish.
     "12 maja 1885",
     "12 maja 1885 r.",
     "12 maja 1885 roku",
     "12 maja roku 1885",
+    "12 maja r. 1885",
     "dnia 12 maja 1885 r.",
     "12. maja 1885",
     // English.
@@ -134,6 +137,8 @@ describe("a month and a year", () => {
     "..05.1885",
     "..V.1885",
     "?.V.1885",
+    "XX.V.1885",
+    "..V.1885 г.",
     "??.V.1885",
     ".05.1885",
     "__.05.1885",
@@ -161,6 +166,9 @@ describe("a month and a year", () => {
     "1885г",
     "1885 год",
     "в 1885 году",
+    "в 1885-м году",
+    "1885-й год",
+    "w r. 1885",
     "у 1885 годзе",
     "ў 1885 г.",
     "w 1885 r.",
@@ -181,6 +189,10 @@ describe("a month and a year", () => {
   it.each([
     "12..1885",
     "x.x.1885",
+    "X.X.1885",
+    "X X 1885",
+    "Х.Х.1885 г.",
+    "x.05.1885",
     "..v.1885",
     "12.??.1885",
     "12.00.1885",
@@ -195,17 +207,17 @@ describe("a month and a year", () => {
 
 describe("the names of months", () => {
   const forms = [
-    "январь января январе январём янв. Января генваря студзень студзеня студзені студзенем styczeń stycznia styczniu styczniem styczen January Jan Jan. JAN",
+    "январь января январе январём янв. Января генваря генв. студзень студзеня студзені студзенем styczeń stycznia styczniu styczniem styczen January Jan Jan. JAN",
     "февраль февраля феврале февралем фев. февр. люты лютага лютым luty lutego lutym February Feb",
     "март марта марте мартом мартъ сакавік сакавіка сакавіку сакавіком marzec marca marcu marcem March Mar",
-    "апрель апреля апреле апрелем апр. апрѣля красавік красавіка красавіку красавіком kwiecień kwietnia kwietniu kwietniem April Apr",
+    "апрель апреля апреле апрелем апр. апрѣля красавік красавіка красавіку красавіком kwiecień kwietnia kwietniu kwietniem kwiet. April Apr",
     "май мая мае маем маі травень траўня траўні траўнем maj maja maju majem May",
     "июнь июня июне июнем іюнь іюня июн. чэрвень чэрвеня чэрвені чэрвенем czerwiec czerwca czerwcu czerwcem June Jun",
     "июль июля июле июлем іюль іюля июл. ліпень ліпеня ліпені ліпенем lipiec lipca lipcu lipcem July Jul",
     "август августа августе августом августъ авг. жнівень жніўня жніўні жніўнем sierpień sierpnia sierpniu sierpniem August Aug",
     "сентябрь сентября сентябре сентябрём сент. сен. верасень верасня верасні вераснем wrzesień września wrześniu wrześniem wrzesnia September Sep Sept",
-    "октябрь октября октябре октябрём окт. кастрычнік кастрычніка кастрычніку кастрычнікам październik października październiku październikiem pazdziernika October Oct",
-    "ноябрь ноября ноябре ноябрём нояб. ноя. лістапад лістапада лістападзе лістападам listopad listopada listopadzie listopadem November Nov",
+    "октябрь октября октябре октябрём окт. кастрычнік кастрычніка кастрычніку кастрычнікам październik października październiku październikiem październ. pazdziernika October Oct",
+    "ноябрь ноября ноябре ноябрём нояб. ноя. лістапад лістапада лістападзе лістападам listopad listopada listopadzie listopadem listop. November Nov",
     "декабрь декабря декабре декабрём дек. снежань снежня снежні снежнем grudzień grudnia grudniu grudniem December Dec",
   ];
   const roman = "I II III IV V VI VII VIII IX X XI XII".split(" ");
@@ -213,7 +225,16 @@ describe("the names of months", () => {
   it.each(forms.map((words, i) => [i + 1, words] as const))("of month %i", (month, words) => {
     for (const word of [...words.split(" "), roman[month - 1]]) {
       expect([word, read(`9 ${word} 1885`)]).toEqual([word, exact(1885, month, 9)]);
+      expect([word, read(`${word} 1885`)]).toEqual([word, exact(1885, month)]);
     }
+  });
+
+  it("in Roman digits typed as Cyrillic letters", () => {
+    expect(read("9.Х.1885")).toEqual(exact(1885, 10, 9));
+    expect(read("9 ІІІ 1885")).toEqual(exact(1885, 3, 9));
+    expect(read("9.ХІІ.1885")).toEqual(exact(1885, 12, 9));
+    expect(read("..ІV.1885")).toEqual(exact(1885, 4));
+    expect(read("9.х.1885")).toBeNull();
   });
 
   it("in decomposed letters", () => {
@@ -251,6 +272,7 @@ describe("a date only known nearly", () => {
       "прим. 1885",
       "каля 1885 г.",
       "прыблізна 1885",
+      "прыкладна 1885",
       "około 1885 r.",
       "ok. 1885",
       "about 1885",
@@ -263,6 +285,7 @@ describe("a date only known nearly", () => {
       "c. 1885",
       "c.1885",
       "c1885",
+      "c 1885",
       "~1885",
       "≈ 1885",
       "abt 1885",
@@ -278,6 +301,7 @@ describe("a date only known nearly", () => {
       "до 1885",
       "до 1885 г.",
       "ранее 1885",
+      "перед 1885",
       "не позднее 1885",
       "не позже 1885 года",
       "да 1885 г.",
@@ -348,6 +372,10 @@ describe("a date between two others", () => {
     "betw. 1880 and 1885",
     "BET 1880 AND 1885",
     "1880-1885",
+    "в 1880-1885 гг.",
+    "w latach 1880-1885",
+    "між 1880 і 1885",
+    "между 1880-1885 гг.",
     "1880–1885",
     "1880 – 1885 гг.",
     "1880 -1885",
@@ -363,10 +391,19 @@ describe("a date between two others", () => {
     expect(read("между 5.05 и 10.05.1885")).toEqual(days);
     expect(read("BET 5 MAY 1885 AND 10 MAY 1885")).toEqual(days);
     expect(read("5.05.1885 - 10.05.1885")).toEqual(days);
+    expect(read("5.05.1885-10.05.1885")).toEqual(days);
     const months = between({ year: 1885, month: 5 }, { year: 1885, month: 7 });
     expect(read("между маем и июлем 1885 г.")).toEqual(months);
     expect(read("między majem a lipcem 1885")).toEqual(months);
     expect(read("between May and July 1885")).toEqual(months);
+  });
+
+  it("does not take the day of the second", () => {
+    const day = between({ year: 1885, month: 5 }, { year: 1885, month: 6, day: 5 });
+    expect(read("between May and June 5, 1885")).toEqual(day);
+    expect(read("BET MAY AND JUN 5 1885")).toEqual(day);
+    expect(read("между маем и июнем 5 1885")).toEqual(day);
+    expect(read("между маем и 5 июня 1885")).toEqual(day);
   });
 
   it.each(["1880-е", "1880-е гг.", "1880-е годы", "в 1880-х годах", "1880-я гады", "1880s"])(
@@ -404,6 +441,7 @@ describe("a date between two others", () => {
     ["1-13 мая 1885", "two days or a day in two calendars"],
     ["FROM 1880 TO 1885", "a period"],
     ["с 1880 по 1885", "a period"],
+    ["май–июнь 1885", "a period or a choice"],
     ["1885 или 1886", "one of two years"],
   ])("is not read in %j: %s", (text) => {
     expect(read(text)).toBeNull();
@@ -419,6 +457,9 @@ describe("the calendar", () => {
     "12.05.1885 (ст. ст.)",
     "12 мая 1885 г. ст. ст.",
     "12 мая 1885 ст. стиля",
+    "12 мая 1885 по ст. стилю",
+    "12 мая 1885 (старый стиль)",
+    "12 мая 1885 стараго стиля",
     "12 мая 1885 по ст. ст.",
     "12 мая 1885 г. по старому стилю",
     "12 мая ст. ст. 1885",
@@ -441,6 +482,9 @@ describe("the calendar", () => {
     "12.05.1885 н. ст.",
     "12.05.1885 н.ст.",
     "12 мая 1885 нового стиля",
+    "12 мая 1885 по н. стилю",
+    "12 мая 1885 (новый стиль)",
+    "12 мая 1885 новаго стиля",
     "12 мая 1885 (по новому стилю)",
     "12 мая 1885 г. новага стылю",
     "12 maja 1885 r. n. st.",
@@ -503,6 +547,16 @@ describe("one day in both calendars", () => {
     "01.05.1885/13.05.1885",
     "1 мая / 13 мая 1885",
     "1 мая (13 мая) 1885 года",
+    "1 мая 1885 (13 мая)",
+    "13 мая 1885 (1 мая)",
+    "13 мая 1885 г. (1 мая по ст. ст.)",
+    "1 мая 1885 (13 мая по н. ст.)",
+    "13.05.1885 (1.05 ст. ст.)",
+    "1885 года мая 1/13",
+    "1885 года мая 1/13 дня",
+    "мая 1 (13) дня 1885 года",
+    "May 1/13, 1885",
+    "1/13 мая 1885 н. ст.",
     "1 мая 1885 г. (13 мая 1885 г.)",
     "1 мая 1885 ст. ст. (13 мая 1885 н. ст.)",
     "13 мая н. ст. (1 мая ст. ст.) 1885",
@@ -544,7 +598,8 @@ describe("one day in both calendars", () => {
     ["май 1885 (13 мая 1885)", "the first is not a day"],
     ["19 апреля (май) 1885", "the second is not a day"],
     ["12 (мая) 1885", "a month in brackets"],
-    ["7 ноября 1917 (25 октября по ст. ст.)", "the second year is not written"],
+    ["25 декабря 1885 (6 января)", "the second year is not written and is another"],
+    ["1 мая 1885 (12 мая)", "it is not the same day"],
     ["1/13 мая 1885 ст. ст.", "the style contradicts the second day"],
   ])("is not read in %j: %s", (text) => {
     expect(read(text)).toBeNull();
@@ -583,6 +638,8 @@ describe("what is not read", () => {
     "от 12 мая 1885",
     "к 1885",
     "с 1885",
+    "c 1885 г.",
+    "c мая 1885",
     "18850512",
     "12051885",
     "１２.０５.１８８５",
@@ -613,7 +670,7 @@ const anyText = fc.oneof(
   fc
     .array(
       fc.constantFrom(
-        ..."12 05 1885 1886 мая май V May . .. / - – ( ) [ ] ? , ст. н. до около между и BET AND @#DJULIAN@ г. 1880-е".split(
+        ..."12 31 02 05 1885 1886 мая май V May . .. / - – ( ) [ ] ? , ст. ст.ст. н. до около между и BET AND @#DJULIAN@ г. 1880-е".split(
           " ",
         ),
       ),
@@ -628,6 +685,12 @@ describe("any text", () => {
   });
 
   it("is read into a date that exists, or not at all", () => {
+    const daysIn = (year: number, month: number, calendar: ParsedDate["calendar"]) =>
+      month === 2 && calendar === "julian"
+        ? year % 4 === 0
+          ? 29
+          : 28
+        : new Date(Date.UTC(year, month, 0)).getUTCDate();
     fc.assert(
       fc.property(anyText, (text) => {
         const parsed = read(text);
@@ -636,7 +699,9 @@ describe("any text", () => {
           // The century is always the text's own.
           expect(text).toContain(String(Math.floor(year / 10)));
           if (month !== undefined) expect(month >= 1 && month <= 12).toBe(true);
-          if (day !== undefined) expect(month !== undefined && day >= 1 && day <= 31).toBe(true);
+          if (day !== undefined) {
+            expect(day >= 1 && day <= daysIn(year, month ?? 0, parsed.calendar)).toBe(true);
+          }
         }
         expect(parsed.to !== undefined).toBe(parsed.qualifier === "between");
       }),

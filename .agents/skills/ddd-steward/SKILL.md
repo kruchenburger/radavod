@@ -26,7 +26,7 @@ A union (who, with whom, of what kind) belongs to `kinship`. A wedding or a divo
 ## Layers
 
 ```
-src/kernel/                identifiers, FuzzyDate, NameForm, certainty, language and script; nothing else
+src/kernel/                identifiers, Result, FuzzyDate, NameForm, certainty, language and script; nothing else
 src/contexts/<name>/
   domain/                  rules; imports its own files and src/kernel only
   application/             use cases and ports; knows no adapters

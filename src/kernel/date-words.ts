@@ -2,7 +2,7 @@
 
 const months = [
   [
-    "январь января январе январю январем янв генварь генваря",
+    "январь января январе январю январем янв генварь генваря генв",
     "студзень студзеня студзені студзеню студзенем студз",
     "styczeń stycznia styczniu styczniem stycz sty",
     "january jan",
@@ -22,7 +22,7 @@ const months = [
   [
     "апрель апреля апреле апрелю апрелем апр",
     "красавік красавіка красавіку красавіком крас",
-    "kwiecień kwietnia kwietniu kwietniem kwiec kwi",
+    "kwiecień kwietnia kwietniu kwietniem kwiec kwiet kwi",
     "april apr",
   ],
   [
@@ -58,13 +58,13 @@ const months = [
   [
     "октябрь октября октябре октябрю октябрем окт",
     "кастрычнік кастрычніка кастрычніку кастрычнікам кастр",
-    "październik października październiku październikiem pazdz paz",
+    "październik października październiku październikiem pazdziern pazdz paz",
     "october oct",
   ],
   [
     "ноябрь ноября ноябре ноябрю ноябрем нояб ноя",
     "лістапад лістапада лістападзе лістападу лістападам ліст",
-    "listopad listopada listopadzie listopadem list lis",
+    "listopad listopada listopadzie listopadem listop list lis",
     "november nov",
   ],
   [
@@ -81,12 +81,15 @@ const monthByWord = new Map(
   ),
 );
 
-/** Polish and Belarusian archives number months so. Capitals only: "i" is a conjunction. */
+/**
+ * Polish and Belarusian archives number months so. Capitals only: "i" is a conjunction. On a
+ * Cyrillic keyboard І and Х stand for I and X.
+ */
 const roman = ["I", "II", "III", "IV", "V", "VI", "VII", "VIII", "IX", "X", "XI", "XII"];
 
 /** The number of a month by its name in any case, full or short, old spelling or new. */
 export function monthOf(word: string): number | undefined {
-  const number = roman.indexOf(word) + 1;
+  const number = roman.indexOf(word.replace(/І/gu, "I").replace(/Х/gu, "X")) + 1;
   return number > 0 ? number : monthByWord.get(plain(word));
 }
 
@@ -104,12 +107,12 @@ function plain(word: string): string {
 export const qualifierWords = {
   about: [
     "около|ок|примерно|прим|приблизительно|прибл|бл",
-    "каля|прыблізна|прыбл",
+    "каля|прыблізна|прыбл|прыкладна",
     "około|ok",
-    "about|abt|around|approximately|approx|circa|ca|c|estimated|est|calculated|cal",
+    "about|abt|around|approximately|approx|circa|ca|estimated|est|calculated|cal",
   ].join("|"),
   before: [
-    "до|ранее|раньше|не позднее|не позже",
+    "до|перед|ранее|раньше|не позднее|не позже",
     "да|перад|раней(?: за)?|не пазней(?: за)?",
     "przed|do|nie później niż",
     "before|bef|prior to|no later than|not later than|not after",
@@ -122,11 +125,11 @@ export const qualifierWords = {
   ].join("|"),
 };
 
-export const betweenWords = "между|меж|паміж|między|pomiędzy|between|betw|bet";
+export const betweenWords = "между|меж|паміж|між|między|pomiędzy|between|betw|bet";
 export const andWords = "и|і|а|a|i|oraz|and";
 
 /** What stands before a date and adds nothing to it. */
-export const prepositions = "во?|у|ў|w|we|in|on|dnia";
+export const prepositions = "во?|у|ў|w latach|w|we|in|on|dnia";
 /** What stands after the number of a day. */
 export const dayWords = "дня|числа|of";
 export const yearWords = [
@@ -138,14 +141,14 @@ export const yearWords = [
 export const calendarWords = {
   julian: [
     "@#djulian@|julian",
-    "(?:по )?(?:ст\\.? ?ст\\.?|ст\\.? ?стиля|старого стиля|старому стилю)",
+    "(?:по )?(?:ст\\.? ?ст\\.?|ст\\.? ?стил[яю]|стар[оа]го стиля|старому стилю|старый стиль)",
     "(?:па )?(?:ст\\.? ?стылю|старога стылю|старому стылю|стараму стылю|старым стылі)",
     "st\\.? ?st\\.?|starego stylu",
     "o\\.? ?s\\.?|old style",
   ].join("|"),
   gregorian: [
     "@#dgregorian@|gregorian",
-    "(?:по )?(?:н\\.? ?ст\\.?|н\\.? ?стиля|нового стиля|новому стилю)",
+    "(?:по )?(?:н\\.? ?ст\\.?|н\\.? ?стил[яю]|нов[оа]го стиля|новому стилю|новый стиль)",
     "(?:па )?(?:н\\.? ?стылю|новага стылю|новаму стылю|новым стылі)",
     "n\\.? ?st\\.?|nowego stylu",
     "n\\.? ?s\\.?|new style",
