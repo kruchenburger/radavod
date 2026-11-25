@@ -22,7 +22,8 @@ pnpm guard:ddd
 pnpm guard:data
 pnpm examples                          # writes examples/family.json
 pnpm guard:copy
-pnpm build                             # the browser app, into dist/client
+pnpm build                             # the browser app and the sample, into dist/client
+pnpm bench                             # times of the tree layout
 ```
 
 ## Architecture
@@ -46,6 +47,14 @@ Every text a person reads is in `web/i18n/ru.ts` and `web/i18n/en.ts`, reached t
 ## Example family
 
 `examples/` holds an invented family of 300. `generateFamily(seed, size)` makes it and `examples/family.json` is its output for seed 1; a test compares them, so change the generator and run `pnpm examples`. Every invented name is in `examples/names.ts`. The app never imports `examples/`, and its types are not the domain model.
+
+`examples/snapshot.ts` turns the family into a tree snapshot. `pnpm build` writes it to `dist/client/sample/tree.json`, and the app fetches it from there.
+
+## Tree
+
+`src/shared/tree.ts` is the snapshot of the tree that the server will send. `web/tree/layout` turns it into places: `around` and `aroundNarrow` for the view around a person, `branchMap` for the map, following `docs/design.md`. These are pure functions with no DOM, no clock and no texts; they judge nothing and draw what the snapshot says. `web/tree/map-layouter.ts` runs the map in a worker.
+
+A layout is tested by `test/web/layout/geometry.ts`, not by snapshots of coordinates: nothing overlaps, no line enters a card, everybody stands once, every link is there. A new rule of drawing becomes a check there and a planted defect in `geometry.test.ts`. A family that is hard to draw goes to `cases.ts`.
 
 ## Data guard
 

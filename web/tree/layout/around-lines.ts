@@ -1,9 +1,13 @@
-import type { Row, Rows } from "./around";
 import type { Model } from "./around-model";
 import type { AroundMetrics } from "./around-text";
+import { extent } from "./extent";
 import { listOf } from "./kin";
 import { inPlace, outPlace, spread, step, Track } from "./lanes";
 import type { Link, Point } from "./types";
+
+/** The places of cards from top to bottom, by key. */
+export type Row = { y: number; h: number };
+export type Rows = Map<string, Row>;
 
 /** An end of a line on a side of a card. A gutter has the number of the column on its left. */
 type Pin = { key: string; y: number; gutter: number };
@@ -19,7 +23,7 @@ export function drawLines(
   metrics: AroundMetrics,
 ): { links: Link[]; columns: Column[]; width: number; height: number; shift: number } {
   const generations = [...model.entries.values()].map(({ generation }) => generation);
-  const [first, last] = [Math.min(...generations), Math.max(...generations)];
+  const [first, last] = extent(generations);
   const wires = wiresOf(model, rows, { metrics, margin: first - 1 });
   straighten(wires);
   const passes = findPasses(wires, model, rows);
@@ -70,7 +74,8 @@ export function drawLines(
   };
 
   const ys = [...rows.values()].flatMap(({ y, h }) => [y, y + h]);
-  const shift = -Math.floor(Math.min(...ys, ...passes) / step) * step;
+  const [upper, lower] = extent([...ys, ...passes]);
+  const shift = -Math.floor(upper / step) * step;
   for (const { link, family, from, to, gutters: through, passes: own } of wires) {
     const path: Point[] = [[sideX(from), from.y]];
     const isStraight = from.y === to.y && through.length === 1 && sideX(from) !== sideX(to);
@@ -87,7 +92,7 @@ export function drawLines(
   for (const { isTogether, ...union } of model.unions) {
     if (isTogether) links.push({ ...union, points: [] });
   }
-  return { links, columns, width: x, height: Math.max(...ys, ...passes) + shift, shift };
+  return { links, columns, width: x, height: lower + shift, shift };
 }
 
 type Draft = {
@@ -213,8 +218,8 @@ function findPasses(wires: Wire[], model: Model, rows: Rows): number[] {
     { family, ...to },
   ]);
   const all = [...rows.values()];
-  const top = Math.min(...all.map(({ y }) => y)) - 2 * step;
-  const bottom = Math.max(...all.map(({ y, h }) => y + h)) + 2 * step;
+  const [upper, lower] = extent(all.flatMap(({ y, h }) => [y, y + h]));
+  const [top, bottom] = [upper - 2 * step, lower + 2 * step];
   const taken: { y: number; from: number; to: number; family: string }[] = [];
 
   for (const { family, from, to, gutters, passes } of wires) {

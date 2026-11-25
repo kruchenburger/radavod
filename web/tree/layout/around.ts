@@ -6,10 +6,11 @@ import {
   modelOf,
   type Reach,
   type Role,
+  type UpNode,
 } from "./around-model";
 import { type AroundMetrics, aroundMetrics, textsOf } from "./around-text";
-import { drawLines } from "./around-lines";
-import type { UpNode } from "./around-model";
+import { drawLines, type Row, type Rows } from "./around-lines";
+import { extent } from "./extent";
 import type { Card, Layout, Line, Measure, Wording } from "./types";
 
 export type AroundOptions = Reach & {
@@ -88,9 +89,6 @@ export const emptyAround = () => ({
   order: [],
 });
 
-export type Row = { y: number; h: number };
-export type Rows = Map<string, Row>;
-
 /** Places from top to bottom. Every family has a band of its own through all columns. */
 function placeRows(model: Model, heights: Map<string, number>, metrics: AroundMetrics): Rows {
   const rows: Rows = new Map();
@@ -152,7 +150,8 @@ function placeRows(model: Model, heights: Map<string, number>, metrics: AroundMe
       return key === model.focus.key ? y + middle : y + h / 2;
     }),
   );
-  const center = sources.length === 0 ? middle : (Math.min(...sources) + Math.max(...sources)) / 2;
+  const [first, last] = extent(sources.length === 0 ? [middle] : sources);
+  const center = (first + last) / 2;
   const top = center - downStack(groups) / 2;
   placeDown(groups, top);
   placeDown([model.strayDown], top + downStack(groups) + metrics.sets);

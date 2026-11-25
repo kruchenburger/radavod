@@ -1,4 +1,5 @@
 import type { MapMetrics } from "./branch-map";
+import { extent } from "./extent";
 import type { MapModel, MapNode } from "./map-model";
 
 /** Where nodes stand on their pages, before anything is known about lines and other pages. */
@@ -73,7 +74,7 @@ export function placeNodes(model: MapModel, metrics: MapMetrics): Placed {
     const above = taken.get(node.generation - 1);
     if (above !== undefined) x = Math.max(x, above + step - leftIn(0));
     if (x === -Infinity) {
-      x = taken.size === 0 ? 0 : Math.max(...taken.values()) + step - leftIn(0);
+      x = taken.size === 0 ? 0 : extent(taken.values())[1] + step - leftIn(0);
     }
     x = Math.ceil(x / step) * step;
     xs.set(node, x);

@@ -76,7 +76,7 @@ const unionSchema = z.object({
 const branchSchema = z.object({
   id,
   title: text,
-  /** The number of one of the twelve branch colors. */
+  /** Which of the twelve branch inks of docs/design.md: 0 stands for the first. */
   color: z.int().min(0).max(11),
 });
 

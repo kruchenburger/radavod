@@ -10,7 +10,7 @@ import {
   type MapOptions,
 } from "../../../web/tree/layout/branch-map";
 import { carry } from "../../../web/tree/layout/carry";
-import { mapText } from "../../../web/tree/layout/map-text";
+import { barOf, mapText } from "../../../web/tree/layout/map-text";
 import { cases } from "./cases";
 import { type FamilySpec, familyOf, measure, wordingOf } from "./family";
 import { crossings, problems } from "./geometry";
@@ -248,12 +248,11 @@ describe("the map of branches", () => {
     expect(inRow(drawn({ people, branches }, { perRow: 4, width: 1 }))).toBe(1);
   });
 
-  it("makes a page as wide as its head", () => {
-    const map = drawn({
-      people: [{ id: "a", branch: "A".repeat(60) }],
-      branches: ["A".repeat(60)],
-    });
-    expect(map.pages[0]?.w).toBeGreaterThan(60 * 13);
+  it("makes a page as wide as its head, within reason", () => {
+    const widthOf = (title: string): number =>
+      drawn({ people: [{ id: "a", branch: title }], branches: [title] }).pages[0]?.w ?? 0;
+    expect(widthOf("A".repeat(25))).toBeGreaterThan(25 * 13);
+    expect(widthOf("A".repeat(500))).toBeLessThan(500);
   });
 
   it("says nothing different when asked again", () => {
@@ -328,6 +327,15 @@ describe("levels of one map", () => {
     expect(width / height).toBeGreaterThan(2);
     expect(width / height).toBeLessThan(2.5);
   });
+});
+
+it("stands a bar for a name, as long as the name within bounds", () => {
+  const map = draw(familyOf({ people: ["x"] }), { level: "far" });
+  const bar = (given: string): number =>
+    barOf({ given, surname: "", years: "", branch: "" }, map, measure) / map.metrics.w;
+  expect(bar("Ян")).toBe(0.42);
+  expect(bar("Александра Мария")).toBeGreaterThan(0.6);
+  expect(bar("Ш".repeat(500))).toBe(1);
 });
 
 it("draws five thousand people, and no ribbon of them", () => {

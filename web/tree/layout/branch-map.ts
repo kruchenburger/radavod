@@ -229,7 +229,8 @@ function sheetsOf(
   const list = model.pages.map((branch, i): Sheet => {
     const { width, rowHeights } = placed.pages[i] as { width: number; rowHeights: number[] };
     const own = branches.get(branch);
-    const head = own === undefined ? 0 : measure(headOf(own), "head");
+    // A very long title is cut by the screen, the page does not grow with it.
+    const head = own === undefined ? 0 : Math.min(measure(headOf(own), "head"), widestHead);
     const tops: number[] = [];
     let y = metrics.head;
     rowHeights.forEach((height, row) => {
@@ -262,6 +263,9 @@ function sheetsOf(
   });
   return { perRow, list };
 }
+
+/** A title wider than this does not make its page wider. */
+const widestHead = 360;
 
 /** A map more than so many times as wide as high gets fewer pages in a row. */
 const widest = 8;

@@ -11,6 +11,7 @@ import {
   type UpNode,
 } from "./around-model";
 import { bottomOf, detailRuns, type EntryText, nameRuns, type TextOptions } from "./around-text";
+import { extent } from "./extent";
 import { kinOf, listOf } from "./kin";
 import { spread, step, Track } from "./lanes";
 import { flow, nameLines, type Run } from "./text";
@@ -107,7 +108,7 @@ export function aroundNarrow(
   const marginLanes = margin.lay();
   const marginWidth = marginLanes === 0 ? 0 : (marginLanes + 1) * metrics.lane;
 
-  const deepest = Math.max(...items.map(({ level }) => level));
+  const [, deepest] = extent(items.map(({ level }) => level));
   const lanes: number[] = [0];
   const lefts: number[] = [0];
   for (let level = 1; level <= deepest; level += 1) {

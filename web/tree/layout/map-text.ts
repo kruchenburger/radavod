@@ -1,5 +1,5 @@
 import type { TreePerson } from "../../../src/shared/tree";
-import type { BranchMap, MapCard } from "./branch-map";
+import { type BranchMap, type MapCard, mapMetrics } from "./branch-map";
 import { flow, type Run } from "./text";
 import type { CardText, Line, Measure, TextStyle, Wording } from "./types";
 
@@ -55,7 +55,7 @@ export function barOf(
   measure: Measure,
 ): number {
   const full = measure(`${text.given} ${text.surname}`, "closerName");
-  const share = full / 138;
+  const share = full / mapMetrics.closer.w;
   return metrics.w * Math.min(1, Math.max(0.42, share));
 }
 
