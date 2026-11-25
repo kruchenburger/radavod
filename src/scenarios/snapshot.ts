@@ -42,11 +42,12 @@ export function snapshotsOf(
       const head = headOf();
       const state = unit.read((c) => c.history.state());
       const body = await packed(JSON.stringify(snapshotOf(state, head)));
-      // Somebody erased while it was packed is in it: it is neither kept nor given.
-      if (checkpoints.erasures() !== erasures) continue;
+      // Somebody erased while it was packed is in it: it is neither kept nor given. An erasure is
+      // an edit as well, so one the counter does not see is caught by the version.
+      const now = headOf();
+      if (checkpoints.erasures() !== erasures || now.version !== head.version) continue;
       storage.transactionSync(() => {
-        const now = headOf();
-        if (now.version === head.version && now.epoch === head.epoch) {
+        if (now.epoch === head.epoch) {
           kept.put({ ...head, data: body });
         }
       });
