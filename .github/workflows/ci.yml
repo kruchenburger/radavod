@@ -32,3 +32,5 @@ jobs:
       - run: pnpm test
       - run: pnpm guard:ddd
       - run: pnpm guard:data
+      - run: pnpm guard:copy
+      - run: pnpm build

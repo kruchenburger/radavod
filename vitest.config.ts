@@ -1,4 +1,5 @@
 import { cloudflareTest } from "@cloudflare/vitest-plugin";
+import react from "@vitejs/plugin-react";
 import { defineConfig } from "vitest/config";
 
 export default defineConfig({
@@ -14,7 +15,17 @@ export default defineConfig({
             miniflare: { bindings: { JURISDICTION: "none" } },
           }),
         ],
-        test: { name: "worker", include: ["test/**/*.test.ts"] },
+        test: { name: "worker", include: ["test/**/*.test.ts"], exclude: ["test/web/**"] },
+      },
+      {
+        plugins: [react()],
+        test: {
+          name: "web",
+          environment: "jsdom",
+          include: ["test/web/**/*.test.{ts,tsx}"],
+          setupFiles: ["test/web/setup.ts"],
+          css: true,
+        },
       },
       {
         test: {

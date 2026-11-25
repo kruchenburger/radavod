@@ -4,7 +4,7 @@ A private family tree site that a family runs on its own Cloudflare account. Thi
 
 ## Stack
 
-TypeScript in strict mode, pnpm, Hono on Cloudflare Workers, two SQLite Durable Objects, Vitest in the Workers runtime, oxlint, dependency-cruiser. Node 26 or newer runs the tools.
+TypeScript in strict mode, pnpm, Hono on Cloudflare Workers, two SQLite Durable Objects, Vitest in the Workers runtime, oxlint, dependency-cruiser. The browser app in `web` is React and Mantine, built by Vite. Node 26 or newer runs the tools.
 
 `src/worker` serves `/health` and `/api/*`. `FamilyTree` holds the tree, `FamilyAccess` holds members and sign-in. Every `/api/*` route answers 401 unless a session allows it.
 
@@ -21,6 +21,8 @@ pnpm lint
 pnpm guard:ddd
 pnpm guard:data
 pnpm examples                          # writes examples/family.json
+pnpm guard:copy
+pnpm build                             # the browser app, into dist/client
 ```
 
 ## Architecture
@@ -30,6 +32,12 @@ Seven bounded contexts in `src/contexts`. `.agents/skills/ddd-steward/SKILL.md` 
 `pnpm guard:ddd` fails on a forbidden import, an import dependency-cruiser cannot see, a module outside its place, a table without an owner, and a scan that missed a file. There are no exceptions. `guards/ddd/fixtures` holds one case per folder, most of them broken on purpose; do not fix them.
 
 dependency-cruiser parses with swc, because TypeScript 7 has no compiler API.
+
+## Texts
+
+Every text a person reads is in `web/i18n/ru.ts` and `web/i18n/en.ts`, reached through `t`. Words come from `docs/glossary.md`, wording from `.agents/skills/copy-steward/SKILL.md`. Read both before you add or change a text. Errors and API answers carry codes, not sentences.
+
+`pnpm guard:copy` fails on text outside the catalogs, on keys, parameters and plural forms that do not match, on banned phrases and on a file it cannot read. There are no exceptions. A folder in `guards/copy/fixtures/bad` is laid over `clean` and breaks one rule on purpose.
 
 ## Example family
 
