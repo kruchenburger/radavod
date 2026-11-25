@@ -123,7 +123,7 @@ const qualifiers: ["about" | "before" | "after", RegExp][] = [
   [
     "about",
     new RegExp(
-      `${opening(qualifierWords.about)}|^[~≈]\\s*|^c(?!.*[а-я])(?:\\.\\s*|\\s+|(?=\\d))`,
+      `${opening(qualifierWords.about)}|^[~≈]\\s*|^c(?!.*\\p{Script=Cyrillic})(?:\\.\\s*|\\s+|(?=\\d))`,
       "iu",
     ),
   ],
@@ -133,7 +133,7 @@ const qualifiers: ["about" | "before" | "after", RegExp][] = [
 const betweenOpening = new RegExp(opening(betweenWords), "iu");
 const and = new RegExp(`^(.+?)\\s(?:${andWords})\\s(.+)$`, "iu");
 const range = whole(
-  `(.+?)\\s?[–—]\\s?(.+)|(.+?)\\s-\\s(.+)|(.*\\d{4}${afterYear})\\s?-\\s?(.*\\d{4}${afterYear})`,
+  `(.+?)\\s?[–—]\\s?(.+)|(.+?)\\s-\\s(.+)|([^-]*\\d{4}${afterYear})\\s?-\\s?([^-]*\\d{4}${afterYear})`,
 );
 const preposition = new RegExp(`^(?:${prepositions})\\s+`, "iu");
 /** The 1900s may be ten years or a hundred, so they are not read. */
@@ -211,7 +211,7 @@ function readPoint(text: string): Point | null {
 function inBothCalendars(text: string): Point | null {
   const pairs: [string, string][] = [];
   const numbers =
-    /^(.*?)(?<!\d)(\d{1,2}) ?(?:\/ ?(\d{1,2})|\((\d{1,2})\)|\[(\d{1,2})\])(?!\d)(.*)$/u;
+    /^(.*?)(?<![\d-])(\d{1,2}) ?(?:\/ ?(\d{1,2})|\((\d{1,2})\)|\[(\d{1,2})\])(?!\d)(.*)$/u;
   const [, before = "", a, slashed, round, square, after = ""] = numbers.exec(text) ?? [];
   if (a !== undefined) {
     const b = slashed ?? round ?? square ?? "";
@@ -229,7 +229,9 @@ function inBothCalendars(text: string): Point | null {
     const left = readSide(first.trim());
     const right = readSide(second.trim());
     const one = left.date ?? completed(left.text, right.text);
-    const other = right.date ?? completed(right.text, left.text);
+    // A bare number after a whole date may be a note, an age or a number of a record.
+    const isDay = right.calendar !== undefined || /[\p{L}.]/u.test(right.text);
+    const other = right.date ?? (isDay ? completed(right.text, left.text) : null);
     if (one === null || other === null) continue;
     const isJulianFirst = left.calendar !== "gregorian" && right.calendar !== "julian";
     if (isJulianFirst && isSameDay(one, other)) return { calendar: "julian", date: one };
