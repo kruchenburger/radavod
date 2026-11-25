@@ -87,10 +87,10 @@ export function unitOfWork(
 }
 
 function currentOf(kept: readonly Kept[], aggregate: string): number | string | null {
-  const [, kind = "", id = ""] = /^([a-z-]+)\/([a-z]+_[1-9A-Za-z]{22})$/.exec(aggregate) ?? [];
+  const [kind = "", id = "", more] = aggregate.split("/");
   const current = kept.map((one) => one.current(kind, id)).find((one) => one !== undefined);
   // The key came from outside, so it is not repeated.
-  if (current === undefined) throw new Error("unknown-aggregate");
+  if (current === undefined || more !== undefined) throw new Error("unknown-aggregate");
   return current;
 }
 

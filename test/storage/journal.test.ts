@@ -184,13 +184,25 @@ describe("the journal", () => {
           after: { parents: [], sex: "male" },
         },
       ]);
+      // Whoever stays in a list is not told again, and what only looks like a person is a text.
+      const list = (...people: string[]) => ({ childOrder: people, note: "" });
+      journal.write(4, act, [
+        { kind: "person", id: "p", before: list(ada, eve), after: list(eve, ada, kid) },
+        { kind: "person", id: "q", before: list(), after: { ...list(), note: `${ada}, тайна` } },
+      ]);
+      journal.write(5, act, [
+        { kind: "person", id: "p", before: list(), after: { ...list(), note: "person_ тайна" } },
+      ]);
+      expect(journal.entriesOf(kid)).toEqual([2, 4]);
+      const subjects = tree.rows().history_subject as { id: string }[];
+      expect(subjects.filter(({ id }) => id.includes("тайна"))).toEqual([]);
       // Hundreds may go from one branch to another at once: they are found under the branches.
       journal.write(3, act, [
         { kind: "person-branch", id: ada, before: null, after: branch("green") },
       ]);
-      expect(journal.entriesOf(ada)).toEqual([1]);
+      // Ada was in the union and stays in it.
+      expect(journal.entriesOf(ada)).toEqual([]);
       expect(journal.entriesOf(eve)).toEqual([1, 2]);
-      expect(journal.entriesOf(kid)).toEqual([2]);
       expect(journal.entriesOf("u")).toEqual([1]);
       expect(journal.entriesOf(branch("green"))).toEqual([3]);
     }));

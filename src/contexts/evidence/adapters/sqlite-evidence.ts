@@ -1,5 +1,5 @@
 import { z } from "zod";
-import type { SourceId } from "../../../kernel/id";
+import { isId, type SourceId } from "../../../kernel/id";
 import { type Kept, type RawRow, Rows, type Written } from "../../../shared/rows";
 import { citationIdSchema, factRefSchema, sourceIdSchema } from "../../../shared/values";
 import type { EvidenceStore } from "../application/ports";
@@ -108,8 +108,9 @@ class SqliteEvidence implements EvidenceStore, Kept {
   }
 
   current(kind: string, id: string): number | undefined {
-    if (kind === "source") return this.#sources.version(id as SourceId);
-    return kind === "cited" ? this.#cited.version(id as SubjectId) : undefined;
+    if (kind === "source" && isId("source", id)) return this.#sources.version(id);
+    if (kind !== "cited") return undefined;
+    return isId("person", id) || isId("union", id) ? this.#cited.version(id) : undefined;
   }
 
   flush(version: number): Written[] {

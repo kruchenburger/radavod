@@ -4,6 +4,7 @@ import type { Parentage } from "../src/contexts/kinship";
 import type { LifeEvent } from "../src/contexts/life";
 import { parseFuzzyDate } from "../src/kernel/fuzzy-date";
 import type { PersonId, UnionId } from "../src/kernel/id";
+import type { Contexts } from "../src/scenarios/unit-of-work";
 import { fill, rowsOf } from "./storage/schema-1";
 import {
   accepted,
@@ -143,6 +144,28 @@ describe("rows over 5 000 people", () => {
         accepted(c.kinship.apply({ do: "remove-union", id: union("big") })),
       );
 
+      const ordered = (c: Contexts, order: string[]) =>
+        accepted(
+          c.kinship.apply({
+            do: "order-children",
+            person: person("patriarch"),
+            order: order.map(person),
+          }),
+        );
+      const kids = Array.from({ length: 20 }, (_, i) => `son ${i}`);
+      tree.do((c) => {
+        addPerson(c, "patriarch");
+        for (const kid of kids) {
+          addPerson(c, kid);
+          addParent(c, kid, "patriarch");
+        }
+        ordered(c, kids);
+      });
+      measure("order 20 children", 20, (c) => ordered(c, kids.toReversed()));
+      measure("remove a parent of 20 in order", 20, (c) =>
+        accepted(c.kinship.apply({ do: "remove-parent", child: person("son 1"), id: "patriarch" })),
+      );
+
       const guests = people.slice(0, 20).map(({ id }) => id as PersonId);
       const wedding: LifeEvent = {
         ...birth(ada, "new e3"),
@@ -150,6 +173,14 @@ describe("rows over 5 000 people", () => {
         participants: guests.map((one) => ({ person: one, role: "witness" })),
       };
       measure("add an event with 20 participants", 60, (c) => accepted(c.life.add(wedding)));
+      measure("drop one of 20 participants", 20, (c) =>
+        accepted(
+          c.life.edit(guests[0] as PersonId, {
+            ...wedding,
+            participants: wedding.participants.slice(0, -1),
+          }),
+        ),
+      );
       measure("remove an event with 20 participants", 60, (c) =>
         accepted(c.life.remove(guests[0] as PersonId, wedding.id)),
       );

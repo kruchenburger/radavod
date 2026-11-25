@@ -28,7 +28,7 @@ const entrySchema = z.strictObject({
   ),
 }) satisfies z.ZodType<Omit<Entry, "number">>;
 
-/** How much text a part takes. In bytes it is three times as much at most, and a row holds 2 MB. */
+/** How much text a part takes: in bytes three times as much at most, well below what a row holds. */
 const partSize = 500_000;
 
 const numbersSchema = z.array(z.int().positive());

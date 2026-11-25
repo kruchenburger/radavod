@@ -1,5 +1,5 @@
 import { z } from "zod";
-import type { PlaceId } from "../../../kernel/id";
+import { isId, type PlaceId } from "../../../kernel/id";
 import { type Kept, type RawRow, Rows, type Written } from "../../../shared/rows";
 import { fuzzyDateSchema, languageSchema } from "../../../shared/values";
 import type { PlacesStore } from "../application/ports";
@@ -65,7 +65,7 @@ class SqlitePlaces implements PlacesStore, Kept {
   }
 
   current(kind: string, id: string): number | undefined {
-    return kind === "place" ? this.#places.version(id as PlaceId) : undefined;
+    return kind === "place" && isId("place", id) ? this.#places.version(id) : undefined;
   }
 
   flush(version: number): Written[] {

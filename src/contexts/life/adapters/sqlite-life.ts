@@ -1,5 +1,5 @@
 import { z } from "zod";
-import type { PersonId, PlaceId } from "../../../kernel/id";
+import { isId, type PersonId, type PlaceId } from "../../../kernel/id";
 import { type Kept, type RawRow, Rows, type Written } from "../../../shared/rows";
 import {
   certaintySchema,
@@ -103,7 +103,7 @@ class SqliteLife implements LifeStore, Kept {
   }
 
   current(kind: string, id: string): number | undefined {
-    return kind === "life" ? this.#lives.version(id as PersonId) : undefined;
+    return kind === "life" && isId("person", id) ? this.#lives.version(id) : undefined;
   }
 
   flush(version: number): Written[] {

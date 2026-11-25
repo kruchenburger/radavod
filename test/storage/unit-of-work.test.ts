@@ -146,6 +146,16 @@ describe("a scenario", () => {
       tree.do((c) => accepted(c.kinship.apply(kind)));
       tree.do((c) => accepted(c.kinship.apply({ do: "remove-union", id: union("u") })));
       tree.do((c) => addParent(c, "kid", "ada"));
+      tree.do((c) => addParent(c, "kid", "eve"));
+      tree.do((c) => addParent(c, "ada", "eve"));
+      const order = (...order: string[]) => ({
+        do: "order-children" as const,
+        person: person("eve"),
+        order: order.map(person),
+      });
+      tree.do((c) => accepted(c.kinship.apply(order("ada", "kid"))));
+      // She stays in the list, so this is found by her parent.
+      tree.do((c) => accepted(c.kinship.apply(order("kid", "ada"))));
       tree.do((c) =>
         accepted(c.kinship.apply({ do: "remove-parent", child: person("kid"), id: "ada" })),
       );
@@ -153,14 +163,14 @@ describe("a scenario", () => {
       const named = journal.entriesOf(person("ada"));
       const all = Array.from({ length: tree.entries }, (_, i) => i + 1);
       const says = all.filter((n) => JSON.stringify(journal.entry(n)).includes(person("ada")));
-      expect(named).toEqual(says);
-      // The note and the kind name nobody. They are entries 3 and 6.
-      expect(all.filter((n) => !named.includes(n))).toEqual([3, 6]);
-      const aggregates = named.flatMap((n) => journal.entry(n)?.patches ?? []);
-      const around = aggregates.flatMap(({ aggregate }) => {
-        const [, id = ""] = aggregate.split("/");
-        return journal.entriesOf(id);
-      });
+      // The note of an event, the kind of a union, and a new order of the same children.
+      expect(all.filter((n) => !named.includes(n))).toEqual([3, 6, 9, 12]);
+      // Everything an entry of hers is about or names, and all that was said of those.
+      const patches = JSON.stringify(named.map((n) => journal.entry(n)?.patches));
+      const around = [...patches.matchAll(/(?:person|union)_\w{22}/g)].flatMap(([id]) =>
+        journal.entriesOf(id),
+      );
+      expect(says.filter((n) => !around.includes(n))).toEqual([]);
       expect([...new Set(around)].sort((a, b) => a - b)).toEqual(all);
     }));
 
@@ -329,7 +339,17 @@ describe("a version", () => {
           error: { code: "stale-version", aggregate, current: there[aggregate] },
         });
       }
-      for (const wrong of ["horse/1", "person", `person/${person("ada")}/x`, "person/zzz", ""]) {
+      for (const wrong of [
+        "horse/1",
+        "person",
+        `person/${person("ada")}/x`,
+        "person/zzz",
+        "",
+        `person/${union("u")}`,
+        `place/${person("ada")}`,
+        `cited/${place("town")}`,
+        `union-branch/${person("ada")}`,
+      ]) {
         expect(() => tree.do(() => {}, { expected: { [wrong]: 0 } })).toThrow(
           /^unknown-aggregate$/,
         );
@@ -734,31 +754,39 @@ describe("a row that is not what it should be", () => {
 });
 
 describe("a row with nothing in it", () => {
-  it("is not left behind", () =>
+  const guest = birth("ada", {
+    participants: [
+      { person: person("ada"), role: "principal" },
+      { person: person("eve"), role: "mother" },
+    ],
+  });
+
+  it("keeps the version its last editor was told", () =>
     inTree((tree) => {
       tree.do((c) => {
-        addPerson(c, "ada");
-        addPerson(c, "eve");
-        accepted(
-          c.life.add(
-            birth("ada", {
-              participants: [
-                { person: person("ada"), role: "principal" },
-                { person: person("eve"), role: "mother" },
-              ],
-            }),
-          ),
-        );
+        for (const who of ["ada", "eve"]) addPerson(c, who);
+        accepted(c.life.add(guest));
       });
-      expect(tree.rows().life_subject).toHaveLength(2);
       const aggregate = `life/${person("ada")}`;
-      tree.do((c) => accepted(c.life.remove(person("ada"), birth("ada").id)));
-      expect(tree.rows().life_subject).toEqual([]);
-      // Whoever saw it is told that it is gone.
-      expect(tree.run(() => ({ ok: true, value: 1 }), { expected: { [aggregate]: 1 } })).toEqual({
-        ok: false,
-        error: { code: "stale-version", aggregate, current: 0 },
+      const changed = tree.do((c) => accepted(c.life.remove(person("ada"), guest.id)));
+      expect(changed).toEqual([{ aggregate, version: 2 }]);
+      tree.do((c) => accepted(c.life.add(birth("ada"))), { expected: { [aggregate]: 2 } });
+      // A row nobody ever wrote anything in does not stay.
+      expect(tree.rows().life_subject).toHaveLength(1);
+    }));
+
+  it("does not go stale by a mirror", () =>
+    inTree((tree) => {
+      tree.do((c) => {
+        for (const who of ["ada", "eve"]) addPerson(c, who);
+        accepted(c.life.add(guest));
       });
+      const own = birth("eve");
+      tree.do((c) => accepted(c.life.add(own)));
+      tree.do((c) => accepted(c.life.remove(person("eve"), own.id)));
+      const expected = { [`life/${person("eve")}`]: 3 };
+      tree.do((c) => accepted(c.life.remove(person("ada"), guest.id)), { expected });
+      tree.do((c) => accepted(c.life.add(own)), { expected });
     }));
 });
 

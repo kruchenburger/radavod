@@ -101,13 +101,15 @@ export class Rows<Id extends string, Value extends Aggregate<Id>> {
       if (stored === now || !differ(dataOf(stored), dataOf(now))) continue;
       const changed = writes(this.#kind, id, this.#authored(stored), this.#authored(now));
       written.push(...changed);
-      if (isEmpty(dataOf(now))) {
+      const counted = changed.length > 0 ? version : (stored?.version ?? 0);
+      // A row nobody ever wrote anything in does not stay, another keeps the version somebody saw.
+      if (now === null || (isEmpty(dataOf(now)) && counted === 0)) {
         if (stored !== null) this.#table.remove(id);
         continue;
       }
       const data = JSON.stringify(dataOf(now));
       if (this.#parse(data) === undefined) throw new BadWrite(`${this.#kind}/${id}`);
-      this.#table.write(id, changed.length > 0 ? version : (stored?.version ?? 0), data);
+      this.#table.write(id, counted, data);
     }
     return written;
   }

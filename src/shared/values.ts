@@ -1,7 +1,7 @@
 import { z } from "zod";
 import type { Certainty } from "../kernel/certainty";
 import type { FuzzyDate, ParsedDate, PartialDate } from "../kernel/fuzzy-date";
-import type { FactRef, Id } from "../kernel/id";
+import { type FactRef, type Id, isId } from "../kernel/id";
 import type { Language, NameForm, NameKind, Script } from "../kernel/name-form";
 
 /** Schemas of the values of the kernel, strict: what is stored and what comes in is read by them. */
@@ -35,12 +35,8 @@ export const nameKindSchema = z.enum([
   "variant",
 ]) satisfies z.ZodType<NameKind>;
 
-/** 22 characters of base58: no 0, O, I and l. */
-const base58 = "[1-9A-HJ-NP-Za-km-z]{22}";
-
 function idOf<K extends string>(kind: K) {
-  const pattern = new RegExp(`^${kind}_${base58}$`);
-  return z.custom<Id<K>>((value) => typeof value === "string" && pattern.test(value));
+  return z.custom<Id<K>>((value) => isId(kind, value));
 }
 
 export const personIdSchema = idOf("person");

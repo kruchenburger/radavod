@@ -1,5 +1,5 @@
 import { z } from "zod";
-import type { BranchId, PersonId, UnionId } from "../../../kernel/id";
+import { type BranchId, isId, type PersonId, type UnionId } from "../../../kernel/id";
 import {
   BadWrite,
   CorruptRow,
@@ -184,19 +184,12 @@ class SqliteKinship implements KinshipStore, Kept {
   }
 
   current(kind: string, id: string): number | string | null | undefined {
-    switch (kind) {
-      case "person":
-        return this.#people.version(id as PersonId);
-      case "union":
-        return this.#unions.version(id as UnionId);
-      case "branch":
-        return this.#branches.version(id as BranchId);
-      case "person-branch":
-      case "union-branch":
-        return this.#members.branchOf(id as PersonId | UnionId);
-      default:
-        return undefined;
-    }
+    if (kind === "person" && isId("person", id)) return this.#people.version(id);
+    if (kind === "union" && isId("union", id)) return this.#unions.version(id);
+    if (kind === "branch" && isId("branch", id)) return this.#branches.version(id);
+    if (kind === "person-branch" && isId("person", id)) return this.#members.branchOf(id);
+    if (kind === "union-branch" && isId("union", id)) return this.#members.branchOf(id);
+    return undefined;
   }
 
   flush(version: number): Written[] {
@@ -287,5 +280,5 @@ class Membership {
 }
 
 function isPerson(id: PersonId | UnionId): id is PersonId {
-  return id.startsWith("person_");
+  return isId("person", id);
 }

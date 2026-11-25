@@ -1,5 +1,5 @@
 import { differ } from "../../../kernel/change";
-import type { MemberId } from "../../../kernel/id";
+import { isId, type MemberId } from "../../../kernel/id";
 
 /** One edit: who, when, by what scenario, and what was before and after. Entries are never removed. */
 export type Entry = NewEntry & {
@@ -30,21 +30,27 @@ export function patchesOf(changed: Changed): Patch[] {
 }
 
 /**
- * Under whose identifiers an entry is found: the aggregate itself, and every person the patches name,
- * so that erasing somebody finds all that is said of them. An edit that does not name them, as of the
- * note of an event they were at, is found by the aggregate, which the entry that named them tells. Of
- * those who went from one branch to another there may be hundreds: they are found under the branches.
+ * Under whose identifiers an entry is found: the aggregate itself, and every person who came into what
+ * the patches tell or left it. An edit of something a person is in and stays in, as the note of an
+ * event, is found by what their own entries are about and whom they name. Of those who went from one
+ * branch to another there may be hundreds: they are found under the branches.
  */
 export function subjectsOf(changed: Changed, patches: readonly Patch[]): string[] {
   const { kind, id, before, after } = changed;
   if (kind.endsWith("-branch")) {
     return [before, after].filter((branch) => typeof branch === "string");
   }
-  return [id, ...patches.flatMap((patch) => [...peopleIn(patch.before), ...peopleIn(patch.after)])];
+  return [
+    id,
+    ...patches.flatMap((patch) => {
+      const [were, are] = [new Set(peopleIn(patch.before)), new Set(peopleIn(patch.after))];
+      return [...were, ...are].filter((one) => !were.has(one) || !are.has(one));
+    }),
+  ];
 }
 
 function peopleIn(value: unknown): string[] {
-  if (typeof value === "string") return value.startsWith("person_") ? [value] : [];
+  if (typeof value === "string") return isId("person", value) ? [value] : [];
   if (typeof value !== "object" || value === null) return [];
   return Object.values(value).flatMap(peopleIn);
 }
