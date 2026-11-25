@@ -1,0 +1,5 @@
+blank_issues_enabled: false
+contact_links:
+  - name: A security problem, or a real family's data in this repository
+    url: https://github.com/kruchenburger/radavod/security/advisories/new
+    about: Report it privately. An issue is public from the first minute.

@@ -4,6 +4,6 @@
     "types": ["node"],
     "allowImportingTsExtensions": true
   },
-  "include": ["guards", "examples", "*.config.ts"],
+  "include": ["guards", "examples", "test/e2e", "*.config.ts"],
   "exclude": ["guards/*/fixtures"]
 }

@@ -1,0 +1,22 @@
+name: Idea
+description: Something Radavod should do or do differently
+labels: [enhancement]
+body:
+  - type: textarea
+    id: task
+    attributes:
+      label: What do you want to do and can't?
+      description: This page is public, so use invented people.
+    validations:
+      required: true
+  - type: textarea
+    id: idea
+    attributes:
+      label: How should it work?
+  - type: checkboxes
+    id: data
+    attributes:
+      label: Family data
+      options:
+        - label: Nothing here is about a real family, screenshots included.
+          required: true
