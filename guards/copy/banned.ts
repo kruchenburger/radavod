@@ -42,7 +42,7 @@ const informal = [
 
 // Enough to tell a clause from a name or a label: «Добавьте человека — он появится» from
 // «Иван — сын Петра». The endings are the ones nouns do not share.
-const request = ["\\p{L}+(?:йте|ьте|ните|дите|рите|жите|зите|тите|сите|мите|вите|лите)(?:сь)?"];
+const request = "\\p{L}+(?:йте|ьте|ните|дите|рите|жите|зите|тите|сите|мите|вите|лите)(?:сь)?";
 const statement = [
   "\\p{L}+(?:ется|ются|ится|атся|ятся|лось|лись|лась)",
   "\\p{L}+(?:ает|яет|ают|яют|уют|еют)",
@@ -73,14 +73,18 @@ function matches(patterns: string[]): (text: string) => boolean {
 }
 
 function joinsClauses(text: string): boolean {
-  const isRequest = matches(request);
+  const startsWithRequest = new RegExp(`^${request}(?!\\p{L})`, "iu");
   const isStatement = matches(statement);
+  const isClause = matches([request, ...statement]);
   return text
     .replace(/«[^»]*»/g, "«»")
     .split(/(?<=[.!?…]) /)
     .some((sentence) => {
       // A dash next to a number is a range or a pause.
       const parts = sentence.split(/(?<!\d) (?:—|–|--?) (?!\d)/);
-      return parts.length > 1 && (parts.some(isRequest) || parts.filter(isStatement).length > 1);
+      return parts.slice(1).some((right, i) => {
+        const left = parts[i]?.split(/[:;]/).at(-1) ?? "";
+        return startsWithRequest.test(right) || (isClause(left) && isStatement(right));
+      });
     });
 }

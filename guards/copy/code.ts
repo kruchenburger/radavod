@@ -26,7 +26,7 @@ const notifiers = /^(?:notifications?|notify|toast|toaster|modals?|snackbar|Noti
 const notifies =
   /^(?:show\w*|open\w*|update|success|error|info|warn\w*|loading|message|add|custom)$/;
 const formChecks =
-  /^(?:setCustomValidity|set(?:Field)?Errors?|isNotEmpty\w*|isEmail|hasLength|matches\w*|isInRange|isOneOf)$/;
+  /^(?:setCustomValidity|set(?:Field)?Errors?|isNotEmpty\w*|isEmail|hasLength|isInRange|isOneOf)$/;
 const schemaMessage = /^(?:error|message|required_error|invalid_type_error)$/;
 const schemaValues =
   /^(?:literal|enum|startsWith|endsWith|includes|default|catch|describe|brand|record)$/;
@@ -53,7 +53,12 @@ export function checkCode(module: Module, origins: Origins, keys: Set<string>): 
 
   const reportTexts = (rule: string, origin: Origin, is: Test) => {
     // What an error says is for developers. Another error and a log may repeat it.
-    if (origin.node.type === "ErrorText" && rule !== "error-text" && rule !== "property-text") {
+    if (
+      origin.node.type === "ErrorText" &&
+      is !== never &&
+      rule !== "error-text" &&
+      rule !== "property-text"
+    ) {
       report("error-message-shown", origin, "the message of an error");
     }
     for (const text of textsOf(origin.node)) if (is(text)) report(rule, origin, text);
@@ -136,7 +141,7 @@ export function checkCode(module: Module, origins: Origins, keys: Set<string>): 
       collectDeep("notification-text", args, isLabel, (property) =>
         shown.test(property) ? hasLetter : listProperty.test(property) ? isLabel : never,
       );
-    } else if (formChecks.test(name)) {
+    } else if (formChecks.test(name) || (!isMethod && /^matches(?:Field)?$/.test(name))) {
       collectDeep("form-text", args, isLabel, allBut(codeProperty, isLabel));
     } else if (isMethod && rootOf(callee) === "z" && !schemaValues.test(name)) {
       collectDeep("form-text", args, isLabel, only(schemaMessage, isLabel));
@@ -225,12 +230,15 @@ export function checkCode(module: Module, origins: Origins, keys: Set<string>): 
         );
       } else if (name.startsWith("render")) collect("attribute-text", value);
       else if (listAttribute.test(name)) {
-        collectDeep("attribute-text", value, isLabel, allBut(codeProperty, isLabel));
+        collectDeep("attribute-text", value, isLabel, (property) => {
+          if (shown.test(property)) return (text) => hasLetter(text) && !keys.has(text);
+          return codeProperty.test(property) ? never : isLabel;
+        });
       } else if (isComponent && !codeAttribute.test(name)) {
         // A component may show any of its attributes.
         for (const root of value) {
           for (const origin of origins.of(root, module)) {
-            reportTexts("attribute-text", origin, isLabel);
+            reportTexts("attribute-text", origin, (text) => startsWithCapital(text));
           }
         }
       }
@@ -338,9 +346,13 @@ function isSentence(text: string): boolean {
   );
 }
 
-/** «Имя», "Name", "Add a person"; a code is written otherwise. */
+/** «Имя», "Name", "Add a person", " people" after a number; a code is written otherwise. */
 function startsAsLabel(text: string): boolean {
-  return /^\s*\p{Lu}\p{Ll}/u.test(text) || isProse(text);
+  return startsWithCapital(text) || isProse(text) || /^\s+\p{L}{2}|\p{L}{2}\s+$/u.test(text);
+}
+
+function startsWithCapital(text: string): boolean {
+  return /^[\s\d+]*\p{Lu}\p{Ll}/u.test(text);
 }
 
 function never(): boolean {

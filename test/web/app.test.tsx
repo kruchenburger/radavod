@@ -114,6 +114,7 @@ it("does not wait for a silent server forever", () => {
 
 it.each([
   ["no connection", () => Promise.reject(new TypeError("Failed to fetch"))],
+  ["an answer cut off", () => Promise.resolve({ text: () => Promise.reject(new TypeError()) })],
   ["too long a wait", () => Promise.reject(new DOMException("", "TimeoutError"))],
 ])("has a text of its own for a server that does not answer: %s", async (_, fetch) => {
   vi.stubGlobal("fetch", fetch);

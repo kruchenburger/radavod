@@ -64,7 +64,13 @@ export function read(module: Module): Scopes {
         }
         break;
       }
+      case "RestElement":
+        for (const argument of nodes(pattern.argument)) bind(argument, value, put);
+        break;
       case "ObjectPattern":
+        for (const rest of nodes(pattern.properties)) {
+          if (rest.type === "RestElement") bind(rest, undefined, put);
+        }
         for (const { key, value: part, start } of nodes(pattern.properties)) {
           const member: Node = { type: "MemberExpression", object: value, property: key, start };
           if (isNode(part)) bind(part, value && isNode(key) ? member : undefined, put);

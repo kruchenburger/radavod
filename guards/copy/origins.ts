@@ -1,6 +1,6 @@
 import { posix } from "node:path";
 import { bare, isFunction, isNode, type Module, nameOf, type Node, nodes, walk } from "./ast.ts";
-import { read, type Scope, type Scopes } from "./scopes.ts";
+import { read, type Scopes } from "./scopes.ts";
 
 /** Where an expression comes from: the module it stands in matters for its names. */
 export type Origin = { node: Node; module: Module };
@@ -61,7 +61,9 @@ export class Origins {
       case "TemplateLiteral":
         return [
           { node: expression, module },
-          ...this.#spell(expression.expressions, module, answers),
+          ...(isCode(expression)
+            ? follow(expression.expressions)
+            : this.#spell(expression.expressions, module, answers)),
         ];
       case "TaggedTemplateExpression":
         return follow(expression.quasi);
@@ -104,22 +106,25 @@ export class Origins {
   /** What an identifier stands for. */
   #named(identifier: Node, module: Module): Origin[] {
     const { root, of } = this.#scopesOf(module);
-    return this.#inScope(String(identifier.name), of.get(identifier) ?? root, module);
+    const scope = of.get(identifier) ?? root;
+    return this.#values(scope.find(String(identifier.name)), module, new Set());
   }
 
-  #inScope(name: string, scope: Scope, module: Module): Origin[] {
-    return scope.find(name).flatMap((node) => {
+  /** The values of a name, those of other modules in place of its imports. */
+  #values(found: Node[], module: Module, seen: Set<string>): Origin[] {
+    return found.flatMap((node) => {
       if (node.type !== "Import") return [{ node, module }];
       const from = this.#resolve(String(node.source), module.file);
       if (!from) return [];
       if (node.imported === "*") return [{ node: { ...node, type: "Namespace" }, module: from }];
-      return this.#exported(String(node.imported), from, new Set());
+      return this.#exported(String(node.imported), from, seen);
     });
   }
 
-  #exported(name: string, module: Module, seen: Set<Module>): Origin[] {
-    if (seen.has(module)) return [];
-    seen.add(module);
+  #exported(name: string, module: Module, seen: Set<string>): Origin[] {
+    const question = `${module.file} ${name}`;
+    if (seen.has(question)) return [];
+    seen.add(question);
     const { root, exports, stars } = this.#scopesOf(module);
     const found = exports.get(name);
     if (found?.node) return [{ node: found.node, module }];
@@ -127,8 +132,9 @@ export class Origins {
       ? [[found.source, found.local ?? name]]
       : stars.map((source) => [source, name]);
     if (!found?.source) {
-      const own = this.#inScope(found?.local ?? name, root, module);
-      if (own.length > 0) return own;
+      // An import is exported only where that is said.
+      const own = root.find(found?.local ?? name).filter((n) => found || n.type !== "Import");
+      if (own.length > 0) return this.#values(own, module, seen);
     }
     return next.flatMap(([source, imported]) => {
       const from = this.#resolve(source, module.file);
@@ -149,8 +155,9 @@ export class Origins {
     const objects = this.#of(member.object, module, answers);
     if (member.element === true) return objects;
     const name = nameOf(member);
-    if (/^(?:message|stack)$/.test(name ?? "") && this.#isError(member.object, module)) {
-      return [errorText(member, module)];
+    if (/^(?:message|stack)$/.test(name ?? "")) {
+      const isCaught = nameOf(member.object) === "e" || this.#isError(member.object, module);
+      if (isCaught) return [errorText(member, module)];
     }
     const seen = new Set<Node>();
     const pick = (origin: Origin): Origin[] => {
@@ -190,7 +197,7 @@ export class Origins {
       const method = nameOf(callee) ?? "";
       const owner = nameOf(callee.object);
       if (owner === "JSON" && method === "stringify") return follow(args[0]);
-      if (owner === "React") return results(args);
+      if (owner === "React" && wrappers.test(method)) return results(args);
       if (owner === "Object") {
         if (!/^(?:values|entries)$/.test(method)) return follow(args);
         return follow(args).flatMap((o) =>
@@ -251,11 +258,17 @@ export class Origins {
 const parts =
   /^(?:trim\w*|to(?:Locale)?(?:Upper|Lower)Case|slice|substring|at|normalize|repeat|split|filter|find|reverse|sort|pop|shift|get)$/;
 const wrappers = /^(?:useMemo|useState|useRef|useCallback|memo|forwardRef)$/;
-const errorName = /^(?:e|err|ex|exception|failure)$|error$/i;
+const errorName = /^(?:err|error|ex|exception|failure)$|^(?!is|has)\w+Error$/;
 
 /** A call of t: its result comes from the catalog. */
 export function isTranslation(node: Node): boolean {
   return node.type === "CallExpression" && nameOf(node.callee) === "t";
+}
+
+/** A template as `error.${error}` makes a code, not a text. */
+function isCode(template: Node): boolean {
+  const fixed = nodes(template.quasis).map((q) => (q.value as { raw: string }).raw);
+  return fixed.join("") !== "" && fixed.every((text) => /^[\w.:/-]*$/.test(text));
 }
 
 function errorText({ start }: Node, module: Module): Origin {

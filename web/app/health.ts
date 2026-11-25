@@ -13,7 +13,11 @@ export const healthQuery = queryOptions({
 /** Fails when the server does not answer; null is an answer that is not about health. */
 async function fetchHealth(): Promise<Health | null> {
   const response = await fetch("/health", { signal: AbortSignal.timeout(10_000) });
-  // 503 has the same body and says which part is down.
-  const answer = healthSchema.safeParse(await response.json().catch(() => null));
-  return answer.success ? answer.data : null;
+  const text = await response.text();
+  try {
+    // 503 has the same body and says which part is down.
+    return healthSchema.parse(JSON.parse(text));
+  } catch {
+    return null;
+  }
 }

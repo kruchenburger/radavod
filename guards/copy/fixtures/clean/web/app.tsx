@@ -52,7 +52,19 @@ export function Codes({ url, role }: { url: string; role: Role }) {
   );
 }
 
-export function download() {
+const rest = "tree";
+export const List = ({ first, ...rest }: { first: string; rest: string[] }) => (
+  <Box bd="1px solid red" p="xs md" valueFormat="DD MMM YYYY" accept=".ged, text/plain" first={first}>
+    {rest}
+  </Box>
+);
+
+export function download(error: "conflict", years: number[], element: HTMLElement) {
+  notifications.show({ id: `save-${error}` });
+  element.matches(".card, .person button");
+  const options = years.map((e) => ({ value: String(e), label: String(e) }));
+  const key = <Box textKey={`error.${error}`} mod={`x-${rest}`} data={options} />;
+  store.keep(key, React.createElement("svg", {}, React.createElement("path")));
   const name = "tree.ged";
   notifications.hide("import-progress");
   store.notify("changed");
@@ -64,6 +76,8 @@ export function download() {
 
 export const Card = ({ name }: { name: string }) => <p>{name}</p>;
 type Living = "Living person";
+declare const React: any;
+declare function Box(props: Record<string, unknown>): ReactNode;
 declare const death: { cause: string };
 declare const locale: "ru" | "en";
 declare const notifications: any, store: any, worker: any, writable: any;
