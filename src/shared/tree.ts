@@ -34,8 +34,9 @@ const yearSchema = z.object({
   /** The interface turns it into words, for example "about". */
   qualifier: z.enum(["exact", "about", "before", "after", "between", "unread"]),
   /**
-   * Gregorian day number of the earliest possible day. Null when there is none: an unread date, and
-   * a date only known to be before some other. Whoever has no day stands last.
+   * What `sortKey` of the kernel gives: the number of the earliest possible day, one count for both
+   * calendars. Null when there is none: an unread date, and a date only known to be before some
+   * other. Whoever has no day stands last.
    */
   sort: z.int().nullable(),
 });
