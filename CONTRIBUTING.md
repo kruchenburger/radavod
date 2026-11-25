@@ -33,15 +33,16 @@ CI runs the same checks, but after the push, when the data is already public.
 If the hook refuses, nothing has been sent.
 
 1. Read which file in which commit it means.
-2. Make the commits of your branch again, without the file. Deleting it in a new commit is not enough. These commands turn your commits into one and leave the file on your disk:
+2. Make the commits of your branch again, without the data. Deleting it in a new commit is not enough.
+   - Switch to the branch you are pushing, and copy the file out of the repository if you need it.
+   - Turn the commits of the branch into one. `origin/main` stands for the main branch you started from:
 
-   ```sh
-   git reset --soft "$(git merge-base origin/main HEAD)"
-   git rm --cached --ignore-unmatch <file>
-   git commit
-   ```
+     ```sh
+     git reset --soft "$(git merge-base origin/main HEAD)"
+     ```
 
-   Then move the file out of the repository, so that it isn't added again.
+   - If the file doesn't belong here, run `git rm --cached <file>` and move it out of the repository. If it does, take the data out of it and run `git add <file>`.
+   - Run `git commit` and push.
 
 3. If the file is an invented example, put it in `examples/` and list it in `guards/data/examples.json` with the rules it may break.
 4. If the hook is wrong, open an issue that describes the file without its content. Don't skip the hook with `--no-verify`: CI refuses the same commits.

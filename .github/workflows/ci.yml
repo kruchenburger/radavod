@@ -15,6 +15,7 @@ concurrency:
 
 env:
   # The commits pushed to main, or what main does not have yet: the base of a pull request may change.
+  # After the merge main has them all, and a check of no commits fails.
   COMMITS: ${{ github.event_name == 'push' && github.event.before || 'origin/main' }}..${{ github.event.pull_request.head.sha || github.sha }}
 
 jobs:

@@ -66,10 +66,6 @@ function familyData(violations: { rule: string; file: string; commit: string }[]
     "These files look like a family's data:",
     ...violations.map(({ rule, file, commit }) => `  ${rule}: ${file} in ${commit}`),
     "Deleting a file in a new commit is not enough: the old commit is pushed too.",
-    "Make the commits of this branch again, without the file. It stays on your disk:",
-    '  git reset --soft "$(git merge-base origin/main HEAD)"',
-    `  git rm --cached --ignore-unmatch "${violations[0]?.file}"`,
-    "  git commit",
     "An invented example goes to examples/ and is listed in guards/data/examples.json.",
   ].join("\n");
 }
@@ -86,7 +82,9 @@ function knownTo(root: string, address: string): string[] {
   const lines = git(root, ["ls-remote", "--", address]).toString().split("\n").filter(Boolean);
   const ids = new Set(lines.map((line) => line.split("\t")[0]));
   const input = [...ids].map((id) => `${id}^{commit}\n`).join("");
-  const found = git(root, ["cat-file", "--batch-check"], input).toString();
+  // A partial copy would fetch everything it does not have.
+  const local = { GIT_NO_LAZY_FETCH: "1" };
+  const found = git(root, ["cat-file", "--batch-check"], input, local).toString();
   return [...found.matchAll(/^([0-9a-f]+) commit /gm)].map(([, id = ""]) => id);
 }
 

@@ -79,7 +79,7 @@ Local workerd has no jurisdictions, so tests run with `none`.
 - English in code, comments, commits and the changelog.
 - Test first. Tests live in `test/`, guard and example tests next to what they test.
 - A real family's data never enters the repository. Examples use invented people.
-- Dependencies that ship must be MIT, ISC, BSD, Apache-2.0, 0BSD or CC0-1.0. Fonts, and only fonts, may also be OFL-1.1; the build puts their licence texts into `dist/client/licences`. A development tool under another license is listed in `guards/licenses/exceptions.ts`. `src` and `web` import no development dependency.
+- Dependencies that ship must be MIT, ISC, BSD, Apache-2.0, 0BSD or CC0-1.0. Fonts, and only fonts, may also be OFL-1.1; the build puts their license texts into `dist/client/licences`. A development tool under another license is listed in `guards/licenses/exceptions.ts`. `src` and `web` import no development dependency.
 - pnpm runs no install script of a dependency (`pnpm-workspace.yaml`).
 - Workflows pin actions by full commit SHA, read only, and use no secrets.
 - Conventional Commits with the work item, as in `feat: add unions (RAD-12)`.

@@ -2,9 +2,6 @@ import listed from "./examples.json" with { type: "json" };
 import { type Entry, fields, git, readEntries, rootOf } from "./git.ts";
 import { brokenRules, checkExamples, type Examples, type Violation } from "./guard.ts";
 
-/** The list of examples, as it is named inside a commit. */
-const LIST = "guards/data/examples.json";
-
 export type CommitReport = {
   commits: number;
   files: number;
@@ -16,7 +13,7 @@ export type CommitReport = {
  * removes is still published. Revisions are written as for `git rev-list`, for example `base..head`.
  *
  * Every file of every commit is read, apart from those that stand unchanged, under the same name, in
- * a commit the range starts from. An example may be listed in any of the commits, but the rules it
+ * a commit the range starts from. An example may be listed in any of these commits, but the rules it
  * may break are those of today's list.
  */
 export function checkCommits(
@@ -29,29 +26,29 @@ export function checkCommits(
   const { commits, boundary } = commitsOf(root, revisions);
   if (commits.length === 0) throw new Error("no commits scanned");
 
-  const before = new Set(boundary.flatMap((commit) => treeOf(root, commit)).map(keyOf));
-  const added = new Map<string, Entry & { commit: string }>();
+  const before = boundary.flatMap((commit) => treeOf(root, commit));
+  const seen = new Set(before.map(keyOf));
+  const lists = new Map(before.filter(isList).map((entry) => [entry.id, entry]));
+  const added: (Entry & { commit: string })[] = [];
   for (const commit of commits) {
     for (const entry of treeOf(root, commit)) {
-      const key = keyOf(entry);
-      if (!before.has(key) && !added.has(key)) added.set(key, { ...entry, commit });
+      if (isList(entry)) lists.set(entry.id, entry);
+      if (seen.has(keyOf(entry))) continue;
+      seen.add(keyOf(entry));
+      added.push({ ...entry, commit });
     }
   }
 
-  const entries = [...added.values()];
-  const files = readEntries(root, entries);
-  const listedOnce = files
-    .filter(({ file }) => file === LIST)
-    .flatMap(({ bytes }) => namesIn(bytes));
-  const allExamples = { ...Object.fromEntries(listedOnce.map((name) => [name, []])), ...examples };
-  const violations = files.flatMap((file, i) =>
+  const names = readEntries(root, [...lists.values()]).flatMap(({ bytes }) => namesIn(bytes));
+  const allExamples = { ...Object.fromEntries(names.map((name) => [name, []])), ...examples };
+  const violations = readEntries(root, added).flatMap((file, i) =>
     brokenRules(file, allExamples).map((rule) => ({
       rule,
       file: file.file,
-      commit: entries[i]?.commit ?? "",
+      commit: added[i]?.commit ?? "",
     })),
   );
-  return { commits: commits.length, files: entries.length, violations };
+  return { commits: commits.length, files: added.length, violations };
 }
 
 /** The commits of a range, oldest first, and the ones just before it. */
@@ -82,6 +79,10 @@ function treeOf(root: string, commit: string): Entry[] {
     const [mode = "", , id = ""] = info.split(" ");
     return { file, mode, id };
   });
+}
+
+function isList({ file }: Entry): boolean {
+  return file === "guards/data/examples.json";
 }
 
 /** The names in a list of examples. An unreadable one has none. */

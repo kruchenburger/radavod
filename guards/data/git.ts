@@ -32,13 +32,18 @@ export function fields(output: Buffer): string[] {
   return output.toString().split("\0").slice(0, -1);
 }
 
-export function git(folder: string, args: string[], input = ""): Buffer {
+export function git(
+  folder: string,
+  args: string[],
+  input = "",
+  env: Record<string, string> = {},
+): Buffer {
   const { error, status, stdout, stderr } = spawnSync("git", args, {
     cwd: folder,
     input,
     maxBuffer: Number.POSITIVE_INFINITY,
     // A replaced object shows other content here than where it is pushed.
-    env: { ...process.env, LC_ALL: "C", GIT_NO_REPLACE_OBJECTS: "1" },
+    env: { ...process.env, LC_ALL: "C", GIT_NO_REPLACE_OBJECTS: "1", ...env },
   });
   if (error) throw error;
   if (status !== 0) throw new Error(`git ${args[0]}: ${stderr.toString().trim()}`);

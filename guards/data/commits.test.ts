@@ -110,6 +110,16 @@ it("takes an example that was listed in the same range", () => {
   ]);
 });
 
+it("takes a change and the removal of an example that was listed before", () => {
+  const list = "guards/data/examples.json";
+  const file = "examples/a.json";
+  const listed = Buffer.from(JSON.stringify({ [file]: [] }));
+  const root = started({ [list]: listed, [file]: contents.clean });
+  commit(root, { [file]: Buffer.from("changed") });
+  commit(root, { [list]: Buffer.from("{}"), [file]: null });
+  expect(checkCommits(root, ["base..HEAD"], {}).violations).toEqual([]);
+});
+
 it("reads a path with spaces and other letters", () => {
   const root = started();
   const file = "докі/мой файл.txt";

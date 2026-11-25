@@ -49,20 +49,18 @@ it("refuses a file added and removed, and says what to do", () => {
   const { status, output } = push(root, "origin", "main");
   expect(status).not.toBe(0);
   expect(output).toContain(`gedcom-content: a.txt in ${id}`);
-  expect(output).toContain("git reset --soft");
   expect(output).toContain("CONTRIBUTING.md");
   expect(git(remote, "rev-parse", "main")).toBe(before);
 });
 
-it("advises what makes the push pass and keeps the file", () => {
+it("passes after the steps CONTRIBUTING.md gives, and keeps the file", () => {
   const { root } = started();
   commit(root, { "a.txt": contents.gedcom });
-  const { output } = push(root, "origin", "main");
-  const advice = output.split("\n").filter((line) => / {2}git /.test(line));
-  expect(advice).toHaveLength(3);
-  git(root, "reset", "--soft", git(root, "merge-base", "origin/main", "HEAD").trim());
-  git(root, "rm", "--quiet", "--cached", "--ignore-unmatch", "a.txt");
   commit(root, { "b.txt": contents.clean });
+  expect(push(root, "origin", "main").status).not.toBe(0);
+  git(root, "reset", "--soft", git(root, "merge-base", "origin/main", "HEAD").trim());
+  git(root, "rm", "--quiet", "--cached", "a.txt");
+  commit(root);
   expect(push(root, "origin", "main").status).toBe(0);
   expect(existsSync(join(root, "a.txt"))).toBe(true);
 });
