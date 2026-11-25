@@ -73,6 +73,13 @@ export function putFamilyBack(
   );
 }
 
+/** Removes a person nobody names: no child, no union. Their own parents are forgotten with them. */
+export function removePerson(g: FamilyGraph, id: PersonId): Result<Change, PutBackError> {
+  return g.person(id) === null
+    ? missing(id)
+    : putFamilyBack(g, [{ kind: "person", id, value: null }]);
+}
+
 function putPerson(g: FamilyGraph, draft: Draft, id: PersonId, value: PersonWritten | null): void {
   if (value === null) {
     draft.removePerson(id);

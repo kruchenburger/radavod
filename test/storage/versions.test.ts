@@ -6,6 +6,8 @@ import { parseFuzzyDate } from "../../src/kernel/fuzzy-date";
 import type { Result } from "../../src/kernel/result";
 import { restoreTo } from "../../src/scenarios/restore-to";
 import { startOver } from "../../src/scenarios/start-over";
+import { eraseForever } from "../../src/scenarios/erase";
+import { restore, trash } from "../../src/scenarios/trash";
 import { undo } from "../../src/scenarios/undo";
 import type { Contexts } from "../../src/scenarios/unit-of-work";
 import { versionsOf } from "../../src/scenarios/versions";
@@ -363,6 +365,8 @@ const someStep = fc.oneof(
   fc.record({ do: fc.constant("event" as const), who: anyone, other: anyone }),
   fc.record({ do: fc.constant("forget" as const), who: anyone }),
   fc.record({ do: fc.constant("branch" as const), who: anyone }),
+  fc.record({ do: fc.constant("trash" as const), who: anyone }),
+  fc.record({ do: fc.constant("back" as const), who: anyone }),
   fc.record({ do: fc.constant("undo" as const), back: fc.integer({ min: 0, max: 5 }) }),
   fc.record({ do: fc.constant("restore" as const), back: fc.integer({ min: 0, max: 8 }) }),
 );
@@ -446,6 +450,10 @@ function take(tree: Tree, step: Step): boolean {
           overwrite: false,
         });
       }
+      case "trash":
+        return trash(c, person(step.who), { actor: anna, now: 5 });
+      case "back":
+        return restore(c, person(step.who));
       case "undo":
         return undo(c, at - step.back);
       case "restore":
@@ -504,7 +512,46 @@ describe("after any steps", () => {
             });
           }),
         ),
-        { numRuns: 60 },
+        { numRuns: 100 },
+      ),
+    60_000,
+  );
+});
+
+describe("after any steps and an erasure", () => {
+  const steps = fc.array(someStep, { minLength: 10, maxLength: 40, size: "max" });
+
+  it(
+    "no row and no version knows the erased, and every version can be returned to",
+    () =>
+      fc.assert(
+        fc.asyncProperty(steps, anyone, steps, (list, who, more) =>
+          inTree(async (tree) => {
+            for (const step of list) take(tree, step);
+            const ledger = { remember: () => {}, all: () => [] };
+            let made = 0;
+            const newId = () => event(`new ${(made += 1)}`);
+            const id = person(who);
+            const gone = await eraseForever(ledger, tree.work, { actor: anna, now: 5 }, id, newId);
+            expect(gone.ok).toBe(true);
+            const isSaid = () => JSON.stringify(tree.rows()).includes(id);
+            expect(isSaid()).toBe(false);
+            for (const step of more) if (!("who" in step) || step.who !== who) take(tree, step);
+            const last = head(tree);
+            const all = versionsOf(tree.storage, tree.work);
+            for (let number = 0; number <= last; number += 3) {
+              const state = JSON.stringify(await all.at(number));
+              expect(state.includes(id) || state.includes('"erased"')).toBe(false);
+              const result = tree.run((c) => restoreTo(c, number));
+              if (!result.ok) expect(result).toEqual(refused("nothing-to-restore"));
+            }
+            const others = JSON.stringify({ ...tree.rows(), other: 0 });
+            if (!more.some((step) => "other" in step && step.other === who)) {
+              expect(others.includes(id)).toBe(false);
+            }
+          }),
+        ),
+        { numRuns: 100 },
       ),
     60_000,
   );
@@ -558,6 +605,16 @@ describe("versions", () => {
       for (const [number, state] of states.entries()) {
         expect(await all.at(number), String(number)).toEqual(state);
       }
+    }));
+
+  it("do without a checkpoint that cannot be read, and tell nothing of what is in it", () =>
+    inTree(async (tree) => {
+      const all = versions(tree);
+      tree.do((c) => addPerson(c, "ada"));
+      const state = stateOf(tree);
+      await all.checkpoint();
+      tree.storage.sql.exec("UPDATE history_checkpoint SET data = ?", new Uint8Array([1, 2, 3]));
+      expect(await all.at(1)).toEqual(state);
     }));
 
   it("start from the next checkpoint, so old ones need few entries", () =>

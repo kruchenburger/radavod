@@ -1,0 +1,192 @@
+import type { Citation } from "../contexts/evidence";
+import {
+  purge,
+  scrubbed,
+  speaksOf,
+  withoutNames,
+  type Trashed,
+  wholeNames,
+} from "../contexts/history";
+import type { PersonWritten } from "../contexts/kinship";
+import type { LifeEvent } from "../contexts/life";
+import type { EventId, MemberId, PersonId } from "../kernel/id";
+import type { NameForm } from "../kernel/name-form";
+import type { Result } from "../kernel/result";
+import { withoutErased } from "../shared/reverse";
+import { trash, type TrashError } from "./trash";
+import type { Contexts, Reading, StaleVersion, UnitOfWork } from "./unit-of-work";
+
+/** Who was erased. It lies with the members, so that a rollback of the tree does not bring them back. */
+export interface Ledger {
+  remember(ids: PersonId[]): void | Promise<void>;
+  all(): PersonId[] | Promise<PersonId[]>;
+}
+
+export type EraseError = TrashError | StaleVersion;
+/** Where others still write the whole name in words of their own, as "kind/id". */
+export type Erased = { mentions: string[] };
+export type Eraser = { actor: MemberId; now: number };
+
+/**
+ * Takes a person out of the tree, the trash and the whole history, for ever. The ledger first: a repeat
+ * after a crash finishes it and is harmless. What was also about somebody else stays with them.
+ */
+export async function eraseForever(
+  ledger: Ledger,
+  unit: UnitOfWork,
+  act: Eraser,
+  id: PersonId,
+  newId: () => EventId,
+): Promise<Result<Erased, EraseError>> {
+  await ledger.remember([id]);
+  return eraseHere(unit, act, id, newId);
+}
+
+/** Erases again whoever was erased, after the tree went back to a point in time. */
+export async function reapplyErasures(
+  ledger: Ledger,
+  unit: UnitOfWork,
+  act: Eraser,
+  newId: () => EventId,
+): Promise<void> {
+  for (const id of await ledger.all()) {
+    const done = eraseHere(unit, act, id, newId);
+    if (!done.ok) throw new Error(`not-erased ${done.error.code}`);
+  }
+}
+
+/** The part of an erasure that is done in the tree, in one transaction. */
+export function eraseHere(
+  unit: UnitOfWork,
+  act: Eraser,
+  id: PersonId,
+  newId: () => EventId,
+): Result<Erased, EraseError> {
+  let forms: NameForm[] = [];
+  const done = unit.run(
+    { ...act, scenario: "erase", expected: {} },
+    (c): Result<Erased, EraseError> => {
+      forms = formsOf(c, id);
+      if (c.kinship.get(id) !== null) {
+        const gone = trash(c, id, act);
+        if (!gone.ok) return gone;
+      }
+      const trashed = c.history.trash.get(id);
+      if (trashed !== null) {
+        c.history.trash.put(id, null);
+        // What goes over to others does not name the one who goes, in words either.
+        const names = wholeNames(forms);
+        for (const event of trashed.events as LifeEvent[]) {
+          handOver(c, trashed, event, newId, (value) => inWords(value, names));
+        }
+      }
+      for (const other of c.history.trash.everybody()) {
+        c.history.trash.put(other.id, untied(other, id));
+      }
+      // Somebody who went by an undo may have left rows with nothing in them.
+      const left = c.life.putBack([{ kind: "life", id, value: null }]);
+      if (!left.ok) return left;
+      const cited = c.evidence.putBack([{ kind: "cited", id, value: null }]);
+      if (!cited.ok) return cited;
+      return { ok: true, value: { mentions: mentionsIn(c, id, forms) } };
+    },
+    {
+      tell: (written) =>
+        written
+          .filter((one) => one.id !== id)
+          .map((one) => ({
+            ...one,
+            before: scrubbed(one.before, id, wholeNames(forms)),
+            after: scrubbed(one.after, id, wholeNames(forms)),
+          })),
+      last: (sql) => purge(sql, id, forms),
+    },
+  );
+  return done.ok ? { ok: true, value: done.value.value } : done;
+}
+
+/** What others still say of a person by the whole name, for whoever erases to decide about. */
+export function mentionsOf(c: Reading, id: PersonId): string[] {
+  return mentionsIn(c, id, formsOf(c, id));
+}
+
+function mentionsIn(c: Reading, id: PersonId, forms: readonly NameForm[]): string[] {
+  const names = wholeNames(forms);
+  return Object.entries(c.history.state())
+    .filter(([aggregate]) => !aggregate.endsWith(`/${id}`))
+    .filter(([, value]) => textsIn(value).some((text) => speaksOf(text, names)))
+    .map(([aggregate]) => aggregate);
+}
+
+function formsOf(c: Reading, id: PersonId): NameForm[] {
+  const trashed = c.history.trash.get(id)?.person as PersonWritten | undefined;
+  return c.kinship.get(id)?.names ?? trashed?.names ?? [];
+}
+
+function textsIn(value: unknown): string[] {
+  if (typeof value === "string") return [value];
+  if (typeof value !== "object" || value === null) return [];
+  return Object.values(value).flatMap(textsIn);
+}
+
+/** An event that is about others too goes on with the next of them, with its citations. */
+function handOver(
+  c: Contexts,
+  trashed: Trashed,
+  event: LifeEvent,
+  newId: () => EventId,
+  clean: <T>(value: T) => T,
+): void {
+  const bin = c.history.trash;
+  // Whoever is in the trash has left the event, and says there what they were in it.
+  const waiting = bin
+    .everybody()
+    .flatMap(({ id: person, guest }) =>
+      guest
+        .filter((one) => one.home === trashed.id && one.event === event.id)
+        .flatMap(({ roles }) => roles.map((role) => ({ person, role }))),
+    );
+  const others = [...event.participants, ...waiting].filter(({ person }) => {
+    const isThere = c.kinship.get(person) !== null || bin.get(person) !== null;
+    return person !== trashed.id && isThere;
+  });
+  const isOfTwo = event.kind === "wedding" || event.kind === "divorce";
+  const next = others.find(({ role }) => isOfTwo || role === "principal");
+  if (next === undefined) return;
+  const home = next.person;
+  const id = newId();
+  const rest = others.filter((one) => one !== next);
+  for (const { person, role } of rest) {
+    const theirs = bin.get(person);
+    if (theirs === null || person === home) continue;
+    bin.put(person, { ...theirs, guest: [...theirs.guest, { home, event: id, roles: [role] }] });
+  }
+  const here = rest.filter(({ person }) => person === home || c.kinship.get(person) !== null);
+  const told = clean({ ...event, id, participants: [next, ...here] });
+  const citations = (trashed.citations as Citation[])
+    .filter(({ fact }) => fact.fact === `event:${event.id}`)
+    .map((citation) => clean({ ...citation, fact: { subject: home, fact: `event:${id}` } }));
+  const theirs = bin.get(home);
+  if (theirs !== null) {
+    bin.put(home, {
+      ...theirs,
+      events: [...theirs.events, told],
+      citations: [...theirs.citations, ...citations],
+    });
+    return;
+  }
+  const place = event.place !== null && c.places.get(event.place) === null ? null : event.place;
+  const union = event.union !== null && c.kinship.union(event.union) === null ? null : event.union;
+  c.life.add({ ...told, place, union });
+  for (const citation of citations) c.evidence.cite(citation);
+}
+
+function inWords<T>(value: T, names: readonly string[]): T {
+  return withoutNames(value, names) as T;
+}
+
+/** Somebody in the trash without any link to an erased person. */
+function untied(trashed: Trashed, id: PersonId): Trashed {
+  const marked = scrubbed(trashed, id, []) as Trashed;
+  return withoutErased(`trash/${trashed.id}`, marked) as Trashed;
+}

@@ -1,7 +1,9 @@
 import type { EvidenceError, EvidenceTarget } from "../contexts/evidence";
+import type { Trashed } from "../contexts/history";
 import type { FamilyTarget, KinshipError } from "../contexts/kinship";
 import type { LifeError, LifeTarget } from "../contexts/life";
 import type { PlaceTarget } from "../contexts/places";
+import type { PersonId } from "../kernel/id";
 import { inUse } from "../kernel/refusal";
 import type { Result } from "../kernel/result";
 import type { Contexts } from "./unit-of-work";
@@ -49,6 +51,9 @@ export function putBack(c: Contexts, targets: readonly Target[]): Result<object,
         ? c.evidence.citationsOf(target.id).length
         : 0;
     if (events + citations > 0) return inUse(events + citations);
+  }
+  for (const { id, value } of of<{ id: PersonId; value: object | null }>("trash")) {
+    c.history.trash.put(id, value && ({ ...value, id, version: 0 } as Trashed));
   }
   return { ok: true, value: {} };
 }

@@ -38,16 +38,23 @@ export function versionsOf(
     async at(number) {
       const last = journal.last();
       if (!Number.isInteger(number) || number < 0 || number > last) return null;
+      const entriesFrom = (from: number) =>
+        Array.from({ length: from - number }, (_, i) => journal.entry(from - i)).filter(
+          (entry) => entry !== null,
+        );
       const kept = checkpoints.from(number);
-      // Both are read before the first wait, so they are of one moment.
-      const [from, state] =
-        kept === null ? [last, unit.read((c) => c.history.state())] : [kept.number, kept.data];
-      const entries = Array.from({ length: from - number }, (_, i) => journal.entry(from - i));
-      const whole = state instanceof Uint8Array ? await unpack(state) : state;
-      return reverse(
-        whole,
-        entries.filter((entry) => entry !== null),
-      );
+      if (kept !== null) {
+        // The entries are read before the wait, so they are of the moment of the checkpoint.
+        const entries = entriesFrom(kept.number);
+        const state = await unpack(kept.data);
+        if (state !== null) return reverse(state, entries);
+      }
+      return number > journal.last()
+        ? null
+        : reverse(
+            unit.read((c) => c.history.state()),
+            entriesFrom(journal.last()),
+          );
     },
     async checkpoint() {
       const number = journal.last();
@@ -72,7 +79,12 @@ async function pack(state: State): Promise<Uint8Array> {
   return new Uint8Array(await new Response(stream).arrayBuffer());
 }
 
-async function unpack(data: Uint8Array): Promise<State> {
-  const stream = new Response(data).body?.pipeThrough(new DecompressionStream("gzip"));
-  return (await new Response(stream).json()) as State;
+/** The state in a checkpoint, or null if it cannot be read: there is another way to it. */
+async function unpack(data: Uint8Array): Promise<State | null> {
+  try {
+    const stream = new Response(data).body?.pipeThrough(new DecompressionStream("gzip"));
+    return (await new Response(stream).json()) as State;
+  } catch {
+    return null;
+  }
 }

@@ -78,7 +78,6 @@ function inOrder(things: Thing[], order: unknown): Thing[] {
 export function withoutErased(aggregate: string, value: unknown): unknown {
   const fields = fieldsOf(value);
   if (fields === null) return value;
-  const isThere = (one: unknown) => one !== ERASED;
   switch (aggregate.split("/")[0]) {
     case "person":
       return {
@@ -86,26 +85,56 @@ export function withoutErased(aggregate: string, value: unknown): unknown {
         parents: thingsOf(fields.parents).map((link) =>
           link.parent === ERASED ? { ...link, parent: "unknown", union: null } : link,
         ),
-        childOrder: listOf(fields.childOrder).filter(isThere),
+        childOrder: withoutMark(fields.childOrder),
       };
-    case "union": {
-      const partners = listOf(fields.partners).filter((one) => isThere(one) && one !== "unknown");
-      if (partners.length === 0) return null;
-      return { ...fields, partners: [partners[0], partners[1] ?? "unknown"] };
-    }
+    case "union":
+      return unionWithoutErased(fields);
     case "life":
-      return {
-        ...fields,
-        events: thingsOf(fields.events).map((event) => ({
-          ...event,
-          participants: listOf(event.participants).filter(
-            (one) => fieldsOf(one)?.person !== ERASED,
-          ),
-        })),
-      };
+      return { ...fields, events: eventsWithoutErased(fields.events) };
+    case "trash":
+      return trashWithoutErased(fields);
     default:
       return value;
   }
+}
+
+function unionWithoutErased(union: Fields): Fields | null {
+  const [first, second] = withoutMark(union.partners).filter((one) => one !== "unknown");
+  return first === undefined ? null : { ...union, partners: [first, second ?? "unknown"] };
+}
+
+function eventsWithoutErased(events: unknown): Thing[] {
+  return thingsOf(events).map((event) => ({
+    ...event,
+    participants: withoutMark(event.participants, "person"),
+  }));
+}
+
+/** Links of somebody in the trash to an erased person go: they would come back to nobody. */
+function trashWithoutErased(trashed: Fields): Fields {
+  const person = fieldsOf(trashed.person) ?? {};
+  return {
+    ...trashed,
+    person: {
+      ...person,
+      parents: withoutMark(person.parents, "parent"),
+      childOrder: withoutMark(person.childOrder),
+    },
+    children: withoutMark(trashed.children, "child"),
+    unions: listOf(trashed.unions)
+      .map((one) => fieldsOf(one) ?? {})
+      .filter((one) => !listOf(fieldsOf(one.union)?.partners).includes(ERASED))
+      .map((one) => ({ ...one, children: withoutMark(one.children, "child") })),
+    events: eventsWithoutErased(trashed.events),
+    guest: withoutMark(trashed.guest, "home"),
+  };
+}
+
+/** A list without those who are marked as erased, themselves or by a field. */
+function withoutMark(list: unknown, field?: string): unknown[] {
+  return listOf(list).filter(
+    (one) => (field === undefined ? one : fieldsOf(one)?.[field]) !== ERASED,
+  );
 }
 
 type Fields = { readonly [field: string]: unknown };

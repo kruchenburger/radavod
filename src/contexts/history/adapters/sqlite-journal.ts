@@ -14,7 +14,7 @@ export const historyTables = [
   "CREATE TABLE history_trash (id TEXT PRIMARY KEY, data TEXT NOT NULL) WITHOUT ROWID",
 ];
 
-const entrySchema = z.strictObject({
+export const entrySchema = z.strictObject({
   at: z.int(),
   by: memberIdSchema,
   scenario: z.string().min(1),

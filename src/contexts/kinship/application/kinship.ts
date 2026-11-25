@@ -12,7 +12,12 @@ import {
   removeBranch,
 } from "../domain/branch";
 import type { Change, FamilyGraph } from "../domain/family-graph";
-import { type FamilyTarget, type PutBackError, putFamilyBack } from "../domain/put-back";
+import {
+  type FamilyTarget,
+  type PutBackError,
+  putFamilyBack,
+  removePerson,
+} from "../domain/put-back";
 import {
   addParent,
   editParent,
@@ -47,6 +52,7 @@ import type { KinshipStore } from "./ports";
 export type KinshipCommand =
   | { do: "add-person"; person: NewPerson; branch: BranchId | null }
   | { do: "edit-person"; id: PersonId; patch: PersonPatch }
+  | { do: "remove-person"; id: PersonId }
   | { do: "put-name"; person: PersonId; name: NameForm }
   | { do: "remove-name"; person: PersonId; id: string }
   | { do: "order-children"; person: PersonId; order: PersonId[] }
@@ -96,6 +102,8 @@ function resultOf(g: FamilyGraph, command: KinshipCommand): Result<Change, Kinsh
       return addPerson(g, command.person, command.branch);
     case "edit-person":
       return editPerson(g, command.id, command.patch);
+    case "remove-person":
+      return removePerson(g, command.id);
     case "put-name":
       return putName(g, command.person, command.name);
     case "remove-name":
