@@ -89,6 +89,11 @@ it.each<[what: string, rule: string, source: string]>([
     "privileged-event",
     clean.replace("on: pull_request", "on:\n  pull_request_target:\n    types: [opened]"),
   ],
+  [
+    "pull_request_target in another case",
+    "privileged-event",
+    clean.replace("on: pull_request", "on: Pull_Request_Target"),
+  ],
   ["workflow_run", "privileged-event", clean.replace("on: pull_request", "on: workflow_run")],
   ["no event", "privileged-event", clean.replace("on: pull_request\n", "")],
 
@@ -126,6 +131,29 @@ it.each<[what: string, rule: string, source: string]>([
   ],
 
   [
+    "an expression in a script, in another case",
+    "expression-in-run",
+    step(
+      `uses: actions/github-script@${sha}\n        with:\n          Script: "\${{ github.ref }}"`,
+    ),
+  ],
+  [
+    "a default shell of a job",
+    "hidden",
+    clean.replace("steps:", "defaults:\n      run:\n        shell: bash {0}\n    steps:"),
+  ],
+  [
+    "a default shell of a workflow",
+    "hidden",
+    clean.replace("jobs:", "defaults:\n  run:\n    shell: bash {0}\njobs:"),
+  ],
+  ["a merge key", "hidden", step("<<: { uses: actions/cache@v4 }")],
+  [
+    "credentials kept by a checkout in another case",
+    "credentials",
+    step(`uses: Actions/Checkout@${sha}`),
+  ],
+  [
     "credentials kept on disk",
     "credentials",
     clean.replace("\n        with:\n          persist-credentials: false", ""),
@@ -148,6 +176,13 @@ it("checks the steps of a local action", () => {
   expect(action("run: pnpm install\n      shell: bash")).toEqual([]);
   expect(action("uses: actions/setup-node@v7")).toEqual(["unpinned"]);
   expect(action("run: echo ${{ inputs.x }}\n      shell: bash")).toEqual(["expression-in-run"]);
+});
+
+it("rejects a local action that is an image or a script", () => {
+  for (const runs of ["using: docker\n  image: docker://alpine:3", "using: node24\n  main: a.js"]) {
+    const found = checkFile(".github/actions/a/action.yml", `name: A\nruns:\n  ${runs}\n`);
+    expect(found.map(({ rule }) => rule)).toEqual(["hidden"]);
+  }
 });
 
 it("accepts a write permission that is listed for its job", () => {
@@ -208,7 +243,7 @@ it.each([
 ])("turns the results %j into an exit code", (results, code) => {
   const [step] = ci.jobs.check.steps;
   expect(step.env).toEqual({ RESULTS: "${{ join(needs.*.result, ' ') }}" });
-  const run = spawnSync("sh", ["-e", "-c", step.run], {
+  const run = spawnSync("sh", ["-c", step.run], {
     env: { ...process.env, RESULTS: results },
   });
   expect(run.status).toBe(code);

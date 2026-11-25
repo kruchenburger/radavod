@@ -43,12 +43,15 @@ export function checkFile(file: string, source: string, allowed: Writes = writes
   for (const [key, text] of scalarsOf(content)) {
     const isExpression = text.includes("${{") || key === "if";
     if (key === "secrets" || (isExpression && /\bsecrets\b/i.test(text))) add("secrets", text);
+    // A merge key hides the rest of a step from this check, and a default shell from its step.
+    if (["<<", "defaults"].includes(key)) add("hidden", key);
   }
 
   if (isWorkflow(file)) {
     const events = eventsOf(content.on);
     if (events.length === 0) add("privileged-event", "no event");
-    for (const event of events) if (privileged.includes(event)) add("privileged-event", event);
+    for (const event of events)
+      if (privileged.includes(event.toLowerCase())) add("privileged-event", event);
     if (!["{}", '{"contents":"read"}'].includes(JSON.stringify(content.permissions))) {
       add("permissions", "the workflow");
     }
@@ -63,7 +66,10 @@ export function checkFile(file: string, source: string, allowed: Writes = writes
       job.steps?.forEach(checkStep);
     }
   } else {
-    (content.runs as Job | undefined)?.steps?.forEach(checkStep);
+    const runs = content.runs as Job | undefined;
+    // Any other kind brings an image or a script no step here shows.
+    if (runs?.using !== "composite") add("hidden", String(runs?.using));
+    runs?.steps?.forEach(checkStep);
   }
   return violations;
 
@@ -71,15 +77,22 @@ export function checkFile(file: string, source: string, allowed: Writes = writes
   function checkStep(step: Step): void {
     const { uses, run, shell } = step;
     if (typeof uses === "string" && !isPinned(uses)) add("unpinned", uses);
-    if (typeof uses === "string" && uses.startsWith("actions/checkout@")) {
+    if (typeof uses === "string" && /^actions\/checkout@/i.test(uses)) {
       if (step.with?.["persist-credentials"] !== false) add("credentials", uses);
     }
     // Text becomes code here, whoever wrote it. It goes through `env` instead.
-    for (const code of [run, shell, step.with?.script]) {
+    for (const code of [run, shell, ...scriptsOf(step)]) {
       if (String(code).includes("${{")) add("expression-in-run", String(code));
     }
     if (step["continue-on-error"]) add("ignored-failure", String(run ?? uses));
   }
+}
+
+/** The names of inputs are the same in any case. */
+function scriptsOf(step: Step): unknown[] {
+  return Object.entries(step.with ?? {}).flatMap(([name, value]) =>
+    name.toLowerCase() === "script" ? [value] : [],
+  );
 }
 
 function isWorkflow(file: string): boolean {
@@ -118,7 +131,7 @@ function scalarsOf(value: unknown, key = ""): [key: string, text: string][] {
   if (typeof value !== "object" || value === null) return [[key, String(value)]];
   if (Array.isArray(value)) return value.flatMap((item) => scalarsOf(item, key));
   return Object.entries(value).flatMap(([name, item]) => [
-    ...(name === "secrets" ? [[name, ""] as [string, string]] : []),
+    ...(["secrets", "<<", "defaults"].includes(name) ? [[name, ""] as [string, string]] : []),
     ...scalarsOf(item, name),
   ]);
 }

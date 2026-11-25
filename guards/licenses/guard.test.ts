@@ -5,7 +5,7 @@ import { check, type Exception, type Package, parseList } from "./guard.ts";
 const pkg = (license: string, name = "lib"): Package => ({ name, version: "1.0.0", license });
 const mit = pkg("MIT", "ok");
 const helper = pkg("MIT", "helper");
-const tool: Exception = { name: "tool", licences: ["MPL-2.0"], reason: "runs in CI only" };
+const tool: Exception = { name: "tool", licenses: ["MPL-2.0"], reason: "runs in CI only" };
 
 const shipped = (license: string, name?: string) =>
   check([mit, pkg(license, name)], [mit, helper, pkg(license, name)], []);
@@ -68,13 +68,13 @@ it("gives no exception to what ships", () => {
   );
 });
 
-it("needs an exception for a development tool under another licence", () => {
+it("needs an exception for a development tool under another license", () => {
   expect(dev("MPL-2.0", [], "tool")).toEqual(['development: tool@1.0.0 is under "MPL-2.0"']);
   expect(dev("MPL-2.0", [tool], "tool")).toEqual([]);
   expect(dev("MPL-2.0 AND MIT", [tool], "tool")).toEqual([]);
 });
 
-it("allows a tool the licence it is listed with and no other", () => {
+it("allows a tool the license it is listed with and no other", () => {
   expect(dev("GPL-3.0-only", [tool], "tool")).toContain(
     'development: tool@1.0.0 is under "GPL-3.0-only"',
   );

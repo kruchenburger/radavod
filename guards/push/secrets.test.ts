@@ -87,6 +87,39 @@ it.skipIf(!installed)("is not talked out of it by a comment", () => {
   expect(checkSecrets(root, ["base..HEAD"])).toBe("found");
 });
 
+it.skipIf(!installed).each([
+  [".gitleaks.toml", "[extend]\nuseDefault = true\n[allowlist]\npaths = ['a.txt']\n"],
+  [".gitleaksignore", "%id:a.txt:github-pat:1\n"],
+])("is not talked out of it by %s", (file, content) => {
+  const root = started();
+  const id = commit(root, { "a.txt": secret });
+  commit(root, { [file]: text(content.replace("%id", id)) });
+  expect(checkSecrets(root, ["base..HEAD"])).toBe("found");
+});
+
+it.skipIf(!installed)("is not talked out of it by a replaced file", () => {
+  const root = started();
+  commit(root, { "a.txt": secret, "b.txt": text("b\n") });
+  git(root, "replace", "HEAD:a.txt", "HEAD:b.txt");
+  expect(checkSecrets(root, ["base..HEAD"])).toBe("found");
+});
+
+it.skipIf(!installed)("reads colored output of git", () => {
+  const root = started();
+  git(root, "config", "color.ui", "always");
+  commit(root, { "a.txt": text("a\n") });
+  expect(checkSecrets(root, ["base..HEAD"])).toBe("clean");
+});
+
+it.skipIf(!installed).each([
+  ["attributes call binary", { ".gitattributes": text("*.txt binary\n"), "a.txt": secret }],
+  ["has a zero byte", { "a.txt": Buffer.concat([text("\0\n"), secret]) }],
+])("finds a secret in a file that %s", (_name, files) => {
+  const root = started();
+  commit(root, files);
+  expect(checkSecrets(root, ["base..HEAD"])).toBe("found");
+});
+
 it.skipIf(!installed)("accepts clean commits", () => {
   const root = started();
   commit(root, { "a.txt": text("a\n") });

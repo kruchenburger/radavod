@@ -2,6 +2,9 @@ import listed from "./examples.json" with { type: "json" };
 import { type Entry, fields, git, readEntries, rootOf } from "./git.ts";
 import { brokenRules, checkExamples, type Examples, type Violation } from "./guard.ts";
 
+/** The list of examples, as it is named inside a commit. */
+const LIST = "guards/data/examples.json";
+
 export type CommitReport = {
   commits: number;
   files: number;
@@ -13,7 +16,8 @@ export type CommitReport = {
  * removes is still published. Revisions are written as for `git rev-list`, for example `base..head`.
  *
  * Every file of every commit is read, apart from those that stand unchanged, under the same name, in
- * a commit the range starts from. Examples are judged by today's list.
+ * a commit the range starts from. An example may be listed in any of the commits, but the rules it
+ * may break are those of today's list.
  */
 export function checkCommits(
   folder: string,
@@ -35,8 +39,13 @@ export function checkCommits(
   }
 
   const entries = [...added.values()];
-  const violations = readEntries(root, entries).flatMap((file, i) =>
-    brokenRules(file, examples).map((rule) => ({
+  const files = readEntries(root, entries);
+  const listedOnce = files
+    .filter(({ file }) => file === LIST)
+    .flatMap(({ bytes }) => namesIn(bytes));
+  const allExamples = { ...Object.fromEntries(listedOnce.map((name) => [name, []])), ...examples };
+  const violations = files.flatMap((file, i) =>
+    brokenRules(file, allExamples).map((rule) => ({
       rule,
       file: file.file,
       commit: entries[i]?.commit ?? "",
@@ -49,13 +58,15 @@ export function checkCommits(
 export function commitsOf(
   folder: string,
   revisions: string[],
+  known: string[] = [],
 ): { commits: string[]; boundary: string[] } {
   // A shallow copy ends early and looks like a short history.
   if (git(folder, ["rev-parse", "--is-shallow-repository"]).toString().trim() !== "false") {
-    throw new Error("cannot read the commits: the copy is shallow");
+    throw new Error("the copy is shallow. Run git fetch --unshallow");
   }
-  const options = ["--reverse", "--topo-order", "--boundary"];
-  const lines = git(folder, ["rev-list", ...options, ...revisions, "--"])
+  const options = ["--reverse", "--topo-order", "--boundary", "--stdin"];
+  const input = known.map((id) => `^${id}\n`).join("");
+  const lines = git(folder, ["rev-list", ...options, ...revisions, "--"], input)
     .toString()
     .split("\n")
     .filter(Boolean);
@@ -71,6 +82,15 @@ function treeOf(root: string, commit: string): Entry[] {
     const [mode = "", , id = ""] = info.split(" ");
     return { file, mode, id };
   });
+}
+
+/** The names in a list of examples. An unreadable one has none. */
+function namesIn(bytes: Buffer): string[] {
+  try {
+    return Object.keys(JSON.parse(bytes.toString()));
+  } catch {
+    return [];
+  }
 }
 
 function keyOf({ file, id }: Entry): string {

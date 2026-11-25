@@ -13,7 +13,7 @@ export type Examples = Record<string, string[]>;
  * Looks for a family's data in every file git tracks or has staged.
  *
  * It does not see: untracked files, earlier commits (`checkCommits` reads them), other branches, the
- * message and the author of a commit, text in images and PDF,
+ * messages and authors of commits and tags, text in images and PDF,
  * encrypted or encoded data (base64, a compressed or encrypted database), archives of a kind not in
  * `rules.ts` (brotli has no signature at all), archives other than zip after other bytes,
  * parts of a GEDCOM file with no header, no person or family record and no name with the surname in

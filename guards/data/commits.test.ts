@@ -91,6 +91,25 @@ it("allows a listed example only the rules it is listed for", () => {
   expect(checkCommits(root, ["base..HEAD"], { [file]: [] }).violations).toHaveLength(1);
 });
 
+it("takes an example that was listed in the same range", () => {
+  const list = "guards/data/examples.json";
+  const listing = (name: string) => Buffer.from(JSON.stringify({ [name]: ["gedcom-content"] }));
+  const root = started();
+  commit(root, { "examples/a.json": contents.clean });
+  commit(root, { [list]: listing("examples/a.json") });
+  commit(root, { "examples/a.json": null, "examples/b.json": contents.clean });
+  commit(root, { [list]: listing("examples/b.json") });
+  expect(checkCommits(root, ["base..HEAD"], {}).violations).toEqual([]);
+
+  commit(root, { [list]: Buffer.from("not a list"), "examples/c.json": contents.clean });
+  expect(checkCommits(root, ["base..HEAD"], {}).violations).toHaveLength(1);
+  // A list inside the range lets no rule be broken.
+  commit(root, { [list]: listing("examples/c.json"), "examples/c.json": contents.gedcom });
+  expect(checkCommits(root, ["base..HEAD"], {}).violations).toMatchObject([
+    { rule: "gedcom-content", file: "examples/c.json" },
+  ]);
+});
+
 it("reads a path with spaces and other letters", () => {
   const root = started();
   const file = "докі/мой файл.txt";

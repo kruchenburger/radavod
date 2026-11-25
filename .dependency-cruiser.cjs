@@ -100,7 +100,7 @@ module.exports = {
     ),
     rule(
       "ships-no-dev-tool",
-      "What src and web import is shipped, and the licences of development tools are not for that.",
+      "What src and web import is shipped, and the licenses of development tools are not for that.",
       { path: "^(?:src|web)/" },
       { dependencyTypes: ["npm-dev"] },
     ),

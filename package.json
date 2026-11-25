@@ -55,7 +55,7 @@
     "guard:copy": "node guards/copy/cli.ts",
     "guard:data": "node guards/data/cli.ts",
     "guard:secrets": "node guards/push/cli.ts --secrets",
-    "guard:licences": "node guards/licences/cli.ts",
+    "guard:licenses": "node guards/licenses/cli.ts",
     "examples": "node examples/write.ts"
   }
 }

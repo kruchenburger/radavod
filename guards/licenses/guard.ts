@@ -1,6 +1,6 @@
 export type Package = { name: string; version: string; license: string };
-/** A development tool under another licence. A star at the end stands for any ending. */
-export type Exception = { name: string; licences: string[]; reason: string };
+/** A development tool under another license. A star at the end stands for any ending. */
+export type Exception = { name: string; licenses: string[]; reason: string };
 
 const allowed = [
   "MIT",
@@ -13,7 +13,7 @@ const allowed = [
 ] as const;
 
 /**
- * Checks the licence of every package: the shipped ones against the list above, with OFL-1.1 for
+ * Checks the license of every package: the shipped ones against the list above, with OFL-1.1 for
  * fonts, the rest against the same list and the exceptions.
  *
  * It believes the `license` field of a package and sees the packages installed on this system only.
@@ -36,8 +36,8 @@ export function check(shipped: Package[], all: Package[], exceptions: Exception[
   for (const found of all) {
     if (shippedIds.has(idOf(found)) || isAllowed(found.license, allowed)) continue;
     const exception = exceptions.find(
-      ({ name, licences }) =>
-        matches(name, found.name) && isAllowed(found.license, [...allowed, ...licences]),
+      ({ name, licenses }) =>
+        matches(name, found.name) && isAllowed(found.license, [...allowed, ...licenses]),
     );
     if (exception) needed.add(exception);
     else violations.push(`development: ${describe(found)}`);
@@ -69,8 +69,8 @@ function matches(pattern: string, name: string): boolean {
   return pattern.endsWith("*") ? name.startsWith(pattern.slice(0, -1)) : name === pattern;
 }
 
-/** An SPDX expression: every licence joined by AND must be allowed, one of those joined by OR. */
-function isAllowed(expression: string, licences: readonly string[]): boolean {
+/** An SPDX expression: every license joined by AND must be allowed, one of those joined by OR. */
+function isAllowed(expression: string, licenses: readonly string[]): boolean {
   const tokens = expression.match(/[()]|[^\s()]+/g) ?? [];
   let at = 0;
 
@@ -93,7 +93,7 @@ function isAllowed(expression: string, licences: readonly string[]): boolean {
   function one(): boolean {
     const token = tokens[at];
     at += 1;
-    if (token !== "(") return token !== undefined && licences.includes(token);
+    if (token !== "(") return token !== undefined && licenses.includes(token);
     const result = any();
     at += 1;
     return tokens[at - 1] === ")" && result;

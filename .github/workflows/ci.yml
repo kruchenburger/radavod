@@ -9,12 +9,13 @@ permissions:
   contents: read
 
 concurrency:
-  group: ci-${{ github.ref }}
+  # Every push to main has commits of its own to read.
+  group: ci-${{ github.event_name == 'push' && github.sha || github.ref }}
   cancel-in-progress: ${{ github.event_name == 'pull_request' }}
 
 env:
-  # The commits of the pull request, or the ones pushed to main.
-  COMMITS: ${{ github.event.pull_request.base.sha || github.event.before }}..${{ github.event.pull_request.head.sha || github.sha }}
+  # The commits pushed to main, or what main does not have yet: the base of a pull request may change.
+  COMMITS: ${{ github.event_name == 'push' && github.event.before || 'origin/main' }}..${{ github.event.pull_request.head.sha || github.sha }}
 
 jobs:
   lint:
@@ -111,9 +112,9 @@ jobs:
       - run: pnpm vitest run guards/push/secrets.test.ts
       - run: pnpm guard:secrets "$COMMITS"
       - run: osv-scanner scan source --lockfile=pnpm-lock.yaml
-      - run: pnpm guard:licences
+      - run: pnpm guard:licenses
 
-  # The one check main requires. It is always reported, so a pull request never waits for it in vain.
+  # The one check to require on main. It is always reported, so no pull request waits for it in vain.
   check:
     if: always()
     needs: [lint, guards, test, build, e2e, security]
@@ -125,5 +126,5 @@ jobs:
           RESULTS: ${{ join(needs.*.result, ' ') }}
         run: |
           echo "$RESULTS"
-          test -n "$RESULTS"
-          for result in $RESULTS; do test "$result" = success; done
+          test -n "$RESULTS" || exit 1
+          for result in $RESULTS; do test "$result" = success || exit 1; done

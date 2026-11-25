@@ -2,7 +2,7 @@
 
 This project is about families, and the people here come from different ones: other countries, languages, religions and stories. Treat everyone with respect.
 
-- Talk about the work, not about the person.
+- Criticize the work and leave the person out of it.
 - No insults, no harassment, no mocking anyone's family, origin, faith, gender, language or English.
 - Don't publish anyone's private life here: your own, a relative's or a stranger's.
 - When someone asks you to stop, stop.
