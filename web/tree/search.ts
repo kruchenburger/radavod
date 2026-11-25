@@ -1,4 +1,4 @@
-import { foldName } from "../../src/kernel/fold-name";
+import { foldName } from "../../src/kernel/name-form";
 import type { TreeNameForm, TreePerson, TreeSnapshot } from "../../src/shared/tree";
 
 export type Found = {
