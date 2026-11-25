@@ -20,6 +20,8 @@ export type Rules = {
   children: "x" | "y";
   lines?: (card: Card) => Line[];
   measure?: Measure;
+  /** Which row a card stands in, when a row holds columns of cards. */
+  row?: (card: Card) => string;
   /** A list with indents: deeper rows may stand between partners. */
   isList?: boolean;
 };
@@ -267,6 +269,11 @@ function areOfOneStack(
     if (link.type !== "parentage" || !link.parents.some((key) => parents.has(key))) continue;
     partners.add(link.child);
   }
+  // Under a partner stand references to other partners of that partner.
+  for (const link of links) {
+    if (link.type !== "union" || link.at === undefined) continue;
+    if (partners.has(link.partners[0])) partners.add(link.at);
+  }
   let bottom = upper.y + upper.h;
   const between = [...byKey.values()]
     .filter(({ x, w, y }) => (isList || (x === a.x && w === a.w)) && y > upper.y && y <= lower.y)
@@ -343,7 +350,7 @@ function checkMerged(links: Link[], found: Findings): void {
 function checkOrder(
   byKey: Map<string, Card>,
   links: Link[],
-  { snapshot, children }: Rules,
+  { snapshot, children, row }: Rules,
   found: Findings,
 ): void {
   const other = children === "x" ? "y" : "x";
@@ -354,15 +361,17 @@ function checkOrder(
     .forEach(({ id }, i) => rank.set(id, rank.get(id) ?? i));
   const families = new Map<string, Set<Card>>();
   for (const link of links) {
-    if (link.type !== "parentage" || !link.tree) continue;
-    const child = byKey.get(link.child);
-    if (child === undefined || child.person === null) continue;
-    const family = `${link.family} at ${child[other]}`;
+    if (link.type !== "parentage" || (!link.tree && link.childAt === undefined)) continue;
+    const child = byKey.get(link.childAt ?? link.child);
+    if (child === undefined) continue;
+    const family = `${link.family} at ${row?.(child) ?? child[other]}`;
     families.set(family, (families.get(family) ?? new Set()).add(child));
   }
   for (const [family, cards] of families) {
-    const placed = [...cards].sort((a, b) => a[children] - b[children]);
-    const ranks = placed.map(({ person }) => rank.get(person ?? "") ?? -1);
+    const placed = [...cards].sort((a, b) => a[children] - b[children] || a[other] - b[other]);
+    const ranks = placed.map(
+      ({ person, reference }) => rank.get(person ?? reference?.people[0] ?? "") ?? -1,
+    );
     if (ranks.some((value, i) => i > 0 && value < (ranks[i - 1] ?? 0))) {
       found.unordered.push(`${family}: ${placed.map(({ key }) => key).join(" ")}`);
     }

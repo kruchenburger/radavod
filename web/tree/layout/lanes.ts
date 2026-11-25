@@ -10,6 +10,7 @@ const clearance = 10;
  */
 export class Track {
   readonly #spans = new Map<string, { from: number; to: number; lane: number }>();
+  #count = 0;
 
   /** The family has a line here that enters or leaves the strip at this place. */
   touch(family: string, at: number): void {
@@ -34,7 +35,13 @@ export class Track {
       ends[lane] = span.to;
       span.lane = lane;
     }
-    return ends.length;
+    this.#count = ends.length;
+    return this.#count;
+  }
+
+  /** How many lanes were dealt out. */
+  get count(): number {
+    return this.#count;
   }
 
   lane(family: string): number {
