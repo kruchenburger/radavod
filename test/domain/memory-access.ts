@@ -10,6 +10,7 @@ export class MemoryAccess implements AccessStore {
     invitation: new Map<string, Saved<"invitation">>(),
     credential: new Map<string, Saved<"credential">>(),
     session: new Map<string, Saved<"session">>(),
+    setup: new Map<string, Saved<"setup">>(),
   };
   saves = 0;
 
@@ -27,6 +28,16 @@ export class MemoryAccess implements AccessStore {
 
   invitationByHash(hash: string) {
     return copy([...this.rows.invitation.values()].find((one) => one.hash === hash));
+  }
+
+  recoveriesOf(member: MemberId) {
+    return [...this.rows.invitation.values()]
+      .filter((one) => one.kind === "recovery" && one.member === member && one.spentAt === null)
+      .map((one) => structuredClone(one));
+  }
+
+  isCodeUsed(hash: string) {
+    return this.rows.setup.has(hash);
   }
 
   credential(id: string) {

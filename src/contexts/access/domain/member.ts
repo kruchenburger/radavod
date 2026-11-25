@@ -2,7 +2,7 @@ import { type Write, writes } from "../../../kernel/change";
 import type { MemberId, PersonId } from "../../../kernel/id";
 import { type Missing, missing } from "../../../kernel/refusal";
 import type { Result } from "../../../kernel/result";
-import { type Credential, type PasskeyRequired, passkeyRequired } from "./credential";
+import type { Credential } from "./credential";
 import type { Invitation } from "./invitation";
 import { type Action, can, type Role } from "./rights";
 import type { Session } from "./session";
@@ -25,7 +25,11 @@ export type Change = (
   | Write<"invitation", string, Invitation>
   | Write<"credential", string, Credential>
   | Write<"session", string, Session>
+  | Write<"setup", string, SetupCode>
 )[];
+
+/** A setup code that let a keeper in, by its hash. Each code does so once. */
+export type SetupCode = { hash: string; usedAt: number };
 
 /** What the access of a family holds. A family has few members: they are read all at once. */
 export interface AccessReader {
@@ -33,6 +37,10 @@ export interface AccessReader {
   members(): Member[];
   invitation(id: string): Invitation | null;
   invitationByHash(hash: string): Invitation | null;
+  /** The recovery links of a member that are not spent. */
+  recoveriesOf(member: MemberId): Invitation[];
+  /** Whether a setup code, by its hash, ever let a keeper in. */
+  isCodeUsed(hash: string): boolean;
   credential(id: string): Credential | null;
   credentialsOf(member: MemberId): Credential[];
   /** A session by the hash of its token. */
@@ -41,10 +49,17 @@ export interface AccessReader {
 }
 
 export type Forbidden = { code: "forbidden" };
+export type PasskeyRequired = { code: "passkey-required" };
 export type LastKeeper = { code: "last-keeper" };
 
 export const forbidden = { ok: false, error: { code: "forbidden" } } as const;
 export const lastKeeper = { ok: false, error: { code: "last-keeper" } } as const;
+export const passkeyRequired = { ok: false, error: { code: "passkey-required" } } as const;
+
+/** Whether a family has a keeper: until then only setting up is open. */
+export function isSetUp(reader: AccessReader): boolean {
+  return reader.members().some((one) => isLive(one) && one.role === "keeper");
+}
 
 export function isLive<T extends { revokedAt: number | null }>(thing: T | null): thing is T {
   return thing !== null && thing.revokedAt === null;

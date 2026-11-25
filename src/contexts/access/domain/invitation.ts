@@ -46,12 +46,14 @@ export type RedeemError = Spent | Expired | Missing | Duplicate | CredentialErro
  */
 export function setUp(
   reader: AccessReader,
-  input: { member: NewMember; credential: NewCredential; now: number; again?: boolean },
+  input: { member: NewMember; credential: NewCredential; now: number; code: string },
 ): Result<Change, SetUp | Duplicate | CredentialError> {
-  const { member, credential, now, again = false } = input;
-  const isSetUp = reader.members().some((one) => isLive(one) && one.role === "keeper");
-  if (isSetUp && !again) return { ok: false, error: { code: "set-up" } };
-  return joined(reader, { ...member, role: "keeper", person: null }, credential, now);
+  const { member, credential, now, code } = input;
+  if (reader.isCodeUsed(code)) return { ok: false, error: { code: "set-up" } };
+  const made = joined(reader, { ...member, role: "keeper", person: null }, credential, now);
+  if (!made.ok) return made;
+  const used = writes("setup", code, null, { hash: code, usedAt: now });
+  return { ok: true, value: [...made.value, ...used] };
 }
 
 export function invite(
@@ -105,7 +107,11 @@ export function recover(
   };
   return {
     ok: true,
-    value: [...writes("invitation", id, null, invitation), ...signedOut(reader, whose, now)],
+    value: [
+      ...withoutRecoveries(reader, whose),
+      ...writes("invitation", id, null, invitation),
+      ...signedOut(reader, whose, now),
+    ],
   };
 }
 
@@ -134,19 +140,28 @@ export function redeem(
   if (invitation === null) return missing("invitation");
   if (invitation.spentAt !== null) return { ok: false, error: { code: "spent" } };
   if (now >= invitation.expiresAt) return { ok: false, error: { code: "expired" } };
+  // A link is worth what its giver may still do: one lowered or revoked since gives nothing.
+  if (!allowed(reader, invitation.by, "manage-members").ok) return missing("invitation");
   const spent = writes("invitation", invitation.id, invitation, { ...invitation, spentAt: now });
   if (invitation.kind === "recovery") {
     const member = invitation.member === null ? null : reader.member(invitation.member);
     if (!isLive(member)) return missing(invitation.member ?? "member");
     const added = credentialFor(reader, member, credential, now);
     if (!added.ok) return added;
-    return { ok: true, value: { change: [...spent, ...added.value], member: member.id } };
+    const others = withoutRecoveries(reader, member.id).filter(({ id }) => id !== invitation.id);
+    const change = [...spent, ...others, ...added.value];
+    return { ok: true, value: { change, member: member.id } };
   }
   if (input.member === undefined) return missing("member");
   const { role, person } = invitation;
   const made = joined(reader, { ...input.member, role, person }, credential, now);
   if (!made.ok) return made;
   return { ok: true, value: { change: [...spent, ...made.value], member: input.member.id } };
+}
+
+/** Recovery links of a member not yet spent go: only the last one given, or used, counts. */
+function withoutRecoveries(reader: AccessReader, member: MemberId): Change {
+  return reader.recoveriesOf(member).flatMap((one) => writes("invitation", one.id, one, null));
 }
 
 function joined(

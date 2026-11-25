@@ -1,6 +1,6 @@
 import { writes } from "../../../kernel/change";
 import type { MemberId, PersonId } from "../../../kernel/id";
-import { type Missing, missing } from "../../../kernel/refusal";
+import { type Duplicate, duplicate, type Missing, missing } from "../../../kernel/refusal";
 import type { Result } from "../../../kernel/result";
 import type { Credential } from "./credential";
 import { type AccessReader, type Change, isLive } from "./member";
@@ -19,8 +19,9 @@ export type Signed = { member: MemberId; role: Role; person: PersonId | null; ex
 export function signIn(
   reader: AccessReader,
   input: { hash: string; credential: string; now: number },
-): Result<Change, Missing> {
+): Result<Change, Missing | Duplicate> {
   const { hash, now } = input;
+  if (reader.session(hash) !== null) return duplicate;
   const credential = reader.credential(input.credential);
   if (!isLive(credential) || !isLive(reader.member(credential.member))) {
     return missing(input.credential);
@@ -35,7 +36,7 @@ export function signIn(
     ok: true,
     value: [
       ...writes("credential", credential.id, credential, { ...credential, lastUsedAt: now }),
-      ...writes("session", hash, reader.session(hash), session),
+      ...writes("session", hash, null, session),
     ],
   };
 }

@@ -22,7 +22,7 @@ import {
   changeRole,
   deleteAccount,
   type Forbidden,
-  isLive,
+  isSetUp,
   keepsAKeeper,
   type LastKeeper,
   lastKeeper,
@@ -50,8 +50,8 @@ export interface Access {
     member: NewMember;
     credential: NewCredential;
     now: number;
-    /** A new setup code lets in one more keeper. */
-    again?: boolean;
+    /** The hash of the setup code: a new one lets in one more keeper, each only once. */
+    code: string;
   }): Result<Change, AccessError>;
   invite(
     by: MemberId,
@@ -90,7 +90,7 @@ export function accessOver(store: AccessStore): Access {
     return result;
   };
   return {
-    isSetUp: () => store.members().some((one) => isLive(one) && one.role === "keeper"),
+    isSetUp: () => isSetUp(store),
     member: (id) => store.member(id),
     members: () => store.members(),
     credentialsOf: (id) => store.credentialsOf(id),

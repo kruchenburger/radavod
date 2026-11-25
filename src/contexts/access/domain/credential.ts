@@ -9,6 +9,8 @@ import {
   type Forbidden,
   isLive,
   type Member,
+  type PasskeyRequired,
+  passkeyRequired,
 } from "./member";
 
 /** A way to sign in: a passkey, or a device a reader bound when a passkey did not work. */
@@ -28,11 +30,8 @@ export type Credential = {
 
 export type NewCredential = Pick<Credential, "id" | "kind" | "label" | "publicKey" | "counter">;
 
-export type PasskeyRequired = { code: "passkey-required" };
 export type OneDevice = { code: "one-device" };
 export type CredentialError = PasskeyRequired | OneDevice | Duplicate;
-
-export const passkeyRequired = { ok: false, error: { code: "passkey-required" } } as const;
 
 /**
  * A credential a member may have: an editor and a keeper sign in by passkey, a reader may also bind one

@@ -31,6 +31,7 @@ function family(): { access: Access; store: MemoryAccess } {
       member: { id: member("ann"), name: "Ann" },
       credential: passkey("ann-1"),
       now: start,
+      code: "code 1",
     }).ok,
   ).toBe(true);
   return { access, store };
@@ -101,10 +102,14 @@ describe("setting up", () => {
       member: { id: member("bob"), name: "Bob" },
       credential: passkey("bob-1"),
       now: start,
+      code: "code 1",
     };
     expect(access.setUp(again)).toEqual(refused("set-up"));
-    expect(access.setUp({ ...again, again: true }).ok).toBe(true);
+    expect(access.setUp({ ...again, code: "code 2" }).ok).toBe(true);
     expect(access.member(member("bob"))?.role).toBe("keeper");
+    // A new code lets one keeper in, once.
+    const third = { ...again, member: { id: member("eve"), name: "Eve" }, code: "code 2" };
+    expect(access.setUp({ ...third, credential: passkey("eve-1") })).toEqual(refused("set-up"));
   });
 
   it("is open while nobody is set up", () => {
@@ -114,8 +119,11 @@ describe("setting up", () => {
       member: { id: member("ann"), name: "Ann" },
       credential: device("d"),
       now: start,
+      code: "code 1",
     };
     expect(access.setUp(device1)).toEqual(refused("passkey-required"));
+    // A code that let nobody in is not used up.
+    expect(access.setUp({ ...device1, credential: passkey("p") }).ok).toBe(true);
   });
 });
 
@@ -217,7 +225,35 @@ describe("an invitation", () => {
   });
 });
 
+describe("a link of a keeper who was lowered or revoked since", () => {
+  it("lets nobody in", () => {
+    const { access } = family();
+    joined(access, "bob", "keeper");
+    const input = { id: "i", hash: "h", role: "keeper" as const, person: null, now: start };
+    expect(access.invite(member("bob"), input).ok).toBe(true);
+    expect(access.changeRole(member("ann"), member("bob"), "reader", start).ok).toBe(true);
+    const redeem = { hash: "h", now: start, member: { id: member("dan"), name: "Dan" } };
+    expect(access.redeem({ ...redeem, credential: passkey("d") })).toEqual(refused("missing"));
+    expect(access.member(member("dan"))).toBeNull();
+  });
+});
+
 describe("recovery", () => {
+  it("leaves only the last link of a member, and spending it spends the others", () => {
+    const { access } = family();
+    joined(access, "bob", "editor");
+    for (const id of ["r1", "r2"]) {
+      const input = { id, hash: id, member: member("bob"), now: start };
+      expect(access.recover(member("ann"), input).ok).toBe(true);
+    }
+    const redeem = { now: start, credential: passkey("bob-2") };
+    expect(access.redeem({ ...redeem, hash: "r1" })).toEqual(refused("missing"));
+    expect(access.redeem({ ...redeem, hash: "r2" }).ok).toBe(true);
+    expect(access.redeem({ ...redeem, hash: "r2", credential: passkey("x") })).toEqual(
+      refused("spent"),
+    );
+  });
+
   it("revokes the passkeys and sessions of that member only, and lives a day", () => {
     const { access, store } = family();
     joined(access, "bob", "editor");
@@ -330,6 +366,16 @@ describe("a session", () => {
     if (bob === undefined) throw new Error("no member");
     store.rows.member.set(member("bob"), { ...bob, revokedAt: start });
     expect(access.session("s", start)).toBeNull();
+  });
+
+  it("is not taken over by another with the same token", () => {
+    const { access } = family();
+    joined(access, "bob", "editor");
+    expect(access.signIn({ hash: "s", credential: "ann-1", now: start }).ok).toBe(true);
+    expect(access.signIn({ hash: "s", credential: "bob-1", now: start })).toEqual(
+      refused("duplicate"),
+    );
+    expect(access.session("s", start)?.member).toBe(member("ann"));
   });
 
   it("says who it is, the role and the person", () => {

@@ -21,7 +21,9 @@ const someStep = fc.oneof(
   fc.record({ do: fc.constant("delete" as const), who: anyone }),
   fc.record({ do: fc.constant("unbind" as const), by: anyone, who: anyone, n: fc.nat(3) }),
   fc.record({ do: fc.constant("add" as const), who: anyone, kind, n: fc.nat(3) }),
-  fc.record({ do: fc.constant("setup" as const), who: anyone }),
+  fc.record({ do: fc.constant("setup" as const), who: anyone, code: fc.nat(2) }),
+  fc.record({ do: fc.constant("unvite" as const), by: anyone, who: anyone, n: fc.nat(5) }),
+  fc.record({ do: fc.constant("sign" as const), who: anyone, n: fc.nat(3) }),
   fc.record({ do: fc.constant("wait" as const), days: fc.integer({ min: 0, max: 20 }) }),
 );
 type Step = typeof someStep extends fc.Arbitrary<infer T> ? T : never;
@@ -35,7 +37,7 @@ function take(access: Access, step: Step, now: number, n: number): void {
   switch (step.do) {
     case "invite":
       access.invite(member(step.by), {
-        id: `i-${step.who}`,
+        id: `i-${step.who}-${n % 6}`,
         hash: `h-${step.who}-${n}`,
         role: step.role,
         person: null,
@@ -45,15 +47,21 @@ function take(access: Access, step: Step, now: number, n: number): void {
     case "recover":
       access.recover(member(step.by), {
         id: `r-${step.who}-${n}`,
-        hash: `r-${step.who}`,
+        hash: `r-${step.who}-${n}`,
         member: member(step.who),
         now,
       });
       return;
     case "redeem": {
       // The last link given to somebody: an invitation or a recovery.
-      for (const hash of [`r-${step.who}`]) {
-        access.redeem({ hash, now, credential: credential(step.who, step.kind, step.n) });
+      for (let k = n; k >= 0; k--) {
+        const hash = `r-${step.who}-${k}`;
+        const done = access.redeem({
+          hash,
+          now,
+          credential: credential(step.who, step.kind, step.n),
+        });
+        if (done.ok) break;
       }
       for (let k = n; k >= 0; k--) {
         const done = access.redeem({
@@ -88,8 +96,17 @@ function take(access: Access, step: Step, now: number, n: number): void {
         member: { id: member(step.who), name: step.who },
         credential: credential(step.who, "passkey", 0),
         now,
+        code: `code ${step.code}`,
       });
       return;
+    case "unvite":
+      access.revokeInvitation(member(step.by), `i-${step.who}-${step.n}`);
+      return;
+    case "sign": {
+      const [one] = access.credentialsOf(member(step.who)).slice(step.n);
+      if (one !== undefined) access.signIn({ hash: `s-${n}`, credential: one.id, now });
+      return;
+    }
     case "wait":
       return;
   }
@@ -117,6 +134,15 @@ describe("after any operations on members", () => {
           take(access, step, now, n);
           wasSetUp ||= access.isSetUp();
           if (wasSetUp) expect(keepers(access), JSON.stringify(step)).toBeGreaterThan(0);
+          // Every live session is of a live member and credential, and says the member's role.
+          for (let k = 0; k <= n; k++) {
+            const signed = access.session(`s-${k}`, now);
+            if (signed === null) continue;
+            expect(access.member(signed.member)).toMatchObject({
+              revokedAt: null,
+              role: signed.role,
+            });
+          }
           // A member never has two live devices, and only a reader has one.
           for (const one of access.members()) {
             const devices = access
