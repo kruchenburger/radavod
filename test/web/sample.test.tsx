@@ -199,7 +199,7 @@ describe("around a person", () => {
   it("begins with the person of the example, on the direct line", async () => {
     await open("/sample");
     expect(centre().dataset["key"]).toBe(`p:${start}`);
-    const label = within(centre()).getAllByRole("link")[0]?.getAttribute("aria-label");
+    const label = within(centre()).getAllByRole("link")[0]?.textContent;
     expect(label).toContain(name(start));
     expect(label).toContain("Прямая линия");
   });

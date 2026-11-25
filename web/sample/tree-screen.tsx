@@ -291,10 +291,15 @@ function PersonCard({ card, as, open, place, words, relatives }: PersonCardProps
         className={classes.name}
         href={href}
         data-press={key}
-        aria-label={label}
         aria-current={isFocus ? "true" : undefined}
       >
-        <CardLines lines={card.lines} words={words} person={person} isSpouse={isSpouse} />
+        <CardLines
+          label={label}
+          lines={card.lines}
+          words={words}
+          person={person}
+          isSpouse={isSpouse}
+        />
         {folded !== undefined && folded > 0 && (
           <span className={classes.folded} aria-hidden="true">
             {folded}
@@ -316,17 +321,23 @@ type PlaceProps = Pick<PersonCardProps, "card" | "place" | "words"> & {
 /** Somebody nobody knows, or people who stand elsewhere on this page. */
 function Place({ card, place, words, style }: PlaceProps) {
   const { key, reference, unknown, lines, isSpouse } = card;
-  const text = <CardLines lines={lines} words={words} person={null} isSpouse={isSpouse} />;
+  const label =
+    reference === undefined
+      ? unknown === undefined
+        ? ""
+        : words.unknown(unknown)
+      : Object.values(words.reference(reference)).join(": ");
+  const text = (
+    <CardLines label={label} lines={lines} words={words} person={null} isSpouse={isSpouse} />
+  );
   const [first] = reference?.people ?? [];
   if (reference !== undefined && first !== undefined) {
-    const { title, detail } = words.reference(reference);
     return (
       <div className={classes.card} data-key={key} data-role="reference" style={style}>
         <Link
           className={classes.name}
           href={hrefOf({ ...treePlace(first), half: place.half })}
           data-press={key}
-          aria-label={`${title}: ${detail}`}
         >
           {text}
         </Link>
@@ -335,13 +346,7 @@ function Place({ card, place, words, style }: PlaceProps) {
   }
   return (
     <div className={classes.card} data-key={key} data-role="unknown" style={style}>
-      <span
-        className={classes.name}
-        data-press={key}
-        tabIndex={-1}
-        role="note"
-        aria-label={unknown === undefined ? undefined : words.unknown(unknown)}
-      >
+      <span className={classes.name} data-press={key} tabIndex={-1}>
         {text}
       </span>
     </div>

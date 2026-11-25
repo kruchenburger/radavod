@@ -6,11 +6,16 @@ import sansMedium from "@fontsource/alegreya-sans/500.css?raw";
 import main from "../../web/main.tsx?raw";
 import packageJson from "../../package.json?raw";
 import page from "../../web/index.html?raw";
-import styles from "../../web/app/home.module.css?raw";
 import config from "../../vite.config.ts?raw";
 import wrangler from "../../wrangler.jsonc?raw";
 import { THEME_KEY } from "../../web/app/memory";
 import { fonts } from "../../web/app/tokens";
+
+const styles = import.meta.glob<string>("../../web/**/*.css", {
+  query: "?raw",
+  import: "default",
+  eager: true,
+});
 
 const faces = [
   ["serif", serif],
@@ -19,7 +24,11 @@ const faces = [
   ["sans medium", sansMedium],
 ] as const;
 
-it.each([["the page", page] as const, ["the styles", styles] as const, ...faces])(
+it("has styles to look through", () => {
+  expect(Object.keys(styles).length).toBeGreaterThan(5);
+});
+
+it.each([["the page", page] as const, ...Object.entries(styles), ...faces])(
   "asks no other site for anything: %s",
   (_, source) => {
     expect(source).not.toMatch(/(?:https?:)?\/\/\w/);

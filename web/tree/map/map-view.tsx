@@ -468,10 +468,15 @@ const PersonOnMap = memo(
           className={classes.person}
           href={rest.hrefOfReference(first, map.level)}
           tabIndex={-1}
-          aria-label={`${title} ${detail}`}
           style={style}
         >
-          <CardLines lines={lines} words={words} person={null} ink={words.ink(reference.page)} />
+          <CardLines
+            label={`${title} ${detail}`}
+            lines={lines}
+            words={words}
+            person={null}
+            ink={words.ink(reference.page)}
+          />
         </Link>
       );
     }
@@ -490,7 +495,6 @@ const PersonOnMap = memo(
         data-press={key}
         data-chosen={isChosen || undefined}
         tabIndex={isStop ? 0 : -1}
-        aria-label={label}
         aria-current={isChosen ? "true" : undefined}
         style={style}
         onFocus={({ target }) => {
@@ -498,6 +502,7 @@ const PersonOnMap = memo(
         }}
       >
         <CardLines
+          label={label}
           lines={lines}
           words={words}
           person={person}
