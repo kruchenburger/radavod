@@ -435,6 +435,7 @@ describe("a date between two others", () => {
     ["1885/86", "a year without its century"],
     ["1885-05-1886", "nobody knows what 05 goes with"],
     ["1885-13-05-1886", "nobody knows what 13-05 goes with"],
+    ["13-05-1885-1886", "nobody knows where the first ends"],
     ["1885-05", "a month or a year without its century"],
     ["между 5 и 1885", "nobody knows what 5 is"],
     ["около 1880-1885", "two qualifiers"],
