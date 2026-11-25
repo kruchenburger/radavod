@@ -9,6 +9,9 @@
   "examples/names.ts": [],
   "examples/problems.ts": [],
   "examples/random.ts": [],
+  "examples/snapshot.test.ts": [],
+  "examples/snapshot.ts": [],
   "examples/tree.ts": [],
+  "examples/write-sample.ts": [],
   "examples/write.ts": []
 }

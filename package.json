@@ -30,6 +30,7 @@
     "@types/react-dom": "^19.3.0",
     "@vitejs/plugin-react": "^6.3.0",
     "dependency-cruiser": "^18.9.0",
+    "fast-check": "^4.11.0",
     "jsdom": "^31.0.1",
     "oxc-parser": "^0.160.0",
     "oxlint": "^1.95.0",
@@ -38,7 +39,7 @@
     "vitest": "4.1.12"
   },
   "scripts": {
-    "build": "vite build",
+    "build": "vite build && node examples/write-sample.ts dist/client",
     "test": "vitest run",
     "lint": "oxlint",
     "typecheck": "tsc --noEmit && tsc --noEmit -p tsconfig.node.json && tsc --noEmit -p tsconfig.web.json",

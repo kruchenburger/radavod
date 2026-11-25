@@ -1,0 +1,416 @@
+import type { TreeSnapshot } from "../../../src/shared/tree";
+import {
+  type Box,
+  type Card,
+  type Layout,
+  type Line,
+  type Link,
+  type Measure,
+  type Point,
+  personKey,
+} from "../../../web/tree/layout/types";
+
+export type Drawing = Pick<Layout, "cards" | "links" | "width" | "height">;
+
+export type Rules = {
+  snapshot: TreeSnapshot;
+  /** Everybody who must be drawn. */
+  people: Iterable<string>;
+  /** Along which axis the children of a family stand. */
+  children: "x" | "y";
+  lines?: (card: Card) => Line[];
+  measure?: Measure;
+};
+
+/** Each finding names its place. Empty lists mean a good drawing. */
+export type Findings = {
+  badNumbers: string[];
+  outside: string[];
+  overlaps: string[];
+  missingPeople: string[];
+  extraPeople: string[];
+  duplicates: string[];
+  throughCards: string[];
+  slanted: string[];
+  loose: string[];
+  missingLinks: string[];
+  falseLinks: string[];
+  merged: string[];
+  unordered: string[];
+  textOutside: string[];
+};
+
+/** How far a line may stop from a card it belongs to. */
+const near = 4.5;
+
+export function check(drawing: Drawing, rules: Rules): Findings {
+  const { cards, links } = drawing;
+  const found: Findings = {
+    badNumbers: [],
+    outside: [],
+    overlaps: [],
+    missingPeople: [],
+    extraPeople: [],
+    duplicates: [],
+    throughCards: [],
+    slanted: [],
+    loose: [],
+    missingLinks: [],
+    falseLinks: [],
+    merged: [],
+    unordered: [],
+    textOutside: [],
+  };
+  const byKey = new Map(cards.map((card) => [card.key, card]));
+  checkNumbers(drawing, found);
+  checkPeople(cards, rules, found);
+  checkOverlaps(cards, found);
+  checkPaths(cards, byKey, links, found);
+  checkLinks(byKey, links, rules, found);
+  checkMerged(links, found);
+  checkOrder(byKey, links, rules, found);
+  checkText(cards, rules, found);
+  return found;
+}
+
+/** Only the lists with something in them, cut short. */
+export function problems(drawing: Drawing, rules: Rules): Partial<Findings> {
+  const all = Object.entries(check(drawing, rules));
+  return Object.fromEntries(
+    all.filter(([, list]) => list.length > 0).map(([key, list]) => [key, list.slice(0, 5)]),
+  );
+}
+
+function checkNumbers({ cards, links, width, height }: Drawing, found: Findings): void {
+  const isFine = (n: number): boolean => Number.isFinite(n);
+  if (!isFine(width) || !isFine(height)) found.badNumbers.push("the layout");
+  const isInside = (x: number, y: number): boolean =>
+    x >= -0.5 && y >= -0.5 && x <= width + 0.5 && y <= height + 0.5;
+  for (const { key, x, y, w, h } of cards) {
+    if (![x, y, w, h].every(isFine) || w <= 0 || h <= 0) found.badNumbers.push(key);
+    if (!isInside(x, y) || !isInside(x + w, y + h)) found.outside.push(key);
+  }
+  for (const link of links) {
+    if (!link.points.flat().every(isFine)) found.badNumbers.push(nameOf(link));
+    if (!link.points.every(([x, y]) => isInside(x, y))) found.outside.push(nameOf(link));
+  }
+}
+
+function checkPeople(cards: Card[], { people }: Rules, found: Findings): void {
+  const expected = new Set(people);
+  const keys = new Set<string>();
+  const seen = new Set<string>();
+  for (const { key, person } of cards) {
+    if (keys.has(key) || (person !== null && seen.has(person))) found.duplicates.push(key);
+    keys.add(key);
+    if (person === null) continue;
+    seen.add(person);
+    if (!expected.has(person)) found.extraPeople.push(person);
+  }
+  for (const person of expected) if (!seen.has(person)) found.missingPeople.push(person);
+}
+
+function checkOverlaps(cards: Card[], found: Findings): void {
+  const grid = new Grid<Card>();
+  for (const card of cards) {
+    for (const other of grid.near(card)) {
+      const w = -gap(card.x, card.w, other.x, other.w);
+      const h = -gap(card.y, card.h, other.y, other.h);
+      if (w > 0.01 && h > 0.01) found.overlaps.push(`${card.key} ${other.key}`);
+    }
+    grid.add(card, card);
+  }
+}
+
+function checkPaths(cards: Card[], byKey: Map<string, Card>, links: Link[], found: Findings): void {
+  const grid = new Grid<Card>();
+  for (const card of cards) grid.add(card, card);
+  const unions = new Set(
+    links.flatMap((link) => (link.type === "union" ? [pairOf(...link.partners)] : [])),
+  );
+  for (const link of links) {
+    const { points } = link;
+    const [first] = points;
+    const last = points.at(-1);
+    if (first === undefined || last === undefined) {
+      if (link.type === "parentage" || !standTogether(link.partners, byKey, links)) {
+        found.loose.push(nameOf(link));
+      }
+      continue;
+    }
+    const [from, to] =
+      link.type === "parentage"
+        ? [link.parents, [link.child]]
+        : [[link.partners[0]], [link.partners[1]]];
+    if (link.type === "parentage") {
+      const [a, b] = link.parents;
+      const isCouple = b === undefined || unions.has(pairOf(a ?? "", b));
+      if (!isCouple && !standTogether([a ?? "", b ?? ""], byKey, links)) found.loose.push(nameOf(link));
+    }
+    const touches = (point: Point, keys: string[]): boolean =>
+      keys.some((key) => touchesCard(point, byKey.get(key)));
+    if (!touches(first, from) || !touches(last, to)) found.loose.push(nameOf(link));
+    for (const [a, b] of pieces(points)) {
+      const box = boxOf(a, b);
+      if (box.w > 0.01 && box.h > 0.01) found.slanted.push(nameOf(link));
+      for (const card of grid.near(box)) {
+        // A line may touch the border of a card and enter none, its own ends included.
+        const inside = lengthInside(box, card, 0.5);
+        if (inside > 0.5) found.throughCards.push(`${nameOf(link)}: ${card.key}`);
+      }
+    }
+  }
+}
+
+/** A couple that needs no line of its own: the cards touch, or they are the arms of one brace. */
+function standTogether(
+  partners: [string, string],
+  byKey: Map<string, Card>,
+  links: Link[],
+): boolean {
+  const [a, b] = partners.map((key) => byKey.get(key));
+  if (a === undefined || b === undefined) return false;
+  const gapX = gap(a.x, a.w, b.x, b.w);
+  const gapY = gap(a.y, a.h, b.y, b.h);
+  if (Math.abs(gapX) < 0.01 && gapY < 0) return true;
+  if (gapY >= -0.01 && gapY <= near && gapX < 0) return true;
+  if (areOfOneStack(a, b, byKey, links)) return true;
+  const arms = (key: string): string[] =>
+    links.flatMap((link) =>
+      link.type === "parentage" && link.parents.length === 1 && link.parents[0] === key
+        ? [`${link.family} ${link.child}`]
+        : [],
+    );
+  const first = new Set(arms(a.key));
+  return arms(b.key).some((arm) => first.has(arm));
+}
+
+/** Partners in a pile under one person: nothing but other partners of either between the two. */
+function areOfOneStack(
+  a: Card,
+  b: Card,
+  byKey: Map<string, Card>,
+  links: Link[],
+): boolean {
+  if (a.x !== b.x || a.w !== b.w) return false;
+  const [upper, lower] = a.y < b.y ? [a, b] : [b, a];
+  const partners = new Set(
+    links.flatMap((link) => {
+      const pair = link.type === "union" ? link.partners : link.parents;
+      return pair.includes(a.key) || pair.includes(b.key) ? pair : [];
+    }),
+  );
+  let bottom = upper.y + upper.h;
+  const between = [...byKey.values()]
+    .filter(({ x, w, y }) => x === a.x && w === a.w && y > upper.y && y <= lower.y)
+    .sort((first, second) => first.y - second.y);
+  for (const card of between) {
+    if (card.y - bottom > near || !partners.has(card.key)) return false;
+    bottom = card.y + card.h;
+  }
+  return true;
+}
+
+function checkLinks(
+  byKey: Map<string, Card>,
+  links: Link[],
+  { snapshot }: Rules,
+  found: Findings,
+): void {
+  const drawn = new Map<string, string[]>();
+  for (const link of links) {
+    if (link.type === "union") drawn.set(pairOf(...link.partners), link.partners);
+    else for (const parent of link.parents) drawn.set(`${parent} > ${link.child}`, [parent, link.child]);
+  }
+  const told = new Map<string, string[]>();
+  const tell = (edge: string, ...ids: string[]): void => {
+    told.set(edge, ids.map(personKey));
+  };
+  const seen = new Set<string>();
+  for (const { id, parents } of snapshot.people) {
+    if (seen.has(id)) continue;
+    seen.add(id);
+    for (const { parent } of parents) {
+      if (parent !== null && parent !== id) {
+        tell(`${personKey(parent)} > ${personKey(id)}`, parent, id);
+      }
+    }
+  }
+  for (const { partners } of snapshot.unions) {
+    const [a, b] = partners;
+    if (b !== null && a !== b) tell(pairOf(personKey(a), personKey(b)), a, b);
+  }
+  for (const [edge, keys] of told) {
+    if (keys.every((key) => byKey.has(key)) && !drawn.has(edge)) found.missingLinks.push(edge);
+  }
+  for (const [edge, keys] of drawn) {
+    const cards = keys.map((key) => byKey.get(key));
+    const isOfUnknown = cards.some((card) => card?.person === null);
+    if (cards.includes(undefined) || (!isOfUnknown && !told.has(edge))) found.falseLinks.push(edge);
+  }
+}
+
+function checkMerged(links: Link[], found: Findings): void {
+  type Piece = Box & { family: string; name: string };
+  const grid = new Grid<Piece>();
+  for (const link of links) {
+    for (const [a, b] of pieces(link.points)) {
+      const piece: Piece = { ...boxOf(a, b), family: link.family, name: nameOf(link) };
+      for (const other of grid.near(piece, 2)) {
+        if (other.family === piece.family) continue;
+        const isFlat = piece.h < 0.01 && other.h < 0.01;
+        const isUpright = piece.w < 0.01 && other.w < 0.01;
+        if (!isFlat && !isUpright) continue;
+        const [along, apart] = isFlat
+          ? [-gap(piece.x, piece.w, other.x, other.w), Math.abs(piece.y - other.y)]
+          : [-gap(piece.y, piece.h, other.y, other.h), Math.abs(piece.x - other.x)];
+        if (apart < 1.5 && along > 0.5) found.merged.push(`${piece.name} and ${other.name}`);
+      }
+      grid.add(piece, piece);
+    }
+  }
+}
+
+function checkOrder(
+  byKey: Map<string, Card>,
+  links: Link[],
+  { snapshot, children }: Rules,
+  found: Findings,
+): void {
+  const other = children === "x" ? "y" : "x";
+  const rank = new Map<string, number>();
+  snapshot.people
+    .map(({ id, birth }, i) => ({ id, i, sort: birth?.sort ?? Infinity }))
+    .sort((a, b) => (a.sort === b.sort ? a.i - b.i : a.sort - b.sort))
+    .forEach(({ id }, i) => rank.set(id, rank.get(id) ?? i));
+  const families = new Map<string, Set<Card>>();
+  for (const link of links) {
+    if (link.type !== "parentage" || !link.tree) continue;
+    const child = byKey.get(link.child);
+    if (child === undefined || child.person === null) continue;
+    const family = `${link.family} at ${child[other]}`;
+    families.set(family, (families.get(family) ?? new Set()).add(child));
+  }
+  for (const [family, cards] of families) {
+    const placed = [...cards].sort((a, b) => a[children] - b[children]);
+    const ranks = placed.map(({ person }) => rank.get(person ?? "") ?? -1);
+    if (ranks.some((value, i) => i > 0 && value < (ranks[i - 1] ?? 0))) {
+      found.unordered.push(`${family}: ${placed.map(({ key }) => key).join(" ")}`);
+    }
+  }
+}
+
+function checkText(cards: Card[], { lines, measure }: Rules, found: Findings): void {
+  if (lines === undefined) return;
+  for (const card of cards) {
+    const own = lines(card);
+    own.forEach((line, i) => {
+      const isInside =
+        line.x >= -0.01 &&
+        line.y >= -0.01 &&
+        line.x + line.w <= card.w + 0.01 &&
+        line.y + line.h <= card.h + 0.01;
+      const fits = measure === undefined || measure(line.text, line.style) <= line.w + 0.01;
+      const isClear = own
+        .slice(0, i)
+        .every(
+          (other) =>
+            gap(line.x, line.w, other.x, other.w) >= -0.01 ||
+            gap(line.y, line.h, other.y, other.h) >= -0.01,
+        );
+      if (!isInside || !fits || !isClear) found.textOutside.push(`${card.key}: ${line.text}`);
+    });
+  }
+}
+
+export function nameOf(link: Link): string {
+  return link.type === "union"
+    ? link.partners.join(" + ")
+    : `${link.parents.join(" & ")} > ${link.child}`;
+}
+
+/** Plain crossings of lines of different families: a number to compare layouts by, not a defect. */
+export function crossings(links: Link[]): number {
+  type Piece = Box & { family: string };
+  const flat = new Grid<Piece>();
+  const upright: Piece[] = [];
+  for (const { points, family } of links) {
+    for (const [a, b] of pieces(points)) {
+      const piece = { ...boxOf(a, b), family };
+      if (piece.h < 0.01) flat.add(piece, piece);
+      else upright.push(piece);
+    }
+  }
+  let count = 0;
+  for (const piece of upright) {
+    for (const other of flat.near(piece)) {
+      const isCrossed =
+        other.x < piece.x - 0.5 &&
+        other.x + other.w > piece.x + 0.5 &&
+        piece.y < other.y - 0.5 &&
+        piece.y + piece.h > other.y + 0.5;
+      if (isCrossed && other.family !== piece.family) count += 1;
+    }
+  }
+  return count;
+}
+
+const pairOf = (a: string, b: string): string => [a, b].sort().join(" + ");
+
+const pieces = (points: Point[]): [Point, Point][] =>
+  points.slice(1).map((point, i) => [points[i] as Point, point]);
+
+const boxOf = ([ax, ay]: Point, [bx, by]: Point): Box => ({
+  x: Math.min(ax, bx),
+  y: Math.min(ay, by),
+  w: Math.abs(ax - bx),
+  h: Math.abs(ay - by),
+});
+
+/** The distance between two intervals; below zero they overlap. */
+const gap = (a: number, aSize: number, b: number, bSize: number): number =>
+  Math.max(a, b) - Math.min(a + aSize, b + bSize);
+
+function touchesCard([x, y]: Point, card: Card | undefined): boolean {
+  if (card === undefined) return false;
+  const dx = Math.max(card.x - x, 0, x - card.x - card.w);
+  const dy = Math.max(card.y - y, 0, y - card.y - card.h);
+  return Math.max(dx, dy) <= near;
+}
+
+/** How much of a piece lies inside a card shrunk by `pad`. */
+function lengthInside(piece: Box, card: Box, pad: number): number {
+  const w = -gap(piece.x, piece.w, card.x + pad, card.w - 2 * pad);
+  const h = -gap(piece.y, piece.h, card.y + pad, card.h - 2 * pad);
+  return w < 0 || h < 0 ? 0 : Math.max(w, h);
+}
+
+class Grid<T> {
+  readonly #size = 200;
+  readonly #cells = new Map<string, T[]>();
+
+  #keys({ x, y, w, h }: Box, pad: number): string[] {
+    const at = (value: number): number => Math.floor(value / this.#size);
+    const keys: string[] = [];
+    for (let i = at(x - pad); i <= at(x + w + pad); i += 1) {
+      for (let j = at(y - pad); j <= at(y + h + pad); j += 1) keys.push(`${i} ${j}`);
+    }
+    return keys;
+  }
+
+  add(item: T, box: Box): void {
+    for (const key of this.#keys(box, 0)) {
+      const cell = this.#cells.get(key);
+      if (cell === undefined) this.#cells.set(key, [item]);
+      else cell.push(item);
+    }
+  }
+
+  near(box: Box, pad = 1): Set<T> {
+    const found = new Set<T>();
+    for (const key of this.#keys(box, pad)) {
+      for (const item of this.#cells.get(key) ?? []) found.add(item);
+    }
+    return found;
+  }
+}
