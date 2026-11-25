@@ -21,7 +21,8 @@
   display: flex;
   align-items: center;
   gap: 0.5rem;
-  width: 16rem;
+  flex: 0 1 16rem;
+  min-width: 8rem;
   padding-left: 0.5rem;
   border-bottom: 1px solid var(--rule);
   color: var(--muted);
@@ -53,7 +54,6 @@
 }
 
 .field[data-alone] {
-  width: auto;
   border-bottom: 0;
 }
 
