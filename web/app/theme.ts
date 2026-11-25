@@ -1,4 +1,5 @@
 import {
+  Button,
   colorsTuple,
   createTheme,
   type CSSVariablesResolver,
@@ -38,6 +39,10 @@ export const theme = createTheme({
     action: virtualColor({ name: "action", light: "actionLight", dark: "actionDark" }),
   },
   primaryColor: "action",
+  // The interface has no heavier weight, and a browser would make one up.
+  components: {
+    Button: Button.extend({ styles: { root: { fontWeight: 500, minHeight: "2.75rem" } } }),
+  },
   // Mantine writes white on the main colour in both themes.
   variantColorResolver: (input) => ({
     ...defaultVariantColorsResolver(input),

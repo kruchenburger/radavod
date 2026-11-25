@@ -102,7 +102,7 @@ A single row: the name of the family in Alegreya italic, the two views as words 
 - Columns: an entry is 152 px wide, a gap of 34 px holds the brace; the strip is 236 px on `surface`, full height.
 - An entry is the given name in `ink` and the surname in its branch ink, then years and the branch. A spouse is a second entry under the first with ⚭ before it.
 - Couples stand on the left of a brace, their child at its tip. On the right the tip is at the couple and every child has an arm.
-- Lines: `rule` 1.1 px; adoption and guardianship 1.8 px dashed 5 4; the direct line `ink` 2.6 px, and the names on it are 700. The arm to a child on the line is dark, its neighbours stay thin. If the centre is not on the direct line, there is no dark line on the screen.
+- Lines: `rule` 1.1 px; adoption and guardianship 1.8 px dashed 5 4; a version of the parents that contradicts the main one 1.4 px dotted 1.4 3.6; the direct line `ink` 2.6 px, and the names on it are 700. The arm to a child on the line is dark, its neighbours stay thin. If the centre is not on the direct line, there is no dark line on the screen. Under the tree a legend explains the lines that are on it.
 - Brace: `web/app/brace.ts`, corners of 11 px, less when the arms are short.
 - **Pressing a name** puts the person in the centre, pressing the centre opens the card. The "+" beside the chosen person adds a parent, a spouse or a child.
 - **Unknown parent**: a place in italic `muted` with a "+". If both are unknown, one place for the two.
@@ -150,6 +150,7 @@ One page per branch: `surface`, a head with the name of the branch in its ink an
 - **Between pages only the direct line is drawn.** It leaves through the gap under its row, runs in the gutters, and enters through the gap above the row of the child. It never crosses a person. Lines in one gutter keep 6 to 8 px apart.
 - Far: every person is a bar as long as the name, in the branch ink, without a branch in `rule`, a reference is a hollow bar. Names of the pages do not shrink with the drawing. Closer: names. Near: names, years, and the branch when it differs from the page.
 - The chosen person is set in `paper` on `ink`.
+- Closer and near, the head of a page keeps to the edge of the window while its page is in it.
 - Pressing a page in the far view moves closer to it. The place on the map is in the address.
 
 ### Keyboard and reading aloud

@@ -1,0 +1,174 @@
+.frame {
+  display: flex;
+  flex-direction: column;
+  min-height: 100dvh;
+}
+
+.frame[data-screen="branches"] {
+  height: 100dvh;
+  min-height: 26rem;
+  overflow: hidden;
+}
+
+.mark {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0.25rem 0.875rem;
+  min-height: 2.5rem;
+  padding: 0.25rem 1.75rem;
+  border-bottom: 1px solid var(--edge);
+  background-color: var(--surface);
+  font-size: 0.9375rem;
+}
+
+.mark b {
+  padding: 0.0625rem 0.625rem;
+  border: 1.5px solid var(--action);
+  border-radius: 3px;
+  color: var(--action);
+  font-weight: 500;
+}
+
+.mark span {
+  color: var(--muted);
+}
+
+.mark a {
+  display: inline-flex;
+  align-items: center;
+  min-height: 2rem;
+  margin-left: auto;
+  color: var(--action);
+  text-underline-offset: 3px;
+}
+
+.top {
+  position: relative;
+  display: flex;
+  align-items: center;
+  gap: 0 1.5rem;
+  padding: 0.75rem 1.75rem 0.625rem;
+  border-bottom: 1px solid var(--edge);
+}
+
+.brand {
+  color: var(--ink);
+  font: italic 500 1.3125rem/1.2 var(--serif);
+  text-decoration: none;
+}
+
+.views {
+  display: flex;
+  gap: 1.5rem;
+}
+
+.views a {
+  display: inline-flex;
+  align-items: center;
+  min-height: 2.5rem;
+  border-bottom: 2px solid transparent;
+  color: var(--muted);
+  font-size: 1.0625rem;
+  text-decoration: none;
+  white-space: nowrap;
+}
+
+.views a:hover {
+  color: var(--ink);
+}
+
+.views a[aria-current] {
+  border-color: var(--ink);
+  color: var(--ink);
+  font-weight: 500;
+}
+
+.tools {
+  flex: 1;
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+  min-width: 0;
+  gap: 0.25rem;
+}
+
+.tool {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 2.75rem;
+  min-height: 2.75rem;
+  padding: 0 0.5rem;
+  border: 0;
+  border-radius: 3px;
+  background: none;
+  color: var(--ink);
+  font: 500 1rem/1 var(--sans);
+  cursor: pointer;
+}
+
+.tool:hover {
+  background-color: var(--hover);
+}
+
+.main {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+  min-height: 0;
+}
+
+@media (max-width: 44.99em) {
+  .mark {
+    gap: 0 0.5rem;
+    min-height: 2.75rem;
+    padding: 0 1rem;
+  }
+
+  .mark b {
+    padding: 0.0625rem 0.375rem;
+  }
+
+  .mark a {
+    min-height: 2.75rem;
+  }
+
+  .top {
+    flex-wrap: wrap;
+    padding: 0.25rem 1rem 0;
+  }
+
+  .brand {
+    display: inline-flex;
+    align-items: center;
+    min-height: 2.75rem;
+    font-size: 1.125rem;
+  }
+
+  .views {
+    order: 1;
+    gap: 0;
+    width: 100%;
+  }
+
+  .views a {
+    flex: 1;
+    justify-content: center;
+    min-height: 2.75rem;
+    padding: 0.25rem;
+    text-align: center;
+    white-space: normal;
+  }
+
+  .tools {
+    margin-right: -0.5rem;
+  }
+
+  /* The map is a sheet over the tree, with a head of its own. */
+  .frame[data-sheet] .mark,
+  .frame[data-sheet] .top {
+    display: none;
+  }
+}
