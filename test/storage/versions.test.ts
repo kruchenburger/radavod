@@ -758,7 +758,8 @@ describe("versions", () => {
         if (i === 2 || i === 25) await all.checkpoint();
       }
       const { read } = await tree.countAsync(() => all.at(2));
-      expect(read).toBeLessThan(10);
+      // The checkpoint, the epoch twice and the entries after it.
+      expect(read).toBeLessThan(12);
     }));
 
   it("get no checkpoint of somebody who was erased while it was made", () =>
@@ -774,6 +775,17 @@ describe("versions", () => {
       await all.checkpoint();
       expect(tree.rows().history_checkpoint).toHaveLength(1);
       expect(await all.at(head(tree))).toEqual(stateOf(tree));
+    }));
+
+  it("are not looked at with somebody erased while a checkpoint was read", () =>
+    inTree(async (tree) => {
+      const all = versions(tree);
+      tree.do((c) => addPerson(c, "ada"));
+      tree.do((c) => addPerson(c, "eve"));
+      await all.checkpoint();
+      const looking = all.at(2);
+      eraseHere(tree.work, { actor: anna, now: 5 }, person("ada"), () => event("x"));
+      expect(JSON.stringify(await looking)).not.toContain(person("ada"));
     }));
 
   it("get a checkpoint every 500 entries, and not more than are needed for speed", () =>

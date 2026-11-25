@@ -231,7 +231,9 @@ class Return {
     });
     const place = event.place !== null && places.get(event.place) === null ? null : event.place;
     const union = event.union !== null && kinship.union(event.union) === null ? null : event.union;
-    life.add({ ...event, participants, place, union });
+    if (!life.add({ ...event, participants, place, union }).ok) {
+      this.plan.dropped.push({ kind: "event", other: this.#id });
+    }
   }
 
   #guest(home: PersonId, event: string, roles: string[]): void {

@@ -514,6 +514,45 @@ describe("an erased person", () => {
       });
     }));
 
+  it("takes nothing of a namesake, whose whole name is theirs too", () =>
+    inTree(async (tree) => {
+      tree.do((c) => {
+        for (const who of ["father", "son"]) addPerson(c, who);
+        const named = (who: string, patronymic: string) =>
+          accepted(
+            c.kinship.apply({
+              do: "put-name",
+              person: person(who),
+              name: form("n1", { given: "Иван", patronymic, surname: "Петров" }),
+            }),
+          );
+        named("father", "Петрович");
+        named("son", "Иванович");
+      });
+      const own = told("army", "service", ["son", "principal"]);
+      tree.do((c) => accepted(c.life.add({ ...own, note: "Иван Петров служил в армии" })));
+      const last = tree.read((c) => c.history.last());
+      const { mentions } = accepted(await erase(tree, "father"));
+      expect(mentions).toEqual([]);
+      expect(tree.read((c) => JSON.stringify(c.history.entry(last)))).toContain(
+        "Иван Петров служил в армии",
+      );
+      accepted(tree.run((c) => undo(c, last)));
+    }));
+
+  it("leaves an entry that spoke of them in words irreversible, and says so", () =>
+    inTree(async (tree) => {
+      family(tree);
+      const own = told("baptism", "baptism", ["guest", "principal"], ["ada", "godparent"]);
+      tree.do((c) =>
+        accepted(c.life.edit(person("guest"), { ...own, note: "крёстная Нимфадора Заозёрная" })),
+      );
+      const last = tree.read((c) => c.history.last());
+      tree.do((c) => accepted(c.life.edit(person("guest"), { ...own, note: "" })));
+      accepted(await erase(tree, "ada"));
+      expect(tree.run((c) => undo(c, last))).toMatchObject({ error: { code: "irreversible" } });
+    }));
+
   it("is erased once: to repeat it is harmless", () =>
     inTree(async (tree) => {
       family(tree);

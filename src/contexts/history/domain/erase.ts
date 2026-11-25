@@ -1,15 +1,20 @@
-import type { PersonId } from "../../../kernel/id";
+import { ERASED as erased, type PersonId } from "../../../kernel/id";
 import type { NameForm } from "../../../kernel/name-form";
 import type { Patch } from "./entry";
 
-/** Stands for an erased person where others were tied to them. */
-const erased = "erased";
+type Parts = Pick<NameForm, "given" | "patronymic" | "surname">;
 
 /**
- * The ways to write a whole name. A part of a name alone is of others too: nobody's is taken because
- * somebody else was erased.
+ * The ways to write a whole name. A part of a name alone is of others too, and so is a whole name that
+ * somebody else has: nobody's is taken because somebody else was erased. A name of one word is never
+ * looked for.
  */
-export function wholeNames(forms: readonly Pick<NameForm, "given" | "patronymic" | "surname">[]) {
+export function wholeNames(forms: readonly Parts[], others: readonly Parts[] = []): string[] {
+  const theirs = new Set(allWays(others));
+  return allWays(forms).filter((name) => !theirs.has(name));
+}
+
+function allWays(forms: readonly Parts[]): string[] {
   const whole = forms.flatMap(({ given, patronymic, surname }) =>
     [
       [given, surname],
@@ -28,14 +33,23 @@ export function wholeNames(forms: readonly Pick<NameForm, "given" | "patronymic"
 
 /** Whether a text has a whole name in it, as words. */
 export function speaksOf(text: string, names: readonly string[]): boolean {
-  return names.some((name) => asWords(name).test(text));
+  return names.some((name) => text.includes(name) && asWords(name).test(text));
 }
 
+const patterns = new Map<string, RegExp>();
+
 function asWords(text: string): RegExp {
-  return new RegExp(
+  const known = patterns.get(text);
+  if (known !== undefined) {
+    known.lastIndex = 0;
+    return known;
+  }
+  const pattern = new RegExp(
     `(?<![\\p{L}\\p{N}])${text.replace(/[\\^$.*+?()[\]{}|/]/gu, "\\$&")}(?![\\p{L}\\p{N}])`,
     "gu",
   );
+  patterns.set(text, pattern);
+  return pattern;
 }
 
 /**
@@ -90,7 +104,10 @@ export function withoutNames(value: unknown, names: readonly string[]): unknown 
 }
 
 function unnamed(text: string, names: readonly string[]): string {
-  return names.reduce((clean, name) => clean.replace(asWords(name), erased), text);
+  return names.reduce(
+    (clean, name) => (clean.includes(name) ? clean.replace(asWords(name), erased) : clean),
+    text,
+  );
 }
 
 function inTexts(value: unknown, change: (text: string) => string): unknown {

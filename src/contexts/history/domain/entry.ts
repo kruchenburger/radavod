@@ -1,4 +1,4 @@
-import { differ } from "../../../kernel/change";
+import { differ, isOfLists } from "../../../kernel/change";
 import { isId, type MemberId } from "../../../kernel/id";
 
 /** One edit: who, when, by what scenario, and what was before and after. Entries are never removed. */
@@ -27,7 +27,8 @@ export function aggregateOf({ kind, id }: Pick<Changed, "kind" | "id">): string 
 
 export function patchesOf(changed: Changed): Patch[] {
   const aggregate = aggregateOf(changed);
-  return wholesOf(changed.before, changed.after).map((patch) => ({ aggregate, ...patch }));
+  const lists = isOfLists(aggregate);
+  return wholesOf(changed.before, changed.after, lists).map((patch) => ({ aggregate, ...patch }));
 }
 
 /**
@@ -58,9 +59,9 @@ function peopleIn(value: unknown): string[] {
 
 type Difference = Omit<Patch, "aggregate">;
 
-function wholesOf(before: unknown, after: unknown): Difference[] {
-  if (before === null && isLists(after)) return wholesOf(emptied(after), after);
-  if (after === null && isLists(before)) return wholesOf(before, emptied(before));
+function wholesOf(before: unknown, after: unknown, lists: boolean): Difference[] {
+  if (lists && before === null && isLists(after)) return wholesOf(emptied(after), after, lists);
+  if (lists && after === null && isLists(before)) return wholesOf(before, emptied(before), lists);
   if (!isObject(before) || !isObject(after)) return [{ path: "", before, after }];
   return fieldsOf(before, after).flatMap(([path, was, is]) =>
     hasIds(was) && hasIds(is) ? thingsOf(path, was, is) : [{ path, before: was, after: is }],

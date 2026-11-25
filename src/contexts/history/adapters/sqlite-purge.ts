@@ -14,7 +14,9 @@ import { entrySchema } from "./sqlite-journal";
 export function purge(
   sql: SqlStorage,
   id: PersonId,
-  forms: readonly Pick<NameForm, "given" | "patronymic" | "surname">[],
+  forms: readonly Parts[],
+  /** Names of everybody else: a whole name of somebody else is not taken. */
+  others: readonly Parts[],
 ): void {
   const own = partsWith(sql, [id]);
   // Who was erased before is in no entry, and nothing is written again.
@@ -25,7 +27,7 @@ export function purge(
     id,
     (value, { aggregate, path, after }) => takeBack(value, { aggregate, path, before: after }),
   );
-  const names = wholeNames([...forms, ...known]);
+  const names = wholeNames([...forms, ...known], others);
   for (const { number, part, entry } of partsWith(sql, [id, ...names])) {
     const left = withoutPerson(entry.patches, id, names);
     const data = JSON.stringify({ ...entry, patches: left });
@@ -45,14 +47,19 @@ export function purge(
   sqliteCheckpoints(sql).clear();
 }
 
+type Parts = Pick<NameForm, "given" | "patronymic" | "surname">;
+const lookedAtOnce = 50;
+
 /** The parts of entries with one of some texts in them. */
 function partsWith(sql: SqlStorage, texts: readonly string[]) {
   const found = new Map<string, { number: number; part: number; data: string }>();
-  for (const text of texts) {
+  // As they stand in JSON, and some at a time: each look is a look at every entry.
+  const needles = texts.map((text) => JSON.stringify(text).slice(1, -1));
+  for (let at = 0; at < needles.length; at += lookedAtOnce) {
+    const some = needles.slice(at, at + lookedAtOnce);
     const rows = sql.exec<{ number: number; part: number; data: string }>(
-      "SELECT number, part, data FROM history_entry WHERE instr(data, ?) > 0",
-      // As it stands in JSON.
-      JSON.stringify(text).slice(1, -1),
+      `SELECT number, part, data FROM history_entry WHERE ${some.map(() => "instr(data, ?) > 0").join(" OR ")}`,
+      ...some,
     );
     for (const row of rows) found.set(`${row.number}/${row.part}`, row);
   }

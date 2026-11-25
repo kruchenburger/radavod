@@ -17,7 +17,8 @@ export type UndoError =
 export function undo(c: Contexts, number: number): Result<object, UndoError> {
   const entry = c.history.entry(number);
   if (entry === null) return missing(String(number));
-  if (entry.patches.length === 0 || JSON.stringify(entry.patches).includes(`"${ERASED}"`)) {
+  // Where somebody was erased, in a field or in words, nobody can tell any more what there was.
+  if (entry.patches.length === 0 || JSON.stringify(entry.patches).includes(ERASED)) {
     return { ok: false, error: { code: "irreversible" } };
   }
   const values = new Map<string, unknown>();
@@ -27,6 +28,7 @@ export function undo(c: Contexts, number: number): Result<object, UndoError> {
     const isGone = current === null && path !== "" && !isOfLists(aggregate);
     if (isGone || (!isOrder(path) && differ(valueAt(current, path), after))) {
       const by = changedBy(c, number, patch);
+      if (by === null) return { ok: false, error: { code: "irreversible" } };
       return { ok: false, error: { code: "changed-since", aggregate, path, by } };
     }
     const value = values.has(aggregate) ? values.get(aggregate) : current;
@@ -39,7 +41,11 @@ export function undo(c: Contexts, number: number): Result<object, UndoError> {
 }
 
 /** The last entry that changed what a patch set. */
-function changedBy({ history }: Contexts, number: number, { aggregate, path }: Patch): number {
+function changedBy(
+  { history }: Contexts,
+  number: number,
+  { aggregate, path }: Patch,
+): number | null {
   for (let later = history.last(); later > number; later--) {
     const patches = history.entry(later)?.patches ?? [];
     const isIt = patches.some(
@@ -47,7 +53,7 @@ function changedBy({ history }: Contexts, number: number, { aggregate, path }: P
     );
     if (isIt) return later;
   }
-  return number;
+  return null;
 }
 
 /** Whether one path leads to a part of the other, or to the same. */

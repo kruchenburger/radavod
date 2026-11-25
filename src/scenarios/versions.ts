@@ -46,8 +46,10 @@ export function versionsOf(
       if (kept !== null) {
         // The entries are read before the wait, so they are of the moment of the checkpoint.
         const entries = entriesFrom(kept.number);
+        const erasures = checkpoints.erasures();
         const state = await unpack(kept.data);
-        if (state !== null) return reverse(state, entries);
+        // Somebody erased while it was unpacked would be in it.
+        if (state !== null && checkpoints.erasures() === erasures) return reverse(state, entries);
       }
       return number > journal.last()
         ? null

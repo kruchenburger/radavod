@@ -63,10 +63,12 @@ export function eraseHere(
   newId: () => EventId,
 ): Result<Erased, EraseError> {
   let forms: NameForm[] = [];
+  let others: NameForm[] = [];
   const done = unit.run(
     { ...act, scenario: "erase", expected: {} },
     (c): Result<Erased, EraseError> => {
       forms = formsOf(c, id);
+      others = namesOfOthers(c, id);
       if (c.kinship.get(id) !== null) {
         const gone = trash(c, id, act);
         if (!gone.ok) return gone;
@@ -75,7 +77,7 @@ export function eraseHere(
       if (trashed !== null) {
         c.history.trash.put(id, null);
         // What goes over to others does not name the one who goes, in words either.
-        const names = wholeNames(forms);
+        const names = wholeNames(forms, others);
         for (const event of trashed.events as LifeEvent[]) {
           handOver(c, trashed, event, newId, (value) => inWords(value, names));
         }
@@ -88,7 +90,7 @@ export function eraseHere(
       if (!left.ok) return left;
       const cited = c.evidence.putBack([{ kind: "cited", id, value: null }]);
       if (!cited.ok) return cited;
-      return { ok: true, value: { mentions: mentionsIn(c, id, forms) } };
+      return { ok: true, value: { mentions: mentionsIn(c, id, wholeNames(forms, others)) } };
     },
     {
       tell: (written) =>
@@ -96,10 +98,10 @@ export function eraseHere(
           .filter((one) => one.id !== id)
           .map((one) => ({
             ...one,
-            before: scrubbed(one.before, id, wholeNames(forms)),
-            after: scrubbed(one.after, id, wholeNames(forms)),
+            before: scrubbed(one.before, id, wholeNames(forms, others)),
+            after: scrubbed(one.after, id, wholeNames(forms, others)),
           })),
-      last: (sql) => purge(sql, id, forms),
+      last: (sql) => purge(sql, id, forms, others),
     },
   );
   return done.ok ? { ok: true, value: done.value.value } : done;
@@ -107,11 +109,10 @@ export function eraseHere(
 
 /** What others still say of a person by the whole name, for whoever erases to decide about. */
 export function mentionsOf(c: Reading, id: PersonId): string[] {
-  return mentionsIn(c, id, formsOf(c, id));
+  return mentionsIn(c, id, wholeNames(formsOf(c, id), namesOfOthers(c, id)));
 }
 
-function mentionsIn(c: Reading, id: PersonId, forms: readonly NameForm[]): string[] {
-  const names = wholeNames(forms);
+function mentionsIn(c: Reading, id: PersonId, names: readonly string[]): string[] {
   return Object.entries(c.history.state())
     .filter(([aggregate]) => !aggregate.endsWith(`/${id}`))
     .filter(([, value]) => textsIn(value).some((text) => speaksOf(text, names)))
@@ -121,6 +122,16 @@ function mentionsIn(c: Reading, id: PersonId, forms: readonly NameForm[]): strin
 function formsOf(c: Reading, id: PersonId): NameForm[] {
   const trashed = c.history.trash.get(id)?.person as PersonWritten | undefined;
   return c.kinship.get(id)?.names ?? trashed?.names ?? [];
+}
+
+/** The names of everybody else, in the tree and in the trash. */
+function namesOfOthers(c: Reading, id: PersonId): NameForm[] {
+  return Object.entries(c.history.state()).flatMap(([aggregate, value]) => {
+    if (aggregate.endsWith(`/${id}`)) return [];
+    if (aggregate.startsWith("person/")) return (value as PersonWritten).names;
+    if (aggregate.startsWith("trash/")) return ((value as Trashed).person as PersonWritten).names;
+    return [];
+  });
 }
 
 function textsIn(value: unknown): string[] {

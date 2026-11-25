@@ -7,8 +7,10 @@ export type Patch = { aggregate: string; path: string; before: unknown; after: u
 /** Aggregates that are there, by "kind/id". */
 export type State = { readonly [aggregate: string]: unknown };
 
-/** Stands in the journal for a person who was erased. */
-export const ERASED = "erased";
+import { isOfLists } from "../kernel/change";
+import { ERASED } from "../kernel/id";
+
+export { ERASED, isOfLists };
 
 /** The state before the entries, which go from the last one back. */
 export function reverse(state: State, entries: readonly { patches: readonly Patch[] }[]): State {
@@ -42,11 +44,6 @@ export function valueAt(value: unknown, path: string): unknown {
 /** Whether a path is the order of a list. It changes with every other thing in it. */
 export function isOrder(path: string): boolean {
   return path.endsWith("/");
-}
-
-/** Aggregates of lists only: there they are not there when there is nothing in them. */
-export function isOfLists(aggregate: string): boolean {
-  return /^(?:life|cited)\//u.test(aggregate);
 }
 
 /** An aggregate without one change. Patches of an entry are taken back in their order. */
