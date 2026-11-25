@@ -81,6 +81,7 @@ function setWidth(width: number): void {
     value: width,
     configurable: true,
   });
+  vi.stubGlobal("innerWidth", width);
   act(() => void window.dispatchEvent(new Event("resize")));
 }
 
@@ -129,6 +130,16 @@ describe("where the example is off", () => {
       expect(address()).toBe("/");
     },
   );
+});
+
+it.each([
+  ["does not answer", () => Promise.reject(new TypeError()), "Сервер не ответил."],
+  ["answers with something else", () => Promise.resolve(new Response("<html>")), "с ошибкой"],
+])("says why when it is not known whether it is open: the server %s", async (_, config, text) => {
+  answers["/config"] = config;
+  window.history.replaceState(null, "", "/sample");
+  render(<App />);
+  expect((await screen.findByRole("alert", {}, { timeout: 4000 })).textContent).toContain(text);
 });
 
 it("knows no other pages", async () => {
@@ -241,15 +252,19 @@ describe("around a person", () => {
   it.each([1440, 360])("opens one union of several, at %i px", async (width) => {
     setWidth(width);
     await open(`/sample/tree/${hard.threeUnions}`);
-    const closed = within(tree()).getAllByRole("link", { name: /^Дети: \d/ });
+    const closed = within(tree())
+      .getAllByRole("link", { name: /^Дети: \d/ })
+      .filter((link) => link.getAttribute("aria-expanded") === "false");
     expect(closed.length).toBeGreaterThan(0);
     const before = within(tree()).getAllByText(/^Дети: \d/).length;
+    (closed[0] as HTMLElement).focus();
     press(closed[0] as HTMLElement);
     expect(address()).toMatch(/union=p\d+/);
+    expect(document.activeElement).toBe(closed[0]);
     expect(within(tree()).getAllByText(/^Дети: \d/)).toHaveLength(before);
     const opened = within(tree())
-      .getAllByText(/^Дети: \d/)
-      .filter(({ tagName }) => tagName === "B");
+      .getAllByRole("link", { name: /^Дети: \d/ })
+      .filter((link) => link.getAttribute("aria-expanded") === "true");
     expect(opened).toHaveLength(1);
   });
 
@@ -259,6 +274,34 @@ describe("around a person", () => {
     expect(reference.length).toBeGreaterThan(0);
     press(reference[0] as HTMLElement);
     expect(address()).toMatch(/^\/sample\/tree\/p\d+$/);
+  });
+
+  it("keeps the focus in the tree when what had it is gone", async () => {
+    await open(`/sample/tree/${hard.repeated}`);
+    const [reference] = within(tree()).getAllByRole("link", {
+      name: /^Те(?:| же) родители|^Тот же/,
+    });
+    reference?.focus();
+    press(reference as HTMLElement);
+    expect(centre().contains(document.activeElement)).toBe(true);
+  });
+
+  it("opens a family in the half of the descendants", async () => {
+    setWidth(900);
+    await open(`/sample/tree/${hard.threeUnions}`);
+    const [closed] = within(tree())
+      .getAllByRole("link", { name: /^Дети: \d/ })
+      .filter((link) => link.getAttribute("aria-expanded") === "false");
+    press(closed as HTMLElement);
+    expect(address()).toContain("half=descendants");
+    expect(tree().querySelectorAll('[data-role="descendant"]').length).toBeGreaterThan(0);
+  });
+
+  it("has a heading for a screen reader", async () => {
+    await open("/sample");
+    expect(screen.getByRole("heading", { level: 1 }).textContent).toBe(
+      `Древо, в центре ${name(start)}`,
+    );
   });
 
   it("has a place for an unknown parent and nothing to add one with", async () => {
@@ -274,7 +317,7 @@ describe("around a person", () => {
   it("explains the lines it draws", async () => {
     await open(`/sample/tree/${hard.adopted}`);
     expect(within(tree()).getByText("Усыновление, опека")).toBeTruthy();
-    expect(document.querySelector("path[class*=adopted]")).not.toBeNull();
+    expect(document.querySelector("path[data-kind=adopted]")).not.toBeNull();
   });
 
   it("marks another version of the parents", async () => {
@@ -391,6 +434,13 @@ describe("the card of a person", () => {
   });
 });
 
+describe("siblings", () => {
+  it("are not said to share one parent when nobody knows the other", async () => {
+    await open("/sample/person/p169");
+    expect(screen.queryByText(/один общий родитель/)).toBeNull();
+  });
+});
+
 describe("the list", () => {
   it("has the kin, and everybody once by branch and generation", async () => {
     await open(`/sample/list/${start}`);
@@ -466,7 +516,8 @@ describe("the search", () => {
   it("says that nobody was found", async () => {
     await open("/sample");
     type("ъыьэ");
-    expect(screen.getByText("Никого не нашли. Проверьте написание.")).toBeTruthy();
+    const said = screen.getAllByText("Никого не нашли. Проверьте написание.");
+    expect(said.some((one) => one.getAttribute("role") === "status")).toBe(true);
   });
 
   it("is a button on the phone, and gives the focus back", async () => {
@@ -548,6 +599,23 @@ describe("all branches", () => {
     await waitFor(() => expect(window_().dataset["level"]).toBe("closer"));
     fireEvent.keyDown(window_(), { key: "Escape" });
     await waitFor(() => expect(window_().dataset["level"]).toBe("far"));
+  });
+
+  it("leads from a link to another level at the same place", async () => {
+    await open("/sample/branches?level=near&at=p1.0.0");
+    await waitFor(() => expect(window_().dataset["level"]).toBe("near"));
+    const href = within(levels()).getByText("Ближе").getAttribute("href");
+    expect(href).toContain("level=closer");
+    expect(href).toMatch(/at=p\d+/);
+  });
+
+  it("has no sheet to hide the mark behind before there is one", async () => {
+    answers["/sample/tree.json"] = () => Promise.reject(new TypeError());
+    window.history.replaceState(null, "", "/sample/branches");
+    render(<App />);
+    await screen.findByRole("alert", {}, { timeout: 4000 });
+    expect(document.querySelector("[data-sheet]")).toBeNull();
+    expect(screen.getByText("Пример")).toBeTruthy();
   });
 
   it("is a sheet with a way back on the phone", async () => {

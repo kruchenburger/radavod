@@ -1,4 +1,5 @@
 import { type RefObject, useEffect, useRef } from "react";
+import { cameBack } from "./router";
 
 let isFirst = true;
 
@@ -13,7 +14,7 @@ export function useArrival<T extends HTMLElement>(
   const begin = useRef(find);
   useEffect(() => {
     if (!isFirst) {
-      if (begin.current === undefined) window.scrollTo(0, 0);
+      if (begin.current === undefined && !cameBack()) window.scrollTo(0, 0);
       const element = begin.current === undefined ? ref.current : begin.current();
       element?.focus({ preventScroll: true });
     }

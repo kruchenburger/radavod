@@ -1,6 +1,7 @@
 import { useQuery } from "@tanstack/react-query";
 import { lazy, Suspense, useMemo } from "react";
 import { readPlace } from "../sample/places";
+import { Boundary } from "./boundary";
 import { configQuery } from "./config";
 import { useLanguage } from "./language";
 import { Message } from "./message";
@@ -22,14 +23,17 @@ export function Pages({ path, search }: PagesProps) {
       <Message text={t("tree.loading")} />
     </main>
   );
-  if (place !== null && isError) {
-    const reload = { label: t("page.reload"), onClick: () => window.location.reload() };
-    return (
-      <main className={classes.page}>
-        <Message text={t("health.unreachable")} action={reload} isProblem />
-      </main>
-    );
-  }
+  const problem = (text: string) => (
+    <main className={classes.page}>
+      <Message
+        text={text}
+        action={{ label: t("page.reload"), onClick: () => window.location.reload() }}
+        isProblem
+      />
+    </main>
+  );
+  if (place !== null && isError) return problem(t("health.unreachable"));
+  if (place !== null && data === null) return problem(t("health.broken"));
   if (place !== null && data === undefined) return waiting;
   if (place === null || data?.sample !== true) {
     return (
@@ -42,8 +46,10 @@ export function Pages({ path, search }: PagesProps) {
     );
   }
   return (
-    <Suspense fallback={waiting}>
-      <Sample place={place} />
-    </Suspense>
+    <Boundary fallback={problem(t("page.failed"))}>
+      <Suspense fallback={waiting}>
+        <Sample place={place} />
+      </Suspense>
+    </Boundary>
   );
 }

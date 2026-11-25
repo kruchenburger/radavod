@@ -12,7 +12,7 @@ type MovingProps = {
 const move = { duration: 240, easing: "ease-out" };
 const fade = { duration: 120, delay: move.duration, fill: "backwards" as const };
 
-type Places = Map<string, DOMRect>;
+type Places = { cards: Map<string, DOMRect>; hadFocus: boolean };
 
 /**
  * Takes cards from where they are to where they stand now: elements with `data-key`, matched by it.
@@ -28,7 +28,9 @@ export class Moving extends Component<MovingProps> {
 
   // The only moment when the old places are still on the screen, mid-movement included.
   override getSnapshotBeforeUpdate({ centre }: MovingProps): Places | null {
-    return centre === this.props.centre ? null : this.#places();
+    if (centre === this.props.centre) return null;
+    const hadFocus = this.#root.current?.contains(document.activeElement) === true;
+    return { cards: this.#places(), hadFocus };
   }
 
   override componentDidUpdate(_: MovingProps, __: unknown, before: Places | null): void {
@@ -37,11 +39,15 @@ export class Moving extends Component<MovingProps> {
     for (const animation of this.#running) animation.cancel();
     this.#running = [];
     this.props.onArrive(root, false);
+    // Whoever had the focus on something that is gone goes on from the centre.
+    if (before.hadFocus && !root.contains(document.activeElement)) {
+      root.querySelector<HTMLElement>("[data-focus] > a")?.focus({ preventScroll: true });
+    }
     if (prefersStill() || root.animate === undefined) return;
     const after = this.#places();
     for (const card of cardsOf(root)) {
       const key = card.dataset["key"] ?? "";
-      const [from, to] = [before.get(key), after.get(key)];
+      const [from, to] = [before.cards.get(key), after.get(key)];
       if (from === undefined || to === undefined) {
         this.#running.push(card.animate({ opacity: [0, 1] }, fade));
         continue;
@@ -61,7 +67,7 @@ export class Moving extends Component<MovingProps> {
     for (const animation of this.#running) animation.cancel();
   }
 
-  #places(): Places {
+  #places(): Places["cards"] {
     const root = this.#root.current;
     if (root === null) return new Map();
     return new Map(

@@ -5,6 +5,7 @@ import { Link } from "../app/router";
 import { CertaintyMark } from "../tree/certainty";
 import { kinOf } from "../tree/layout/kin";
 import { type Relatives, relativesOf } from "../tree/layout/relatives";
+import { shareOneParent } from "../tree/siblings";
 import { useData } from "./data";
 import classes from "./kin-list.module.css";
 import { hrefOf, type Place } from "./places";
@@ -22,8 +23,12 @@ export function KinList({ person, hrefFor }: KinListProps) {
   if (parents.length + siblings.length + unions.length + otherChildren.length === 0) {
     return <p className={classes.none}>{t("kin.none")}</p>;
   }
-  const hasTwoParents =
-    new Set(parents.filter(({ main }) => main).map((one) => one.person)).size > 1;
+  // Another parent of the children is no partner in a union nobody told of.
+  const told = unions.filter(({ union }) => union !== null);
+  const children = [
+    ...unions.filter(({ union }) => union === null).flatMap((one) => one.children),
+    ...otherChildren,
+  ];
   return (
     <div className={classes.kin}>
       <Group title={t("kin.parents")}>
@@ -32,25 +37,25 @@ export function KinList({ person, hrefFor }: KinListProps) {
         ))}
       </Group>
       <Group title={t("kin.siblings")}>
-        {siblings.map(({ person: sibling, shared }) => (
+        {siblings.map((sibling) => (
           <Entry
-            key={sibling}
-            person={sibling}
+            key={sibling.person}
+            person={sibling.person}
             hrefFor={hrefFor}
             notes={[
-              ...(hasTwoParents && shared.length === 1 ? [t("kin.oneParent")] : []),
-              ...kindsOf(shared).map((kind) => t(`kinship.${kind}`)),
+              ...(shareOneParent(kinOf(snapshot), person, sibling) ? [t("kin.oneParent")] : []),
+              ...kindsOf(sibling.shared).map((kind) => t(`kinship.${kind}`)),
             ]}
           />
         ))}
       </Group>
       <Group title={t("kin.unions")}>
-        {unions.map((union, i) => (
-          <UnionEntry key={union.union ?? i} union={union} hrefFor={hrefFor} />
+        {told.map((union) => (
+          <UnionEntry key={union.union} union={union} hrefFor={hrefFor} />
         ))}
       </Group>
       <Group title={t("kin.children")}>
-        {otherChildren.map(({ person: child, ...tie }) => (
+        {children.map(({ person: child, ...tie }) => (
           <Entry key={child} person={child} hrefFor={hrefFor} tie={tie} />
         ))}
       </Group>

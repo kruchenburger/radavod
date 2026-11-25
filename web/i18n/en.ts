@@ -18,6 +18,7 @@ export const en = {
   "health.broken": "The server answered with an error. Reload the page or tell a keeper.",
 
   "page.unknown": "There's no such page",
+  "page.failed": "The page didn't open. Check your connection and reload it.",
   "page.start": "Go to the start page",
   "page.reload": "Reload",
 

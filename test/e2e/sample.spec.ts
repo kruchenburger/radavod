@@ -237,6 +237,12 @@ test.describe("the search", () => {
   });
 });
 
+/** How large the names on the map are, once they stand still. */
+const scaleOf = (page: Page): Promise<number> =>
+  page.evaluate(
+    "(document.querySelector('[data-level] > div')?.style.transform.match(/scale\\((.*)\\)/)?.[1] ?? 0) * 1",
+  );
+
 test.describe("all branches", () => {
   test("a press on a page comes closer, back leads back", async ({ page }) => {
     await page.goto("/sample/branches");
@@ -244,8 +250,39 @@ test.describe("all branches", () => {
     await map(page).getByRole("link").nth(2).click();
     await expect.poll(() => level(page)).toBe("closer");
     await expect.poll(() => searchOf(page).get("at")).not.toBeNull();
+    expect(await scaleOf(page)).toBe(1);
+    expect(searchOf(page).get("scale")).toBeNull();
     await page.goBack();
     await expect.poll(() => level(page)).toBe("far");
+    // The whole map again, and nothing of the way back in the address.
+    await page.waitForTimeout(400);
+    expect(new URL(page.url()).search).toBe("");
+  });
+
+  test("a press in the middle of a movement does not stop it there", async ({ page }) => {
+    await page.goto("/sample/branches");
+    await ready(page);
+    const box = await map(page).boundingBox();
+    if (box === null) throw new Error("no map");
+    await map(page).getByRole("link").nth(2).click();
+    await page.mouse.move(box.x + 4, box.y + box.height - 4);
+    await page.mouse.down();
+    await page.mouse.up();
+    await expect.poll(() => level(page)).toBe("closer");
+    await expect.poll(() => searchOf(page).get("at")).not.toBeNull();
+    expect(await scaleOf(page)).toBe(1);
+  });
+
+  test("a window that changes on the way does not stop a movement", async ({ page }) => {
+    await page.goto("/sample/branches");
+    await ready(page);
+    await map(page).getByRole("link").nth(2).click();
+    const size = page.viewportSize();
+    await page.setViewportSize({ width: size?.width ?? 0, height: (size?.height ?? 0) - 90 });
+    await expect.poll(() => searchOf(page).get("at")).not.toBeNull();
+    await page.waitForTimeout(400);
+    expect(await level(page)).toBe("closer");
+    expect(await scaleOf(page)).toBe(1);
   });
 
   test("a drag moves the map and presses nothing", async ({ page }) => {
@@ -374,6 +411,47 @@ test.describe("all branches", () => {
       await page.getByRole("button", { name: "As a list" }).click();
       await expect(page.getByRole("heading", { level: 1, name: nameOf(start) })).toBeVisible();
     });
+  });
+});
+
+test("everything to press on a phone is as large as a finger", async ({ page, isMobile }) => {
+  test.skip(!isMobile, "a mouse is finer");
+  for (const path of [
+    "/",
+    "/sample",
+    `/sample/tree/${manyUnions}?siblings=open`,
+    `/sample/person/${start}`,
+  ]) {
+    await page.goto(path);
+    await page.waitForTimeout(600);
+    const small = await page.evaluate(`
+      [...document.querySelectorAll("a[href], button, summary")]
+        .map((one) => [one.textContent, one.getBoundingClientRect()])
+        .filter(([, box]) => box.width > 0 && (box.height < 43.5 || box.width < 43.5))
+        .map(([text, box]) => [text, box.width, box.height].join(" "))
+    `);
+    expect(small, path).toEqual([]);
+  }
+});
+
+test("the mark and a way out stay when the tree does not come", async ({ page }) => {
+  await page.route("/sample/tree.json", (route) => route.fulfill({ body: "nothing" }));
+  for (const path of ["/sample", "/sample/branches"]) {
+    await page.goto(path);
+    await expect(page.getByRole("alert")).toContainText("The server answered with an error.");
+    await expect(page.getByText("Example", { exact: true })).toBeVisible();
+    await expect(page.getByRole("link", { name: "Close example" })).toBeVisible();
+  }
+});
+
+test.describe("screens whose code does not come", () => {
+  test.use({ isQuiet: false });
+
+  test("say so", async ({ page }) => {
+    await page.route(/assets\/sample-.*\.js/, (route) => route.abort());
+    await page.goto("/sample");
+    await expect(page.getByRole("alert")).toContainText("The page didn't open.");
+    await expect(page.getByRole("button", { name: "Reload" })).toBeVisible();
   });
 });
 

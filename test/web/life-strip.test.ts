@@ -1,8 +1,8 @@
 import { describe, expect, it } from "vitest";
 import { generateFamily } from "../../examples/generate.ts";
-import { sampleOf } from "../../examples/snapshot.ts";
+import { dayNumber, sampleOf } from "../../examples/snapshot.ts";
 import type { TreePerson, TreeSnapshot, TreeYear } from "../../src/shared/tree";
-import { lifeStrip, type Life } from "../../web/tree/person/life-strip";
+import { lifeStrip, type Life, yearOfDay } from "../../web/tree/person/life-strip";
 import { familyOf, type FamilySpec } from "./layout/family";
 
 const today = 2026;
@@ -100,6 +100,30 @@ describe("the ends of a bar", () => {
       spec,
     );
     expect(unread?.groups.at(-1)?.lives[0]?.bar).toBeNull();
+  });
+});
+
+it("knows the year of every first and last day of a year, and of days between", () => {
+  for (let year = 1500; year <= 2100; year += 1) {
+    expect(yearOfDay(dayNumber({ year }, "gregorian"))).toBe(year);
+    expect(yearOfDay(dayNumber({ year, month: 12, day: 31 }, "gregorian"))).toBe(year);
+    expect(yearOfDay(dayNumber({ year, month: 2, day: 28 }, "gregorian"))).toBe(year);
+  }
+});
+
+it("has a dot for a union that began, and ends a bar nobody knows the end of there", () => {
+  const snapshot = familyOf({ people: ["me", "wife"], unions: [["me", "wife"]] });
+  const [me] = snapshot.people;
+  const [union] = snapshot.unions;
+  if (me === undefined || union === undefined) throw new Error("no family");
+  Object.assign(me, { birth: year("1930"), living: "no" });
+  union.began = dayNumber({ year: 1960 }, "gregorian");
+  const strip = lifeStrip(snapshot, "me", options);
+  expect(strip?.events).toEqual([1960]);
+  expect(strip?.groups[0]?.lives[0]?.bar?.end).toEqual({
+    inner: 1960,
+    outer: 1960,
+    has: "question",
   });
 });
 

@@ -18,6 +18,8 @@ export type LifeStrip = {
   today: number | null;
   /** The life of the person through all rows. */
   span: { from: number; to: number } | null;
+  /** Years of what happened to the person, as far as the snapshot tells: unions that began. */
+  events: number[];
   groups: Group[];
 };
 
@@ -43,7 +45,10 @@ export function lifeStrip(
     [
       { as: "self", lives: [lifeOf(person)] },
       { as: "parents", lives: once(parents.filter(({ main }) => main).map((one) => one.person)) },
-      { as: "unions", lives: once(unions.map(({ partner }) => partner)) },
+      {
+        as: "unions",
+        lives: once(unions.filter(({ union }) => union !== null).map(({ partner }) => partner)),
+      },
       { as: "children", lives: once(children.map((one) => one.person)) },
     ] satisfies Group[]
   ).filter(({ lives }) => lives.length > 0);
@@ -60,6 +65,7 @@ export function lifeStrip(
     to: last === today ? today : last + room,
     today: last === today ? today : null,
     span: own === null ? null : { from: own.start.outer, to: own.end.outer },
+    events: own === null ? [] : unionsOf(person, snapshot),
     groups,
   };
 }
@@ -110,17 +116,27 @@ function barOf(person: TreePerson, snapshot: TreeSnapshot, today: number): Life[
 /** Years of what the snapshot knows of a life: unions that began and children. */
 function eventsOf({ id }: TreePerson, snapshot: TreeSnapshot): number[] {
   const kin = kinOf(snapshot);
-  const began = kin
-    .unions(id)
-    .flatMap(({ all }) => all.flatMap((union) => union.began ?? []))
-    .map(yearOfDay);
   const children = kin.children(id).flatMap(({ child, set }) => {
     const range =
       set.main && set.kind === "blood" ? rangeOf(kin.person(child)?.birth ?? null) : null;
     return range === null ? [] : [Math.round((range.from + range.to) / 2)];
   });
-  return [...began, ...children];
+  return [...unionsOf(id, snapshot), ...children];
 }
 
-/** The Gregorian year of a day number, counted as in the snapshot. */
-const yearOfDay = (day: number): number => Math.floor((day - 1721060) / 365.2425);
+const unionsOf = (id: string, snapshot: TreeSnapshot): number[] =>
+  kinOf(snapshot)
+    .unions(id)
+    .flatMap(({ all }) => all.flatMap((union) => union.began ?? []))
+    .map(yearOfDay);
+
+/** The Gregorian year of a Julian day number, which is how the snapshot counts days. */
+export function yearOfDay(day: number): number {
+  const a = day + 32044;
+  const century = Math.floor((4 * a + 3) / 146097);
+  const inCentury = a - Math.floor((146097 * century) / 4);
+  const year = Math.floor((4 * inCentury + 3) / 1461);
+  const inYear = inCentury - Math.floor((1461 * year) / 4);
+  const month = Math.floor((5 * inYear + 2) / 153);
+  return 100 * century + year - 4800 + Math.floor(month / 10);
+}

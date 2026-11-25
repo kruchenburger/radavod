@@ -22,12 +22,21 @@ function subscribe(listener: () => void): () => void {
   };
 }
 
+/** Whether the last step was one back or forward, when the browser puts the page where it was. */
+let isReturn = false;
+window.addEventListener("popstate", () => {
+  isReturn = true;
+});
+
+export const cameBack = (): boolean => isReturn;
+
 export const useAddress = (): Address => useSyncExternalStore(subscribe, read);
 
 /** Goes to another place of the app. The same address twice is one step of the history. */
 export function go(href: string, how: "push" | "replace" = "push"): void {
   const { pathname, search } = window.location;
   if (href === pathname + search) return;
+  isReturn = false;
   if (how === "push") window.history.pushState(null, "", href);
   else window.history.replaceState(null, "", href);
   window.dispatchEvent(new Event(changed));

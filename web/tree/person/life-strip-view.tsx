@@ -1,7 +1,7 @@
 import { useMemo } from "react";
 import type { TreeSnapshot } from "../../../src/shared/tree";
 import { useLanguage } from "../../app/language";
-import { phone, usePage } from "../../app/use-page";
+import { isPhone, usePage } from "../../app/use-page";
 import { kinOf } from "../layout/kin";
 import { measure, rem } from "../type";
 import type { Words } from "../words";
@@ -23,6 +23,7 @@ const rowHeight = 36;
 const headWidth = 112;
 const headHeight = 26;
 const groupGap = 8;
+const signRoom = 14;
 /** The last year stands by the end of the scale and not past it. */
 const tickRoom = 30;
 
@@ -31,7 +32,7 @@ export function LifeStripView({ snapshot, person, words, line }: LifeStripViewPr
   const { t } = useLanguage();
   const page = usePage();
   // The card of a person: as wide as the page up to a point, its margins left out.
-  const width = Math.min(page.width, 1392) - 2 * (page.width < phone ? 16 : 28);
+  const width = Math.min(page.width, 1392) - 2 * (isPhone(page) ? 16 : 28);
   const isNarrow = width < 640;
   const strip = useMemo(() => {
     const today = new Date().getFullYear();
@@ -42,10 +43,13 @@ export function LifeStripView({ snapshot, person, words, line }: LifeStripViewPr
   const rows = rowsOf(strip, isNarrow);
   const height = (rows.at(-1)?.bottom ?? 0) + 8;
   const first = isNarrow ? 0 : headWidth;
+  // Room for the "?" at either end. The line of today is the edge itself.
+  const left = first + signRoom;
+  const right = strip.today === null ? width - signRoom : width - 1;
   const place = (year: number): number =>
-    first +
+    left +
     ((Math.min(Math.max(year, strip.from), strip.to) - strip.from) / (strip.to - strip.from)) *
-      (width - first);
+      (right - left);
   const own = strip.groups[0]?.lives[0]?.bar ?? null;
   return (
     <section className={classes.years}>
@@ -76,11 +80,15 @@ export function LifeStripView({ snapshot, person, words, line }: LifeStripViewPr
             <path className={classes.today} d={`M${width - 1} ${scaleHeight}V${height}`} />
           )}
           {rows.map(({ life, y, isSelf }) => {
+            const events = isSelf ? strip.events : [];
             if (life === null || life.bar === null) return null;
             const branch = kinOf(snapshot).person(life.person)?.branch ?? null;
             return (
               <g key={`${life.person} ${y}`} style={{ color: words.ink(branch) }}>
                 <Bar bar={life.bar} y={y} thick={isSelf ? 9 : 4.5} place={place} strip={strip} />
+                {events.map((year, i) => (
+                  <circle key={i} className={classes.event} cx={place(year)} cy={y} r={2.6} />
+                ))}
               </g>
             );
           })}
@@ -211,7 +219,8 @@ function Label({ row: { as, life, isSelf, y }, snapshot, words, line, at }: Labe
   const widthOf = (details: string): number =>
     measure(`${given} ${surname} `, style) + measure(details, "detail") * 1.05;
   // Where there is no room the branch stays, since the bar only has its ink. The years are below.
-  const isRoomy = widthOf(years + words.branch(person.branch)) <= at.width - at.first;
+  const isRoomy =
+    bar === null || widthOf(years + words.branch(person.branch)) <= at.width - at.first;
   const wide = widthOf((isRoomy ? years : "") + words.branch(person.branch));
   const from = bar === null ? at.middle : at.place(bar.start.outer);
   const left = Math.max(at.first, Math.min(from, at.width - wide));

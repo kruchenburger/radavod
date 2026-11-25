@@ -1,3 +1,13 @@
+.said {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  margin: 0;
+  overflow: hidden;
+  clip-path: inset(50%);
+  white-space: nowrap;
+}
+
 .screen {
   flex: 1;
   display: flex;
@@ -134,9 +144,10 @@ a.name:hover > span > span {
   text-underline-offset: 3px;
 }
 
-b.children {
+.children[aria-expanded="true"] {
   color: var(--ink);
   font-weight: 500;
+  text-decoration: none;
 }
 
 .legend {
@@ -195,7 +206,18 @@ b.children {
 }
 
 .children[data-as="narrow"] {
+  bottom: 0;
   left: 1.125rem;
+  min-height: 2.75rem;
+}
+
+/* A near miss must not put the partner in the centre. */
+.card[data-families] > .name {
+  bottom: 1.625rem;
+}
+
+.screen[data-as="narrow"] .card[data-families] > .name {
+  bottom: 2.75rem;
 }
 
 .screen[data-as="narrow"] .legend {

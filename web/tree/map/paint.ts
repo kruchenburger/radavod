@@ -1,5 +1,5 @@
 import type { BranchMap, MapCard } from "../layout/branch-map";
-import { type LineKind, lineKind, lineOrder, linePath } from "../line-path";
+import { type LineKind, lineKind, lineLooks, lineOrder, linePath } from "../line-path";
 import { pointAt, type Size, type View } from "./view";
 
 /** What the canvas of the map is drawn with. */
@@ -18,15 +18,7 @@ type Bars = { ink: string; box: Box; path: Path2D; isHollow: boolean };
 /** Everything of one level, in pieces small enough to leave out what the window does not show. */
 export type Drawing = { map: BranchMap; strokes: Stroke[]; joins: Stroke[]; bars: Bars[] };
 
-const widths: Record<LineKind | "join", number> = {
-  thin: 1.1,
-  reference: 1.1,
-  version: 1.4,
-  adopted: 1.8,
-  direct: 3,
-  join: 1.2,
-};
-const dashes: Partial<Record<LineKind, number[]>> = { adopted: [5, 4], version: [1.4, 3.6] };
+const joinWidth = 1.2;
 
 /** Prepares what does not change while the map moves. `barOf` is the length of a bar from far. */
 export function drawingOf(
@@ -118,11 +110,11 @@ export function paint(
   const draw = ({ path, kind }: Stroke, width: number): void => {
     brush.lineWidth = (width * thickness) / view.k;
     brush.strokeStyle = kind === "direct" ? colors.ink : colors.rule;
-    brush.setLineDash((dashes[kind] ?? []).map((dash) => (dash * thickness) / view.k));
+    brush.setLineDash(lineLooks[kind].dash.map((dash) => (dash * thickness) / view.k));
     brush.stroke(path);
   };
-  for (const stroke of strokes) if (isSeen(stroke.box)) draw(stroke, widths[stroke.kind]);
-  for (const join of joins) if (isSeen(join.box)) draw(join, widths.join);
+  for (const stroke of strokes) if (isSeen(stroke.box)) draw(stroke, lineLooks[stroke.kind].width);
+  for (const join of joins) if (isSeen(join.box)) draw(join, joinWidth);
   brush.setLineDash([]);
   for (const { ink, path, box, isHollow } of bars) {
     if (!isSeen(box)) continue;

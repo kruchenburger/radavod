@@ -48,7 +48,11 @@ function Screens({ place, sample }: { place: Place; sample: TreeSample }) {
   const one = person === null ? undefined : kinOf(snapshot).person(person);
   const isUnknown = person !== null && one === undefined;
 
-  const title = one === undefined ? t(titles[place.screen]) : words.name(one);
+  const name = one === undefined ? null : words.name(one);
+  let title = name ?? t(titles[place.screen]);
+  // The map may have a chosen person and is still the map.
+  if (place.screen === "branches" && !isUnknown) title = t("view.branches");
+  if (place.screen === "list" && name !== null) title = `${name}, ${t("view.list")}`;
   useEffect(() => {
     document.title = t("app.title", { page: title });
     return () => {

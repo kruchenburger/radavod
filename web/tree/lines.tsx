@@ -1,6 +1,6 @@
 import { useLanguage } from "../app/language";
 import type { Link, Point } from "./layout/types";
-import { type Corners, type LineKind, lineKind, lineOrder, linePath } from "./line-path";
+import { type Corners, type LineKind, lineKind, lineLooks, lineOrder, linePath } from "./line-path";
 import classes from "./lines.module.css";
 import { rem } from "./type";
 
@@ -35,11 +35,18 @@ export function Lines({ links, width, height, corners, reach = () => 0 }: LinesP
       data-late
     >
       {drawn.map(({ kind, d }, i) => (
-        <path key={i} className={classes[kind]} d={d} />
+        <path key={i} {...lookOf(kind)} d={d} />
       ))}
     </svg>
   );
 }
+
+const lookOf = (kind: LineKind) => ({
+  className: classes[kind === "direct" ? "direct" : "line"],
+  "data-kind": kind,
+  strokeWidth: lineLooks[kind].width,
+  strokeDasharray: lineLooks[kind].dash.join(" ") || undefined,
+});
 
 /** A reference and what it names have this much room before their texts. */
 const gap = 5;
@@ -68,7 +75,7 @@ export function Legend({ links }: { links: Link[] }) {
     .map((kind) => (
       <span key={kind} className={classes.legend}>
         <svg width="26" height="10" viewBox="0 0 26 10" aria-hidden="true">
-          <path className={classes[kind]} d="M0 5H26" />
+          <path {...lookOf(kind)} d="M0 5H26" />
         </svg>
         {t(named[kind])}
       </span>

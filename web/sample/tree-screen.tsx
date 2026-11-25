@@ -2,7 +2,7 @@ import { type KeyboardEvent, useEffect, useId, useMemo, useRef } from "react";
 import { useArrival } from "../app/arrival";
 import { useLanguage } from "../app/language";
 import { Link } from "../app/router";
-import { phone, spread, usePage } from "../app/use-page";
+import { isPhone, isSpread, usePage } from "../app/use-page";
 import { CardLines } from "../tree/card-lines";
 import { around, type AroundCard, type AroundLayout } from "../tree/layout/around";
 import { type AroundMetrics, aroundMetrics } from "../tree/layout/around-text";
@@ -27,6 +27,8 @@ const corners = { across: 17, down: 11 };
 const narrowCorners = { across: 3, down: 3 };
 /** A line stops this far before the name it leads to. */
 const beforeText = 5;
+/** Every row of the list on the phone is as high as a finger needs. */
+const narrowMetrics = { padY: 11.5 };
 /** Around the list on the phone. */
 const gutter = 16;
 const margin = 28;
@@ -36,11 +38,12 @@ export function TreeScreen({ place }: { place: Centred }) {
   const { snapshot, start, words } = useData();
   const page = usePage();
   const hint = useId();
+  const heading = useId();
   const { person: focus, siblings, open, half } = place;
   useArrival(() => document.querySelector<HTMLElement>("[data-focus] > a"));
   useEffect(() => rememberTree(hrefOf(place)), [place]);
-  const isPhone = page.width < phone;
-  const isWhole = page.width >= spread;
+  const isNarrow = isPhone(page);
+  const isWhole = isSpread(page);
   const cardWords = useMemo(() => wordsOf(snapshot, locale, focus), [snapshot, locale, focus]);
   const relatives = useMemo(() => relativesOf(snapshot, focus), [snapshot, focus]);
   const layout = useMemo((): Layout => {
@@ -51,21 +54,26 @@ export function TreeScreen({ place }: { place: Centred }) {
       siblings,
       open: open === null ? null : keyOf(open, kinOf(snapshot).person(open) !== undefined),
     };
-    if (isPhone) {
+    if (isNarrow) {
       const width = page.width - 2 * gutter;
-      return { as: "narrow", tree: aroundNarrow(snapshot, focus, { ...options, width }) };
+      const narrow = { ...options, width, metrics: narrowMetrics };
+      return { as: "narrow", tree: aroundNarrow(snapshot, focus, narrow) };
     }
     const reach = isWhole ? {} : half === "ancestors" ? { down: 0 } : { up: 0 };
     const metrics = metricsFor(page.width, isWhole ? 6 : 3);
     return { as: "wide", tree: around(snapshot, focus, { ...options, ...reach, metrics }) };
-  }, [snapshot, focus, cardWords, start, siblings, open, half, isPhone, isWhole, page.width]);
+  }, [snapshot, focus, cardWords, start, siblings, open, half, isNarrow, isWhole, page.width]);
 
   const one = kinOf(snapshot).person(focus);
   const name = one === undefined ? "" : words.name(one);
-  const centre = [focus, siblings, layout.tree.open, isWhole || isPhone || half].join(" ");
+  // Not the width: a window that changes moves nothing.
+  const centre = [focus, siblings, layout.tree.open, half].join(" ");
   return (
-    <section className={classes.screen} data-as={layout.as} aria-label={t("tree.name", { name })}>
-      {!isWhole && !isPhone && <Halves place={place} />}
+    <section className={classes.screen} data-as={layout.as} aria-labelledby={heading}>
+      <h1 id={heading} className={classes.said}>
+        {t("tree.name", { name })}
+      </h1>
+      {!isWhole && !isNarrow && <Halves place={place} />}
       <div className={classes.scroller} aria-describedby={hint} role="group">
         <Moving centre={centre} className={classes.sheet} onArrive={bringIntoView}>
           <Sheet
@@ -119,7 +127,12 @@ function Halves({ place }: { place: Centred }) {
       {halves.map((half) => (
         <Link
           key={half}
-          href={hrefOf({ ...place, half })}
+          href={hrefOf({
+            ...place,
+            half,
+            // Siblings stand beside the parents.
+            siblings: place.siblings && half === "ancestors",
+          })}
           aria-current={half === place.half ? "true" : undefined}
         >
           {t(`tree.${half}`)}
@@ -279,11 +292,13 @@ function PersonCard({ card, as, open, place, words, relatives }: PersonCardProps
     ...(folded === undefined ? [] : [t("tree.folded", { number: folded })]),
   ].join(", ");
   const isInStrip = as === "wide" && card.generation === 0;
+  const isPartner = (isInStrip || as === "narrow") && role === "partner" && open !== null;
   return (
     <div
       className={classes.card}
       data-key={key}
       data-role={role}
+      data-families={isPartner || undefined}
       data-focus={isFocus || undefined}
       style={style}
     >
@@ -307,7 +322,7 @@ function PersonCard({ card, as, open, place, words, relatives }: PersonCardProps
         )}
       </Link>
       {isFocus && <Actions as={as} place={place} relatives={relatives} />}
-      {(isInStrip || as === "narrow") && role === "partner" && open !== null && (
+      {isPartner && (
         <Children card={card} as={as} open={open} place={place} relatives={relatives} />
       )}
     </div>
@@ -392,19 +407,13 @@ function Children({ card, as, open, place, relatives }: ChildrenProps) {
   const name = partner === undefined ? t("person.unnamed") : words.name(partner);
   if (number === 0 || id === null) return null;
   const text = t("tree.children", { number });
-  if (card.key === open) {
-    return (
-      <b className={classes.children} data-as={as}>
-        {text}
-      </b>
-    );
-  }
   return (
     <Link
       className={classes.children}
       data-as={as}
-      href={hrefOf({ ...place, open: id })}
-      aria-expanded={false}
+      // The family opens on the side of the descendants.
+      href={hrefOf({ ...place, open: id, half: "descendants" })}
+      aria-expanded={card.key === open}
       aria-label={`${text}. ${name}`}
     >
       {text}

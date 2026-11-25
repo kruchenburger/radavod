@@ -1,9 +1,15 @@
 import { useSyncExternalStore } from "react";
 
 /** The page in units of the text, so a reader with large text gets the layout of a small screen. */
-export type Page = { width: number; height: number };
+export type Page = {
+  /** Without the bar of the scroll: what there is room for. */
+  width: number;
+  height: number;
+  /** With it, as the styles count: which layout it is. */
+  outer: number;
+};
 
-let last: Page = { width: 0, height: 0 };
+let last: Page = { width: 0, height: 0, outer: 0 };
 
 function read(): Page {
   const html = document.documentElement;
@@ -11,7 +17,10 @@ function read(): Page {
   // A page that is not shown yet may have no width at all.
   const width = Math.max(240, Math.floor((html.clientWidth || window.innerWidth) / unit));
   const height = Math.floor(window.innerHeight / unit);
-  if (last.width !== width || last.height !== height) last = { width, height };
+  const outer = Math.floor(window.innerWidth / unit);
+  if (last.width !== width || last.height !== height || last.outer !== outer) {
+    last = { width, height, outer };
+  }
   return last;
 }
 
@@ -29,5 +38,5 @@ function subscribe(listener: () => void): () => void {
 export const usePage = (): Page => useSyncExternalStore(subscribe, read);
 
 /** The breakpoints of docs/design.md. */
-export const phone = 720;
-export const spread = 1400;
+export const isPhone = ({ outer }: Page): boolean => outer < 720;
+export const isSpread = ({ outer }: Page): boolean => outer >= 1400;

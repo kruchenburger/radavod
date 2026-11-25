@@ -2,7 +2,7 @@ import { type KeyboardEvent, useEffect, useId, useMemo, useRef, useState } from 
 import { CloseIcon, SearchIcon } from "../app/icons";
 import { useLanguage } from "../app/language";
 import { go } from "../app/router";
-import { phone, usePage } from "../app/use-page";
+import { isPhone, usePage } from "../app/use-page";
 import { type Found, searchOf } from "../tree/search";
 import { useData } from "./data";
 import { hrefOf, treePlace } from "./places";
@@ -13,10 +13,10 @@ const most = 30;
 /** A field on the desktop, a button that opens the field on the phone. */
 export function SearchBox() {
   const { t } = useLanguage();
-  const { width } = usePage();
+  const page = usePage();
   const [isOpen, setOpen] = useState(false);
   const button = useRef<HTMLButtonElement>(null);
-  if (width >= phone) return <Field onDone={() => {}} />;
+  if (!isPhone(page)) return <Field onDone={() => {}} />;
   return (
     <>
       <button
@@ -58,6 +58,7 @@ function Field({ isAlone = false, onDone }: { isAlone?: boolean; onDone: () => v
   const found = all.slice(0, most);
   const hasQuery = query.trim() !== "";
   const isShown = isOpen && hasQuery;
+  const status = all.length === 0 ? t("search.none") : t("search.found", { count: all.length });
 
   useEffect(() => {
     if (isAlone) input.current?.focus();
@@ -74,9 +75,9 @@ function Field({ isAlone = false, onDone }: { isAlone?: boolean; onDone: () => v
     onDone();
   };
   const onKeyDown = (event: KeyboardEvent): void => {
+    // Enter ends a word that is still being put together.
+    if (event.nativeEvent.isComposing) return;
     if (event.key === "Escape") {
-      // Not the zoom of the map.
-      event.stopPropagation();
       setQuery("");
       setOpen(false);
       if (isAlone) onDone();
@@ -130,11 +131,11 @@ function Field({ isAlone = false, onDone }: { isAlone?: boolean; onDone: () => v
           <CloseIcon />
         </button>
       )}
+      <p role="status" className={classes.said}>
+        {isShown && status}
+      </p>
       <div className={classes.results} hidden={!isShown}>
-        <p role="status">
-          {hasQuery &&
-            (all.length === 0 ? t("search.none") : t("search.found", { count: all.length }))}
-        </p>
+        <p aria-hidden="true">{status}</p>
         <ul ref={list} id={id} role="listbox" aria-label={t("search.label")}>
           {found.map((one, i) => (
             <Option
@@ -175,6 +176,7 @@ function Option({ id, found: { person, form }, isActive, onChoose }: OptionProps
         <span
           className={classes.other}
           lang={form?.language === "other" ? undefined : form?.language}
+          dir={form?.script === "Hebr" ? "rtl" : undefined}
         >
           {`${other.given} ${other.surname}`}
         </span>

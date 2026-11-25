@@ -394,13 +394,13 @@ function People(
   }, [isAsked, current]);
 
   // A card that stays as it was must not bring itself into a window that was.
-  const focused = useRef((_: MapCard): void => {});
+  const focused = useRef<((card: MapCard) => void) | null>(null);
   focused.current = (card) => {
     lastPage.current = card.page;
     setCurrent(card.key);
     bring(card);
   };
-  const onFocus = useCallback((card: MapCard): void => focused.current(card), []);
+  const onFocus = useCallback((card: MapCard): void => focused.current?.(card), []);
 
   const onKeyDown = (event: KeyboardEvent): void => {
     const arrow = arrows[event.key];

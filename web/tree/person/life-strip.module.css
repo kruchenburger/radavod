@@ -40,6 +40,12 @@
   stroke-dashoffset: 3;
 }
 
+.event {
+  fill: var(--paper);
+  stroke: var(--ink);
+  stroke-width: 1.3;
+}
+
 .cap {
   fill: none;
   stroke: var(--ink);

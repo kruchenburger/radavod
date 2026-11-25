@@ -112,7 +112,7 @@
 
 .branch h4 {
   color: var(--muted);
-  font: 400 0.9375rem/1.8 var(--sans);
+  font: italic 400 1.0625rem/1.6 var(--serif);
 }
 
 @media (max-width: 62em) {

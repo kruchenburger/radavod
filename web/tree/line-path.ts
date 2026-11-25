@@ -11,6 +11,15 @@ export function lineKind(link: Link): LineKind {
   return link.kind === "adoption" || link.kind === "guardianship" ? "adopted" : "thin";
 }
 
+/** How a line looks, in SVG and on the canvas alike. */
+export const lineLooks: Record<LineKind, { width: number; dash: number[] }> = {
+  thin: { width: 1.1, dash: [] },
+  reference: { width: 1.1, dash: [] },
+  version: { width: 1.4, dash: [1.4, 3.6] },
+  adopted: { width: 1.8, dash: [5, 4] },
+  direct: { width: 2.6, dash: [] },
+};
+
 /** The order of drawing: the direct line lies over its neighbours. */
 export const lineOrder: Record<LineKind, number> = {
   version: 0,

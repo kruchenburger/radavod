@@ -13,7 +13,7 @@
 .group h4 {
   margin: 0;
   color: var(--muted);
-  font: 400 1rem/1.5 var(--sans);
+  font: italic 400 1.0625rem/1.5 var(--serif);
 }
 
 .group h3 {
@@ -32,7 +32,6 @@
 .group li > h4 {
   margin-top: 0.25rem;
   padding-left: 1.25rem;
-  font-size: 0.9375rem;
 }
 
 .group li > ul {

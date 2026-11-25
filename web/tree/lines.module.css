@@ -6,30 +6,15 @@
   pointer-events: none;
 }
 
-.thin,
-.reference,
-.adopted,
-.version,
+.line,
 .direct {
   fill: none;
   stroke: var(--rule);
-  stroke-width: 1.1;
   stroke-linejoin: round;
-}
-
-.adopted {
-  stroke-width: 1.8;
-  stroke-dasharray: 5 4;
-}
-
-.version {
-  stroke-width: 1.4;
-  stroke-dasharray: 1.4 3.6;
 }
 
 .direct {
   stroke: var(--ink);
-  stroke-width: 2.6;
 }
 
 .legend {

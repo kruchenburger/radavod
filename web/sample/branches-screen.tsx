@@ -4,7 +4,7 @@ import { CloseIcon } from "../app/icons";
 import { useLanguage } from "../app/language";
 import { Message } from "../app/message";
 import { go, Link } from "../app/router";
-import { phone, usePage } from "../app/use-page";
+import { isPhone, usePage } from "../app/use-page";
 import type { MapLevel } from "../tree/layout/branch-map";
 import { Legend } from "../tree/lines";
 import { MapView, type Target } from "../tree/map/map-view";
@@ -37,11 +37,10 @@ export function BranchesScreen({ place }: { place: BranchesPlace }) {
   const page = usePage();
   const [latest, setLatest] = useState<Latest | null>(null);
   const hint = useId();
-  const isPhone = page.width < phone;
   // Two pages in a row on the phone, three when there are many. A window that is not wide has less
   // of them in a row than the book.
   const pages = snapshot.branches.length;
-  const perRow = isPhone
+  const perRow = isPhone(page)
     ? pages > 12
       ? 3
       : 2
