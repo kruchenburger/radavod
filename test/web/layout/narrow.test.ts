@@ -23,10 +23,11 @@ function drawn(
   const byKey = new Map(layout.cards.map((card) => [card.key, card]));
   const found = problems(layout, {
     snapshot,
-    people: expectedAround(snapshot, focus, more),
+    people: expectedAround(snapshot, focus, { ...more, open: layout.open }),
     children: "y",
     lines: ({ key }) => byKey.get(key)?.lines ?? [],
     measure,
+    isList: true,
   });
   expect({ focus, ...found }).toEqual({ focus });
   expect(layout.order).toEqual(layout.cards.map(({ key }) => key));
@@ -109,8 +110,9 @@ describe("around a person on a phone", () => {
 
   it("draws the lines in the margin when somebody stands elsewhere", () => {
     const layout = drawn(cases["an ancestor by two lines"] as FamilySpec, "x");
-    const second = layout.links.filter((link) => link.type === "parentage" && !link.tree);
-    expect(second.length).toBeGreaterThan(0);
+    const right = Math.max(...layout.cards.map(({ x, w }) => x + w));
+    const line = layout.links.find(({ type }) => type === "reference");
+    expect(Math.max(...(line?.points ?? []).map(([x]) => x))).toBeGreaterThan(right);
     expect(layout.width).toBe(328);
   });
 

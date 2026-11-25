@@ -14,6 +14,7 @@ export type TextStyle =
   | "focusName"
   /** A chosen person with a double surname. */
   | "focusNameDouble"
+  | "focusNameNarrow"
   | "focusDetail"
   | "head"
   | "closerName"

@@ -20,6 +20,8 @@ export type Rules = {
   children: "x" | "y";
   lines?: (card: Card) => Line[];
   measure?: Measure;
+  /** A list with indents: deeper rows may stand between partners. */
+  isList?: boolean;
 };
 
 /** Each finding names its place. Empty lists mean a good drawing. */
@@ -67,7 +69,7 @@ export function check(drawing: Drawing, rules: Rules): Findings {
   checkNumbers(drawing, found);
   checkPeople(cards, rules, found);
   checkOverlaps(cards, found);
-  checkPaths(cards, byKey, links, found);
+  checkPaths(cards, byKey, links, rules, found);
   checkLinks(byKey, links, rules, found);
   checkMerged(links, found);
   checkOrder(byKey, links, rules, found);
@@ -125,7 +127,13 @@ function checkOverlaps(cards: Card[], found: Findings): void {
   }
 }
 
-function checkPaths(cards: Card[], byKey: Map<string, Card>, links: Link[], found: Findings): void {
+function checkPaths(
+  cards: Card[],
+  byKey: Map<string, Card>,
+  links: Link[],
+  { isList = false }: Rules,
+  found: Findings,
+): void {
   const grid = new Grid<Card>();
   for (const card of cards) grid.add(card, card);
   const unions = new Set(
@@ -138,7 +146,7 @@ function checkPaths(cards: Card[], byKey: Map<string, Card>, links: Link[], foun
     if (first === undefined || last === undefined) {
       const isNear =
         link.type === "union" &&
-        standTogether([link.partners[0], link.at ?? link.partners[1]], byKey, links);
+        standTogether([link.partners[0], link.at ?? link.partners[1]], byKey, links, isList);
       if (!isNear) found.loose.push(nameOf(link));
       continue;
     }
@@ -146,7 +154,8 @@ function checkPaths(cards: Card[], byKey: Map<string, Card>, links: Link[], foun
     if (link.type === "parentage" && link.parentsAt === undefined) {
       const [a, b] = link.parents;
       const isCouple = b === undefined || unions.has(pairOf(a ?? "", b));
-      if (!isCouple && !standTogether([a ?? "", b ?? ""], byKey, links)) found.loose.push(nameOf(link));
+      const isNear = isCouple || standTogether([a ?? "", b ?? ""], byKey, links, isList);
+      if (!isNear) found.loose.push(nameOf(link));
     }
     const touches = (point: Point, keys: string[]): boolean =>
       keys.some((key) => touchesCard(point, byKey.get(key)));
@@ -207,6 +216,7 @@ function standTogether(
   partners: [string, string],
   byKey: Map<string, Card>,
   links: Link[],
+  isList: boolean,
 ): boolean {
   const [a, b] = partners.map((key) => byKey.get(key));
   if (a === undefined || b === undefined) return false;
@@ -214,7 +224,7 @@ function standTogether(
   const gapY = gap(a.y, a.h, b.y, b.h);
   if (Math.abs(gapX) < 0.01 && gapY < 0) return true;
   if (gapY >= -0.01 && gapY <= near && gapX < 0) return true;
-  if (areOfOneStack(a, b, byKey, links)) return true;
+  if (areOfOneStack(a, b, byKey, links, isList)) return true;
   const arms = (key: string): string[] =>
     links.flatMap((link) =>
       link.type === "parentage" && link.parents.length === 1 && link.parents[0] === key
@@ -231,6 +241,7 @@ function areOfOneStack(
   b: Card,
   byKey: Map<string, Card>,
   links: Link[],
+  isList: boolean,
 ): boolean {
   if (a.x !== b.x || a.w !== b.w) return false;
   const [upper, lower] = a.y < b.y ? [a, b] : [b, a];
@@ -258,10 +269,11 @@ function areOfOneStack(
   }
   let bottom = upper.y + upper.h;
   const between = [...byKey.values()]
-    .filter(({ x, w, y }) => x === a.x && w === a.w && y > upper.y && y <= lower.y)
+    .filter(({ x, w, y }) => (isList || (x === a.x && w === a.w)) && y > upper.y && y <= lower.y)
+    .filter(({ x }) => !isList || x <= a.x)
     .sort((first, second) => first.y - second.y);
   for (const card of between) {
-    if (card.y - bottom > near || !partners.has(card.key)) return false;
+    if ((card.y - bottom > near && !isList) || !partners.has(card.key)) return false;
     bottom = card.y + card.h;
   }
   return true;
