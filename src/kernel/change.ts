@@ -22,6 +22,6 @@ function differ(a: unknown, b: unknown): boolean {
 }
 
 function inOrder(_: string, value: unknown): unknown {
-  if (typeof value !== "object" || value === null) return value;
+  if (typeof value !== "object" || value === null || Array.isArray(value)) return value;
   return Object.fromEntries(Object.entries(value).sort(([a], [b]) => (a < b ? -1 : 1)));
 }

@@ -74,8 +74,8 @@ export function mainOf(
   reader: LifeReader,
   id: PersonId,
   kind: "birth" | "death",
-): LifeEvent | undefined {
-  return lifeOf(reader, id).events.find((one) => one.kind === kind && one.main);
+): LifeEvent | null {
+  return lifeOf(reader, id).events.find((one) => one.kind === kind && one.main) ?? null;
 }
 
 function lifeOf(reader: LifeReader, id: PersonId): PersonLife {
@@ -95,8 +95,7 @@ function withMains(events: LifeEvent[], recorded?: LifeEvent): LifeEvent[] {
     );
   });
   return events.map((one) => {
-    if (!versionedKinds.includes(one.kind)) return one;
-    const main = mains.includes(one);
+    const main = !versionedKinds.includes(one.kind) || mains.includes(one);
     return one.main === main ? one : { ...one, main };
   });
 }
@@ -112,19 +111,19 @@ function changed(
   const before = reader.lifeOf(home);
   const change: Change = writes("life", home, before, { ...lifeOf(reader, home), events });
   const id = (now ?? old)?.id;
-  const [were, are] = [guestsOf(old), guestsOf(now)];
-  for (const guest of new Set([...were, ...are])) {
-    if (id === undefined || were.has(guest) === are.has(guest)) continue;
-    const life = lifeOf(reader, guest);
+  const [were, are] = [othersIn(old), othersIn(now)];
+  for (const other of new Set([...were, ...are])) {
+    if (id === undefined || were.has(other) === are.has(other)) continue;
+    const life = lifeOf(reader, other);
     const others = life.takesPart.filter(({ event }) => event !== id);
-    const takesPart = are.has(guest) ? [...others, { event: id, home }] : others;
-    change.push(...writes("life", guest, reader.lifeOf(guest), { ...life, takesPart }));
+    const takesPart = are.has(other) ? [...others, { event: id, home }] : others;
+    change.push(...writes("life", other, reader.lifeOf(other), { ...life, takesPart }));
   }
   return change;
 }
 
 /** Those who take part in an event of somebody else. */
-function guestsOf(event: LifeEvent | undefined): Set<PersonId> {
+function othersIn(event: LifeEvent | undefined): Set<PersonId> {
   const [home, ...others] = event?.participants.map(({ person }) => person) ?? [];
   return new Set(others.filter((person) => person !== home));
 }

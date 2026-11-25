@@ -1,6 +1,6 @@
 import { type FuzzyDate, lastDay, sortKey } from "../../../kernel/fuzzy-date";
 import type { EventId, PersonId } from "../../../kernel/id";
-import type { EventKind, LifeEvent } from "./event";
+import type { EventKind } from "./event";
 import { eventsOf, type LifeReader, mainOf } from "./life";
 
 /** Something odd but possible. It is told and blocks nothing. */
@@ -13,9 +13,11 @@ export type Warning =
 export type Descent = { parent: PersonId; child: PersonId };
 
 /** "About" is taken for so many days either way. */
-const about = 5 * 365.25;
-/** What may come after the death of whoever takes part: a child may be born, and a family remembers. */
-const posthumous: readonly EventKind[] = ["birth", "burial", "other"];
+const aboutDays = 5 * 365.25;
+/** What may come after a death: a child is born, a verdict is taken back, a family remembers. */
+const posthumous: readonly EventKind[] = ["birth", "burial", "repression", "other"];
+/** Who was there. Whoever has another role may only be named, as a dead father at a wedding. */
+const present: readonly string[] = ["principal", "godparent", "witness"];
 
 /** Warnings about a person, given only when the dates leave no doubt. */
 export function warningsOf(
@@ -37,18 +39,16 @@ export function warningsOf(
   }
   if (death) {
     for (const event of eventsOf(reader, id)) {
-      const isOwnDeath = event.kind === "death" && homeOf(event) === id;
-      if (isOwnDeath || posthumous.includes(event.kind)) continue;
-      if (isBefore(death.date, event.date)) {
+      const [about, ...others] = event.participants;
+      const isOwn = about?.person === id;
+      const wasThere = others.some((one) => one.person === id && present.includes(one.role));
+      if (posthumous.includes(event.kind) || (isOwn && event.kind === "death")) continue;
+      if ((isOwn || wasThere) && isBefore(death.date, event.date)) {
         warnings.push({ code: "event-after-death", event: event.id, death: death.id });
       }
     }
   }
   return warnings;
-}
-
-function homeOf({ participants }: LifeEvent): PersonId | undefined {
-  return participants[0]?.person;
 }
 
 /** Whether every day the first may be is before every day the second may be. */
@@ -60,5 +60,5 @@ function isBefore(first: FuzzyDate | null, second: FuzzyDate | null): boolean {
 }
 
 function doubtOf({ parsed }: FuzzyDate): number {
-  return parsed?.qualifier === "about" ? about : 0;
+  return parsed?.qualifier === "about" ? aboutDays : 0;
 }

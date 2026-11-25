@@ -99,8 +99,10 @@ describe("the name of a place", () => {
     expect(nameOn(null, "pl")).toBe("Osocze Kościelne");
   });
 
-  it("is the first one when none was used at that time", () => {
-    expect(nameOn("1942")).toBe("Осочье");
+  it("is the nearest one when none was used at that time", () => {
+    expect(nameOn("1942")).toBe("Осочье-Костёльное");
+    expect(nameOn("1947")).toBe("Осочьевск");
+    expect(nameOn("1942", "pl")).toBe("Osocze Kościelne");
   });
 
   it("gives way to one with a period when its own is not known", () => {
@@ -134,6 +136,27 @@ describe("the name of a place", () => {
     });
     expect(places.nameOn(id("a"), null, "ru")).toBe("Осочьевск");
     expect(places.nameOn(id("a"), date("1900"), "ru")).toBe("Осочье");
+  });
+
+  it("that ended on a day nobody knows gives way after what is known of it", () => {
+    for (const end of ["при немцах", "после 1918"]) {
+      for (const now of [null, period(null, null)]) {
+        const { places } = start({
+          names: [
+            { text: "Осочье", language: "ru", period: period("1900", end) },
+            { text: "Осочьевск", language: "ru", period: now },
+          ],
+        });
+        const nameAt = (text: string | null) =>
+          places.nameOn(id("a"), text === null ? null : date(text), "ru");
+        expect(nameAt(null)).toBe("Осочьевск");
+        expect(nameAt("1960")).toBe("Осочьевск");
+        expect(nameAt("1.01.1900")).toBe("Осочье");
+        if (end !== "после 1918") continue;
+        expect(nameAt("31.12.1918")).toBe("Осочье");
+        expect(nameAt("1.01.1919")).toBe("Осочьевск");
+      }
+    }
   });
 
   it("with a period nobody could read is as one without", () => {
@@ -171,6 +194,54 @@ describe("the affiliation of a place", () => {
     expect(on("1939")).toBe("БССР");
     expect(on("1919")).toBeNull();
     expect(on("12.05.1917")).toBe("Российская империя");
+  });
+
+  it("before a date and after one is that of the day before and the day after", () => {
+    expect(on("до 1921")).toBeNull();
+    expect(on("до 1918")).toBe("Российская империя");
+    expect(on("до 1.01.1918")).toBe("Российская империя");
+    expect(on("после 1920")).toBe("Польская Республика");
+    expect(on("после 31.12.1920")).toBe("Польская Республика");
+    expect(on("после 1917")).toBeNull();
+  });
+
+  it("of a year or of a span is the one of its first day, else the first to come in it", () => {
+    const { places: precise } = start({
+      affiliations: [
+        { name: "Империя", period: period("1795", "1917") },
+        { name: "Республика", period: period("11.11.1918", "17.09.1939") },
+        { name: "БССР", period: period("17.09.1939", "после 1990") },
+      ],
+    });
+    const of = (text: string) => precise.affiliationOn(id("a"), date(text));
+    for (const text of ["1918", "11.1918", "около 1918", "между 1918 и 1960", "1939", "09.1939"]) {
+      expect([text, of(text)]).toEqual([text, "Республика"]);
+    }
+    expect(of("10.11.1918")).toBeNull();
+    expect(of("17.09.1939")).toBe("БССР");
+    expect(of("1990")).toBe("БССР");
+    const { places: unordered } = start({
+      affiliations: [
+        { name: "БССР", period: period("1939", null) },
+        { name: "Республика", period: period("1921", "1939") },
+      ],
+    });
+    expect(unordered.affiliationOn(id("a"), date("между 1900 и 1960"))).toBe("Республика");
+    const { places: vague } = start({
+      affiliations: [
+        { name: "БССР", period: null },
+        { name: "Республика", period: period("1921", "1939") },
+      ],
+    });
+    expect(vague.affiliationOn(id("a"), date("05.1939"))).toBe("Республика");
+    const { places: after } = start({
+      affiliations: [
+        { name: "Империя", period: period("1795", "1917") },
+        { name: "Советы", period: period("после 1917", null) },
+      ],
+    });
+    expect(after.affiliationOn(id("a"), date("05.1917"))).toBe("Империя");
+    expect(after.affiliationOn(id("a"), date("1918"))).toBe("Советы");
   });
 
   it("is none without a date that was read, or for a missing place", () => {

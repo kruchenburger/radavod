@@ -41,54 +41,93 @@ export function editPlace(
 }
 
 /**
- * What a place was called on a date, in the language asked for if it had such a name then. Where
- * periods meet, the later name wins, and a name of an unknown period gives way. Without a date it is
- * the latest name; if none is known of that time, the first one. Null when the place has no name.
+ * What a place was called on a date, in the language asked for if it had such a name then. If none is
+ * known of that time, it is the nearest one, and without a date the latest. Null when the place has no
+ * name.
  */
 export function nameOn(
   { names }: Place,
   date: FuzzyDate | null,
   language: Language,
 ): string | null {
-  const day = dayOf(date);
-  const known = day === null ? latest(names) : at(names, day);
-  const name = known.find((one) => one.language === language) ?? known[0] ?? names[0];
+  const when = date && spanOf(date);
+  const known = when === null ? latest(names) : during(names, when);
+  const choice = when !== null && known.length === 0 ? nearest(names, when) : known;
+  const name = choice.find((one) => one.language === language) ?? choice[0];
   return name?.text ?? null;
 }
 
-/** What a place belonged to on a date, chosen as its name is. Null when nobody knows. */
+/** What a place belonged to on a date. Null when nobody knows of that time. */
 export function affiliationOn({ affiliations }: Place, date: FuzzyDate | null): string | null {
-  const day = dayOf(date);
-  return day === null ? null : (at(affiliations, day)[0]?.name ?? null);
+  const when = date && spanOf(date);
+  return when === null ? null : (during(affiliations, when)[0]?.name ?? null);
 }
 
 type Dated = { period: Period | null };
+/** Days from and to, both in it. A null end is open. */
 type Span = { from: number | null; to: number | null };
 
-function dayOf(date: FuzzyDate | null): number | null {
-  return date && (sortKey(date) ?? lastDay(date));
+/** The days a date may be. What was before 1918 was not in 1918. Null for an unread date. */
+function spanOf(date: FuzzyDate): Span | null {
+  const { text, parsed } = date;
+  if (parsed === null) return null;
+  const named: FuzzyDate = { text, parsed: { ...parsed, qualifier: "exact" } };
+  const [from, to] = [sortKey(named), lastDay(named)];
+  if (from === null || to === null) return null;
+  if (parsed.qualifier === "before") return { from: null, to: from - 1 };
+  if (parsed.qualifier === "after") return { from: to + 1, to: null };
+  return { from, to };
 }
 
-function spanOf({ period }: Dated): Span {
+function periodOf({ period }: Dated): Span {
   return {
-    from: period?.from ? sortKey(period.from) : null,
-    to: period?.to ? lastDay(period.to) : null,
+    from: (period?.from && spanOf(period.from)?.from) ?? null,
+    to: (period?.to && spanOf(period.to)?.to) ?? null,
   };
 }
 
-/** What holds on a day, the best first. */
-function at<T extends Dated>(list: readonly T[], day: number): T[] {
-  const holds = list.filter((one) => {
-    const { from, to } = spanOf(one);
-    return (from === null || from <= day) && (to === null || day <= to);
+/**
+ * What held on the first day of a span, the best first; if nothing did, what began in it, the first
+ * first. "Before" has no first day, so it goes by the last one.
+ */
+function during<T extends Dated>(list: readonly T[], { from, to }: Span): T[] {
+  const day = from ?? to ?? 0;
+  const held = list.filter((one) => distance(periodOf(one), day) === 0);
+  if (held.length > 0) {
+    const isLost = (one: T) => Number(mayHaveEndedBy(one, day));
+    return held.toSorted((a, b) => isLost(a) - isLost(b) || later(periodOf(a), periodOf(b)));
+  }
+  const began = list.filter((one) => {
+    const start = periodOf(one).from;
+    return start !== null && to !== null && day < start && start <= to;
   });
-  return holds.toSorted((a, b) => later(spanOf(a), spanOf(b)));
+  return began.toSorted((a, b) => later(periodOf(b), periodOf(a)));
 }
 
 /** Everything, what has not ended first. */
 function latest<T extends Dated>(list: readonly T[]): T[] {
-  const hasEnded = (one: T) => Number(spanOf(one).to !== null);
-  return list.toSorted((a, b) => hasEnded(a) - hasEnded(b) || later(spanOf(a), spanOf(b)));
+  const hasEnded = ({ period }: T) => Number((period?.to ?? null) !== null);
+  return list.toSorted((a, b) => hasEnded(a) - hasEnded(b) || later(periodOf(a), periodOf(b)));
+}
+
+function nearest<T extends Dated>(list: readonly T[], { from, to }: Span): T[] {
+  const day = from ?? to ?? 0;
+  return list.toSorted((a, b) => distance(periodOf(a), day) - distance(periodOf(b), day));
+}
+
+/** How many days a day is from a period. */
+function distance({ from, to }: Span, day: number): number {
+  return Math.max((from ?? day) - day, day - (to ?? day), 0);
+}
+
+/** Whether a period has an end nobody can date and is not known to have held on a day. */
+function mayHaveEndedBy({ period }: Dated, day: number): boolean {
+  if (!period?.to) return false;
+  const end = spanOf(period.to);
+  if (end !== null && end.to !== null) return false;
+  // "After 1918" ended some day, and held to the last one of 1918.
+  const heldTo = end?.from == null ? periodOf({ period }).from : end.from - 1;
+  return heldTo === null || day > heldTo;
 }
 
 /** The later beginning first, then what has a beginning or an end at all. */

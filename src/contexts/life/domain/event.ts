@@ -27,7 +27,7 @@ export type LifeEvent = {
   /** The first is whom the event is about. */
   participants: { person: PersonId; role: string }[];
   union: UnionId | null;
-  /** False for a version of a birth or a death that is not the main one. Other kinds have no versions. */
+  /** False for a version of a birth or a death that is not the main one. */
   main: boolean;
   certainty: Certainty;
   note: string;

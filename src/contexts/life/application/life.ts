@@ -9,6 +9,7 @@ import {
   type EventError,
   eventOf,
   eventsOf,
+  mainOf,
   recordEvent,
   removeEvent,
 } from "../domain/life";
@@ -22,6 +23,8 @@ export interface Life {
   event(id: EventId): LifeEvent | null;
   /** Every event a person takes part in, by date. */
   eventsOf(id: PersonId): LifeEvent[];
+  /** The main version of the birth or of the death of a person. */
+  main(id: PersonId, kind: "birth" | "death"): LifeEvent | null;
   /** Adds an event or replaces the one with its identifier. */
   record(event: LifeEvent): Result<Change, LifeError>;
   remove(id: EventId): Result<Change, LifeError>;
@@ -41,12 +44,22 @@ export function lifeOver(
   return {
     event: (id) => eventOf(store, id),
     eventsOf: (id) => eventsOf(store, id),
+    main: (id, kind) => mainOf(store, id, kind),
     record(event) {
+      // What an event named before may have gone since. That does not stop an edit of the rest.
+      const old = eventOf(store, event.id);
+      const known = old?.participants.map(({ person }) => person) ?? [];
       const { participants, place, union } = event;
-      const stranger = participants.find(({ person }) => kinship.get(person) === null);
+      const stranger = participants.find(
+        ({ person }) => !known.includes(person) && kinship.get(person) === null,
+      );
       if (stranger !== undefined) return missing(stranger.person);
-      if (place !== null && places.get(place) === null) return missing(place);
-      if (union !== null && kinship.union(union) === null) return missing(union);
+      if (place !== null && place !== old?.place && places.get(place) === null) {
+        return missing(place);
+      }
+      if (union !== null && union !== old?.union && kinship.union(union) === null) {
+        return missing(union);
+      }
       return saved(recordEvent(store, event));
     },
     remove: (id) => saved(removeEvent(store, id)),

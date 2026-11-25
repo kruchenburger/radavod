@@ -111,7 +111,7 @@ describe("a citation", () => {
     });
   });
 
-  it("leaves nothing behind when it was the only one", () => {
+  it("leaves an empty row when it was the only one", () => {
     const { evidence, store } = start();
     evidence.cite(citation("1"));
     expect(evidence.uncite(citationId("1"))).toMatchObject({

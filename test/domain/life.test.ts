@@ -34,7 +34,8 @@ const on = (text: string): Partial<LifeEvent> => ({ date: parseFuzzyDate(text) }
 
 const start = (...names: string[]) => {
   const family = new Family(...names);
-  const places = placesOver(new MemoryPlaces());
+  const placesStore = new MemoryPlaces();
+  const places = placesOver(placesStore);
   places.add({ id: place("town"), names: [], affiliations: [], coordinates: null });
   const store = new MemoryLife();
   const life = lifeOver(store, family.kinship, places);
@@ -44,7 +45,7 @@ const start = (...names: string[]) => {
     return result.value;
   };
   const ids = (who: string) => life.eventsOf(person(who)).map(({ id }) => id.slice(6));
-  return { family, life, store, record, ids };
+  return { family, placesStore, life, store, record, ids };
 };
 const refused = (code: string, more: object = {}) => ({ ok: false, error: { code, ...more } });
 
@@ -111,7 +112,7 @@ describe("an event", () => {
     expect(ids("a")).toEqual(["e"]);
   });
 
-  it("belongs to a union, whatever the union is", () => {
+  it("belongs to a union", () => {
     const { family, life, record, ids } = start("a", "b");
     family.withUnion("ab", "a", "b");
     record(event("e", "wedding", ["a", "b"], { union: union("ab") }));
@@ -119,8 +120,37 @@ describe("an event", () => {
     expect(ids("b")).toEqual(["e"]);
   });
 
+  it("is recorded again whatever it names has gone since", () => {
+    const { family, placesStore, life, record } = start("a", "b", "c");
+    family.withUnion("ab", "a", "b");
+    const wedding = event("e", "wedding", ["a", "b"], { union: union("ab"), place: place("town") });
+    record(wedding);
+    family.do({ do: "remove-union", id: union("ab") });
+    family.store.people.delete(person("b"));
+    placesStore.places.rows.delete(place("town"));
+    expect(life.record({ ...wedding, certainty: "unresolved" }).ok).toBe(true);
+    expect(life.record({ ...wedding, union: union("x") })).toEqual(
+      refused("missing", { id: union("x") }),
+    );
+    expect(life.record({ ...wedding, place: place("x") })).toEqual(
+      refused("missing", { id: place("x") }),
+    );
+    const participants = [...wedding.participants, { person: person("x"), role: "witness" }];
+    expect(life.record({ ...wedding, participants })).toEqual(
+      refused("missing", { id: person("x") }),
+    );
+  });
+
+  it("is always the main one of a kind that has no versions", () => {
+    const { life, record } = start("a");
+    record(event("e", "birth", "a"));
+    record(event("other", "birth", "a", { main: false }));
+    record(event("other", "residence", "a", { main: false }));
+    expect(life.event(eventId("other"))?.main).toBe(true);
+  });
+
   it("is recorded again in its place", () => {
-    const { life, record, ids } = start("a", "b", "c");
+    const { life, record, ids, store } = start("a", "b", "c");
     record(event("first", "residence", "a"));
     record(event("e", "baptism", ["a", "b"]));
     record(event("e", "burial", ["a", "c"], { note: "новое" }));
@@ -128,7 +158,9 @@ describe("an event", () => {
     expect(ids("b")).toEqual([]);
     expect(ids("c")).toEqual(["e"]);
     expect(life.event(eventId("e"))).toMatchObject({ kind: "burial", note: "новое" });
+    const { saves } = store;
     expect(record(event("e", "burial", ["a", "c"], { note: "новое" }))).toEqual([]);
+    expect(store.saves).toBe(saves);
   });
 
   it("stays with whom it is about: its citations hold to them", () => {
@@ -195,6 +227,16 @@ describe.each(["birth", "death"] as const)("a version of a %s", (kind) => {
     expect(mains(life)).toEqual(["one"]);
     record(event("one", "other", "a"));
     expect(mains(life)).toEqual(["three"]);
+  });
+
+  it("that is the main one is told, and it is never that of a child", () => {
+    const { life, record } = start("father", "child");
+    record(event("child", kind, ["child", "father"]));
+    expect(life.main(person("father"), kind)).toBeNull();
+    record(event("one", kind, "father"));
+    record(event("two", kind, "father", { main: false }));
+    expect(life.main(person("father"), kind)?.id).toBe(eventId("one"));
+    expect(life.main(person("nobody"), kind)).toBeNull();
   });
 
   it("leaves those of others and of other kinds alone", () => {
@@ -319,9 +361,25 @@ describe("a warning", () => {
     record(event("death", "death", "a", on("1950")));
     record(event("wedding", "wedding", ["b", "a"], on("1952")));
     record(event("residence", "residence", "a", on("1951")));
+    record(
+      event("own", "service", "a", {
+        ...on("1953"),
+        participants: [{ person: person("a"), role: "солдат" }],
+      }),
+    );
+    for (const role of ["principal", "godparent"]) {
+      const participants = [
+        { person: person("b"), role: "principal" },
+        { person: person("a"), role },
+      ];
+      record(event(role, "baptism", "b", { ...on("1954"), participants }));
+    }
     expect(life.warnings(person("a"))).toEqual([
       { code: "event-after-death", event: eventId("residence"), death: eventId("death") },
       { code: "event-after-death", event: eventId("wedding"), death: eventId("death") },
+      { code: "event-after-death", event: eventId("own"), death: eventId("death") },
+      { code: "event-after-death", event: eventId("principal"), death: eventId("death") },
+      { code: "event-after-death", event: eventId("godparent"), death: eventId("death") },
     ]);
     expect(life.warnings(person("b"))).toEqual([]);
   });
@@ -333,6 +391,15 @@ describe("a warning", () => {
     record(event("burial", "burial", "a", on("1951")));
     record(event("sign", "other", "a", { ...on("1990"), title: "Памятный знак" }));
     record(event("posthumous", "birth", ["child", "a"], on("1951")));
+    const father = (who: string) => [
+      { person: person(who), role: "principal" },
+      { person: person("a"), role: "father" },
+      { person: person(who), role: "witness" },
+    ];
+    for (const kind of ["baptism", "wedding"] as const) {
+      record(event(kind, kind, "child", { ...on("1952"), participants: father("child") }));
+    }
+    record(event("cleared", "repression", "a", { ...on("1957"), title: "Реабилитация" }));
     record(event("residence", "residence", "a", on("1950")));
     record(event("unread", "residence", "a", on("на Покров")));
     expect(life.warnings(person("a"))).toEqual([]);
