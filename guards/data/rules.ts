@@ -38,7 +38,8 @@ function line(pattern: string): RegExp {
 const head = line(String.raw`0[ \t]+HEAD`);
 const version = line(String.raw`1[ \t]+GEDC`);
 const record = line(String.raw`0[ \t]+@[^@\r\n]{1,40}@[ \t]+(?:INDI|FAM)`);
-const name = /(?<![\d.])1[ \t]+NAME[ \t]+[^/\r\n]{0,80}\/[^/\r\n]{1,80}\//i;
+/** Upper case only: "1 name" is prose. */
+const name = /(?<![\d.])1[ \t]+NAME[ \t]+[^/\r\n]{0,200}\/[^/\r\n]{1,200}\//;
 
 /** A write-ahead log in both byte orders, then a rollback journal. Both hold pages of the database. */
 const sqliteLogs = ["377f0682", "377f0683", "d9d505f920a163d7"];

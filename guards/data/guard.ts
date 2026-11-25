@@ -14,9 +14,11 @@ export type Examples = Record<string, string[]>;
  *
  * It does not see: untracked files, earlier commits, other branches, text in images and PDF,
  * encrypted or encoded data (base64, a compressed or encrypted database), archives of a kind not in
- * `rules.ts` (brotli has no signature at all), parts of a GEDCOM file with no header, person, family
- * or name line, GEDCOM in an encoding that is not ASCII-based, a backup marker without quotes, and a
- * family in a format of its own: a SQL dump, a table, prose, CSV, JSON or XML without the marker.
+ * `rules.ts` (brotli has no signature at all), archives other than zip after other bytes,
+ * parts of a GEDCOM file with no header, no person or family record and no name with the surname in
+ * slashes, GEDCOM in an encoding that is not ASCII-based, a backup marker without quotes or with more
+ * in the same quotes, and a family in a format of its own: a SQL dump, a table, prose, CSV, JSON or
+ * XML without the marker.
  */
 export function check(folder: string, examples: Examples = listed): Report {
   for (const [file, allowed] of Object.entries(examples)) {

@@ -176,6 +176,16 @@ describe("the shape", () => {
     expect(versions[0]!.date).not.toEqual(versions[1]!.date);
   });
 
+  it("cites no book of the old country for what happened overseas", () => {
+    const { id: port } = family.places.find(({ names }) => names[0]!.language === "en")!;
+    const deaths = family.events.filter((e) => e.place === port && e.kind !== "emigration");
+    const cited = family.citations.filter(({ fact }) => deaths.some(({ id }) => id === fact));
+    const kinds = cited.map((c) => family.sources.find(({ id }) => id === c.source)!.kind);
+    expect(cited).not.toEqual([]);
+    expect(kinds).not.toContain("register");
+    expect(kinds).not.toContain("census");
+  });
+
   it("names no archive, fund or file", () => {
     expect(committed).not.toMatch(
       /НИАБ|НГАБ|ЛГИА|РГИА|ГАРФ|LVIA|AGAD|NIAB|фонд|опись|(?<!\p{L})(?:ф|оп|д|л)\. ?\d/iu,

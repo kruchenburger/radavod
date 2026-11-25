@@ -67,6 +67,8 @@ type Subject = {
   year: number;
   tradition: Tradition;
   event?: FamilyEvent["kind"];
+  /** The fact happened after the person left the country. */
+  overseas?: boolean;
   /** The certainty the fact must have. */
   wanted?: Certainty | null;
 };
@@ -268,7 +270,7 @@ class Chronicle {
       this.#event("emigration", { ...subject, year: left }, { date, place, participants: self });
     }
     if (death !== null && deathIsKnown) {
-      const dying = { ...subject, year: death };
+      const dying = { ...subject, year: death, overseas: left !== null };
       const calendar = left === null ? [] : (["gregorian"] as const);
       const died = death === birth ? yearDate(death) : dateIn(this.#random, death, ...calendar);
       const last = left === null ? home : placeId(port);
@@ -381,7 +383,7 @@ class Chronicle {
   }
 
   /** The certainty of a fact, with the citations it needs. */
-  #certainty(fact: string, { year, tradition, event, wanted }: Subject): Certainty {
+  #certainty(fact: string, { year, tradition, event, overseas, wanted }: Subject): Certainty {
     const { int, pick, weighted } = this.#random;
     const certainty =
       wanted ??
@@ -396,10 +398,11 @@ class Chronicle {
 
     const needed = certainty === "confirmed" || certainty === "contradiction" ? 2 : 1;
     const fitting = sources.filter(
-      ({ from, to, about, of }) =>
+      ({ from, to, about, of, local }) =>
         year >= from &&
         year <= to &&
         (about === undefined || about === event) &&
+        !(overseas && local) &&
         (of === undefined || of.includes(tradition)),
     );
     // A fact that must have this certainty is at least told about.

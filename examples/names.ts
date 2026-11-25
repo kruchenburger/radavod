@@ -505,6 +505,8 @@ export const sources: {
   to: number;
   /** The only event it tells about. */
   about?: FamilyEvent["kind"];
+  /** Kept in the country, so it knows nothing of those who left. */
+  local?: true;
   /** The only communities it tells about. */
   of?: Tradition[];
 }[] = [
@@ -514,6 +516,7 @@ export const sources: {
     to: 1917,
     of: ["orthodox"],
     title: "Метрическая книга Заольховичской церкви",
+    local: true,
     unit: "запись",
   },
   {
@@ -522,6 +525,7 @@ export const sources: {
     to: 1939,
     of: ["catholic", "lithuanian"],
     title: "Księga metrykalna parafii Osocze Kościelne",
+    local: true,
     unit: "akt",
   },
   {
@@ -530,6 +534,7 @@ export const sources: {
     to: 1840,
     of: ["catholic", "lithuanian"],
     title: "Liber metricalis ecclesiae Tumanoviensis",
+    local: true,
     unit: "folium",
   },
   {
@@ -538,6 +543,7 @@ export const sources: {
     to: 1915,
     of: ["jewish"],
     title: "Метрическая книга Крынычинского раввината",
+    local: true,
     unit: "запись",
   },
   {
@@ -545,6 +551,7 @@ export const sources: {
     from: 1800,
     to: 1858,
     title: "Ревизская сказка деревни Панская Калинница",
+    local: true,
     unit: "двор",
   },
   {
@@ -552,11 +559,13 @@ export const sources: {
     from: 1870,
     to: 1912,
     title: "Посемейный список Тумановской волости",
+    local: true,
     unit: "двор",
   },
   {
     kind: "register",
     title: "Книга записей актов, Тумановск",
+    local: true,
     unit: "запись",
     from: 1919,
     to: 1995,
@@ -564,6 +573,7 @@ export const sources: {
   {
     kind: "document",
     title: "Похозяйственная книга, Мятликов Брод",
+    local: true,
     unit: "страница",
     from: 1935,
     to: 1980,
@@ -586,6 +596,7 @@ export const sources: {
   {
     kind: "document",
     title: "Надгробия на кладбище в Сосенной Выселке",
+    local: true,
     unit: "ряд",
     from: 1860,
     to: 2015,
