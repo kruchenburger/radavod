@@ -166,7 +166,7 @@ export function aroundNarrow(
     return places[families.indexOf(family)] ?? card.y + card.h / 2;
   };
 
-  const links: Link[] = rails.map(({ link: { from: _, ...link }, level, source, target, as }) => {
+  const links: Link[] = rails.map(({ link, level, source, target, as }) => {
     const { family } = link;
     const x = railX(level, family);
     const [upper, lower] = [cardOf(source), cardOf(target)];
@@ -184,7 +184,7 @@ export function aroundNarrow(
             [x, sideY(target, "left", family)],
             [lower.x, sideY(target, "left", family)],
           ];
-    return { ...link, points: [...start, ...end] };
+    return { ...withoutSource(link), points: [...start, ...end] };
   });
   for (const { link, family, source, target } of wires) {
     const [from, to] = [sideY(source, "right", family), sideY(target, "right", family)];
@@ -243,7 +243,13 @@ function itemsOf(model: Model): Item[] {
   return items;
 }
 
-type Wire = { link: Omit<Link, "points"> & Link; family: string; source: string; target: string };
+type Wire = { link: Link; family: string; source: string; target: string };
+
+/** What only the layout needs to know stays out of the links it returns. */
+function withoutSource(link: ModelLink): Omit<ModelLink, "from"> {
+  const { from: _, ...rest } = link;
+  return rest;
+}
 
 /** Lines a rail can carry, and the rest. */
 function sortLines(model: Model, items: Item[]): { rails: Rail[]; wires: Wire[] } {
@@ -280,8 +286,8 @@ function sortLines(model: Model, items: Item[]): { rails: Rail[]; wires: Wire[] 
     const isSibling = siblings.has(target) && parents.has(source);
     const as = isSibling ? "sibling" : steps.get(JSON.stringify([source, target]));
     if (as === undefined) {
-      const { from: _, ...rest } = link;
-      wires.push({ link: { ...rest, points: [] }, family: link.family, source, target });
+      const drawn = { ...withoutSource(link), points: [] };
+      wires.push({ link: drawn, family: link.family, source, target });
       continue;
     }
     const level = levels.get(as === "down" ? target : source) ?? 1;
@@ -330,7 +336,8 @@ function textOf(entry: Entry, text: CardText | null, box: TextBox): EntryText {
     ...size({ ...box, width: room }, metrics.name),
     indent: entry.isSpouse ? metrics.ring : 0,
   });
-  const detail = entry.folded === undefined ? detailRuns(text) : detailRuns({ ...text, branch: "" });
+  const detail =
+    entry.folded === undefined ? detailRuns(text) : detailRuns({ ...text, branch: "" });
   const beside = besideName(name, detail, { ...box, width: room });
   if (beside !== null) return { lines: [...name, ...beside], h: least.h };
   const below = Math.max(bottomOf(name), metrics.padY + metrics.name);

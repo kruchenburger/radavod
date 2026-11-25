@@ -26,7 +26,14 @@ describe("lanes", () => {
 
   it("are as many as needed and no more", () => {
     const track = new Track();
-    for (const [family, at] of [["a", 0], ["a", 9], ["b", 5], ["b", 20], ["c", 40], ["c", 41]] as const) {
+    for (const [family, at] of [
+      ["a", 0],
+      ["a", 9],
+      ["b", 5],
+      ["b", 20],
+      ["c", 40],
+      ["c", 41],
+    ] as const) {
       track.touch(family, at);
     }
     expect(track.lay()).toBe(2);

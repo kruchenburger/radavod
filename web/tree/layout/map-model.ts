@@ -309,8 +309,7 @@ class MapBuilder {
   }
 
   #lay(generations: Map<Unit, { group: number; generation: number }>): MapModel {
-    const placeOf = (unit: Unit) =>
-      generations.get(unit) as { group: number; generation: number };
+    const placeOf = (unit: Unit) => generations.get(unit) as { group: number; generation: number };
     const roots = this.#units.filter(({ above }) => above === null);
     // The first generation a family has on a page is the first row there.
     const firsts = new Map<string, number>();

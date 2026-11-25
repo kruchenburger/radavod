@@ -55,7 +55,8 @@ export function planLines(model: MapModel, placed: Placed, metrics: MapMetrics):
 
   // Crossings by the node their line leaves, so that a column knows its vertical goes on below.
   const spots = new Map<string, { node: MapNode; row: number }>();
-  for (const node of model.nodes) node.rows.forEach(({ key }, row) => spots.set(key, { node, row }));
+  for (const node of model.nodes)
+    node.rows.forEach(({ key }, row) => spots.set(key, { node, row }));
   const lanes = lanesInto(model);
   const slot = (node: MapNode, family: string): number => {
     const index = [...(lanes.get(node) ?? [])].indexOf(family);
@@ -212,13 +213,7 @@ export function drawMapLines(
           ? [a.column + 1, b.column]
           : [a.column, b.column + 1];
     const street =
-      first === last
-        ? null
-        : a.row === b.row
-          ? a.row === 0
-            ? 1
-            : a.row
-          : Math.max(a.row, b.row);
+      first === last ? null : a.row === b.row ? (a.row === 0 ? 1 : a.row) : Math.max(a.row, b.row);
     return { wire, first, last, street };
   });
   for (const { wire, first, last, street } of routes) {

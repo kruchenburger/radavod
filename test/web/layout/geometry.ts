@@ -190,8 +190,7 @@ function endsOf(link: Link): [from: string[], to: string[]] {
 
 /** References name people who stand somewhere, and links use them for those people alone. */
 function checkReferences(byKey: Map<string, Card>, links: Link[], found: Findings): void {
-  const named = (key: string): string[] =>
-    (byKey.get(key)?.reference?.people ?? []).map(personKey);
+  const named = (key: string): string[] => (byKey.get(key)?.reference?.people ?? []).map(personKey);
   for (const { key, reference } of byKey.values()) {
     if (reference === undefined) continue;
     const people = named(key);
@@ -298,7 +297,9 @@ function checkLinks(
   for (const link of links) {
     if (link.type === "reference") continue;
     if (link.type === "union") drawn.set(pairOf(...link.partners), link.partners);
-    else for (const parent of link.parents) drawn.set(`${parent} > ${link.child}`, [parent, link.child]);
+    else
+      for (const parent of link.parents)
+        drawn.set(`${parent} > ${link.child}`, [parent, link.child]);
   }
   const told = new Map<string, string[]>();
   const tell = (edge: string, ...ids: string[]): void => {

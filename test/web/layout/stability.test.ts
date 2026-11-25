@@ -85,7 +85,12 @@ describe("the measure", () => {
   });
 
   it("falls when neighbors part", () => {
-    expect(stability(tracks, [["a", "b"], ["c", "d"]]).share).toBe(2 / 3);
+    expect(
+      stability(tracks, [
+        ["a", "b"],
+        ["c", "d"],
+      ]).share,
+    ).toBe(2 / 3);
   });
 
   it("leaves out those it is told to", () => {
@@ -122,8 +127,8 @@ describe("after adding one person the view around somebody", () => {
     const options = { measure, wording: wordingOf(snapshot) };
     const visible = around(snapshot, focus, options);
     const ids = new Set(visible.cards.map(({ person }) => person));
-    const far = snapshot.people.find(
-      ({ id }) => [...near(snapshot, id, 1)].every((other) => !ids.has(other)),
+    const far = snapshot.people.find(({ id }) =>
+      [...near(snapshot, id, 1)].every((other) => !ids.has(other)),
     ) as TreePerson;
     for (const change of Object.values(changes)) {
       expect(around(change(far), focus, options)).toEqual(visible);

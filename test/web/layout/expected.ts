@@ -31,7 +31,7 @@ export function expectedAround(
   const reach = (
     map: Map<string, string[]>,
     far: number,
-    isFolded = (_: string): boolean => false,
+    isFolded: (id: string) => boolean = () => false,
   ): Set<string> => {
     const found = new Set<string>();
     let front = [focus];
@@ -58,9 +58,7 @@ export function expectedAround(
   const setOf = (child: string, id: string): (string | null)[] => {
     const links = linksOf(child)
       .map((link, i) => ({ ...link, i }))
-      .sort(
-        (a, b) => Number(b.main) - Number(a.main) || rank[a.kind] - rank[b.kind] || a.i - b.i,
-      );
+      .sort((a, b) => Number(b.main) - Number(a.main) || rank[a.kind] - rank[b.kind] || a.i - b.i);
     const once = links.filter(
       ({ parent }, i) => parent === null || links.findIndex((l) => l.parent === parent) === i,
     );

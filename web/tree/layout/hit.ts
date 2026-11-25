@@ -25,8 +25,7 @@ export function cardIndex<T extends Box>(cards: T[]) {
   const within = (box: Box): T[] => {
     const found = new Set(cellsOf(box).flatMap((name) => cells.get(name) ?? []));
     return [...found].filter(
-      ({ x, y, w, h }) =>
-        x < box.x + box.w && x + w > box.x && y < box.y + box.h && y + h > box.y,
+      ({ x, y, w, h }) => x < box.x + box.w && x + w > box.x && y < box.y + box.h && y + h > box.y,
     );
   };
   return {

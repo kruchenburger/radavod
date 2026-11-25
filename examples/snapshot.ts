@@ -55,8 +55,9 @@ export function snapshotOf(family: ExampleFamily): TreeSnapshot {
   };
 }
 
-function formOf({ id: _, ...form }: NameForm): TreeNameForm {
-  return form;
+function formOf(form: NameForm): TreeNameForm {
+  const { kind, language, script, given, patronymic, surname, certainty } = form;
+  return { kind, language, script, given, patronymic, surname, certainty };
 }
 
 export function yearOf({ text, parsed }: FuzzyDate): TreeYear {

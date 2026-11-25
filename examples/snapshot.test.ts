@@ -91,7 +91,10 @@ describe("a year", () => {
 
   it("is shown in digits, and what it means is a code", () => {
     expect(yearOf(date({}))).toMatchObject({ text: "1885", qualifier: "exact" });
-    expect(yearOf(date({ qualifier: "about" }))).toMatchObject({ text: "1885", qualifier: "about" });
+    expect(yearOf(date({ qualifier: "about" }))).toMatchObject({
+      text: "1885",
+      qualifier: "about",
+    });
     expect(yearOf(date({ qualifier: "between", to: { year: 1890 } }))).toMatchObject({
       text: "1885–1890",
       qualifier: "between",

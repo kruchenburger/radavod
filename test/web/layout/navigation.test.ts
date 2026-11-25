@@ -195,9 +195,7 @@ describe("the list of relatives", () => {
         },
         { union: "u4", partner: null, children: [] },
       ],
-      otherChildren: [
-        { person: "ward", kind: "guardianship", main: true, certainty: "confirmed" },
-      ],
+      otherChildren: [{ person: "ward", kind: "guardianship", main: true, certainty: "confirmed" }],
     });
   });
 

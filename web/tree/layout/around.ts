@@ -1,5 +1,12 @@
 import type { TreeSnapshot } from "../../../src/shared/tree";
-import { type DownNode, type Entry, type Model, modelOf, type Reach, type Role } from "./around-model";
+import {
+  type DownNode,
+  type Entry,
+  type Model,
+  modelOf,
+  type Reach,
+  type Role,
+} from "./around-model";
 import { type AroundMetrics, aroundMetrics, textsOf } from "./around-text";
 import { drawLines } from "./around-lines";
 import type { UpNode } from "./around-model";

@@ -82,20 +82,19 @@ const snapshots = fc
     branches: fc.subarray(["A", "B", "C"]),
     sameIds: fc.boolean(),
   })
-  .map(
-    ({ people, unions, branches, sameIds }): TreeSnapshot =>
-      treeSnapshotSchema.parse({
-        format: 1,
-        version: 0,
-        // Sometimes the last person has the id of the first.
-        people: people.map((one, i) => ({
-          ...one,
-          id: sameIds && i === size - 1 ? "p0" : `p${i}`,
-        })),
-        unions: unions.map((one, i) => ({ ...one, id: `u${i}` })),
-        branches: branches.map((id, i) => ({ id, title: { ru: id, en: id }, color: i })),
-        places: [],
-      }),
+  .map(({ people, unions, branches, sameIds }): TreeSnapshot =>
+    treeSnapshotSchema.parse({
+      format: 1,
+      version: 0,
+      // Sometimes the last person has the id of the first.
+      people: people.map((one, i) => ({
+        ...one,
+        id: sameIds && i === size - 1 ? "p0" : `p${i}`,
+      })),
+      unions: unions.map((one, i) => ({ ...one, id: `u${i}` })),
+      branches: branches.map((id, i) => ({ id, title: { ru: id, en: id }, color: i })),
+      places: [],
+    }),
   );
 
 /** A fixed seed keeps CI the same from run to run; shrinking finds the smallest family. */

@@ -30,13 +30,7 @@ export type Model = {
 };
 
 export type Role =
-  | "focus"
-  | "partner"
-  | "sibling"
-  | "ancestor"
-  | "descendant"
-  | "unknown"
-  | "reference";
+  "focus" | "partner" | "sibling" | "ancestor" | "descendant" | "unknown" | "reference";
 
 export type Entry = {
   key: string;
@@ -197,7 +191,10 @@ class Builder {
   #chooseOpen(partners: Entry[]): string {
     const asked = partners.find(({ key }) => key === this.#reach.open);
     const children = this.#kin.children(this.#focus);
-    const hasChildren = ({ key }: Entry, isWanted = (_: string): boolean => true): boolean =>
+    const hasChildren = (
+      { key }: Entry,
+      isWanted: (child: string) => boolean = () => true,
+    ): boolean =>
       children.some(({ child, set }) => isWanted(child) && this.#partnerOf(set, partners) === key);
     const chosen =
       asked ??
@@ -283,7 +280,7 @@ class Builder {
     const named = new Set<string>();
     const nodes: UpNode[] = [];
     const links: Pick<ModelLink, "parents" | "parentsAt">[] = [];
-    for (const { parent, parentage } of members) {
+    for (const { parent, id: parentage } of members) {
       if (parent === null) {
         if (known.length === 0 && nodes.length > 0) continue;
         const parentages = known.length === 0 ? set.unknown : [parentage];
@@ -387,7 +384,8 @@ class Builder {
           if (seen.has(child)) continue;
           seen.add(child);
           const partner = node === null ? undefined : this.#partnerOf(set, node.cards, person);
-          const isFolded = node === top && open !== null && partner !== undefined && partner !== open;
+          const isFolded =
+            node === top && open !== null && partner !== undefined && partner !== open;
           if (this.#has(child)) {
             if (!isFolded) next.push({ person: child, node: null });
             continue;

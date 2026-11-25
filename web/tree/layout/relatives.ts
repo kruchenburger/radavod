@@ -25,14 +25,11 @@ export function relativesOf(snapshot: TreeSnapshot, person: string): Relatives |
   const kin = kinOf(snapshot);
   if (kin.person(person) === undefined) return null;
 
-  const parents = kin.sets(person).flatMap(({ members, kind, main }) =>
-    members.map(({ parent, parentage }) => {
-      const told = kin.person(person)?.parents.find(
-        (one) => one.parent === parent && one.id === parentage,
-      );
-      return { person: parent, kind, main, certainty: told?.certainty ?? "hypothesis" };
-    }),
-  );
+  const parents = kin
+    .sets(person)
+    .flatMap(({ members, kind, main }) =>
+      members.map(({ parent, certainty }) => ({ person: parent, kind, main, certainty })),
+    );
 
   const shared = new Map<string, string[]>();
   for (const { known } of kin.sets(person)) {

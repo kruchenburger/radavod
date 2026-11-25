@@ -249,7 +249,10 @@ describe("the map of branches", () => {
   });
 
   it("makes a page as wide as its head", () => {
-    const map = drawn({ people: [{ id: "a", branch: "A".repeat(60) }], branches: ["A".repeat(60)] });
+    const map = drawn({
+      people: [{ id: "a", branch: "A".repeat(60) }],
+      branches: ["A".repeat(60)],
+    });
     expect(map.pages[0]?.w).toBeGreaterThan(60 * 13);
   });
 
@@ -265,7 +268,9 @@ describe("the map of branches", () => {
 describe.each(levels)("the map at the level %s", (level) => {
   it.each(Object.entries(cases))("manages %s", (_, spec) => {
     drawn(spec, { level });
-    for (const id of familyOf(spec).people.slice(-2).map((person) => person.id)) {
+    for (const id of familyOf(spec)
+      .people.slice(-2)
+      .map((person) => person.id)) {
       drawn(spec, { level, lineOf: id });
     }
   });
@@ -345,8 +350,7 @@ function withBranches(count: number): TreeSnapshot {
     const kept = branches.slice(0, count - wanted.size);
     for (const branch of kept) wanted.add(own(branch.id));
     all.branches.push(...kept.map((branch) => ({ ...branch, id: own(branch.id) })));
-    const isKept = (branch: string | null): boolean =>
-      branch !== null && wanted.has(own(branch));
+    const isKept = (branch: string | null): boolean => branch !== null && wanted.has(own(branch));
     const ids = new Set(people.filter(({ branch }) => isKept(branch)).map(({ id }) => id));
     for (const { partners } of unions) {
       const [a, b] = partners;

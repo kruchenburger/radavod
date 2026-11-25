@@ -68,7 +68,15 @@ export function flow(runs: Run[], options: FlowOptions): Line[] {
         w = measure(shown, style);
         if (shown === "" || w > width) return set;
       }
-      line = { text: shown, part, style, x: left + start, y: top + row * lineHeight, w, h: lineHeight };
+      line = {
+        text: shown,
+        part,
+        style,
+        x: left + start,
+        y: top + row * lineHeight,
+        w,
+        h: lineHeight,
+      };
       end = start + w;
       set.push(line);
     }

@@ -1,9 +1,4 @@
-import type {
-  Certainty,
-  TreeParentage,
-  TreePerson,
-  TreeUnion,
-} from "../../../src/shared/tree";
+import type { Certainty, TreeParentage, TreePerson, TreeUnion } from "../../../src/shared/tree";
 
 /** What a text looks like. The screen knows the fonts, the layout only asks how wide a text is. */
 export type TextStyle =

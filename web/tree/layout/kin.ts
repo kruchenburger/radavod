@@ -13,7 +13,7 @@ export type ParentSet = {
   /** Parentages to a parent nobody knows. */
   unknown: string[];
   /** Both of the above, in the order of the snapshot. */
-  members: { parent: string | null; parentage: string }[];
+  members: TreeParentage[];
   kind: TreeParentage["kind"];
   main: boolean;
   /** Of the parentage that is least sure. */
@@ -60,93 +60,115 @@ export function kinOf(snapshot: TreeSnapshot): Kin {
   return kin;
 }
 
+/** Everything about one person, so that a question needs one look into the map. */
+type Entry = {
+  person: TreePerson;
+  index: number;
+  bornAt: number;
+  sets: ParentSet[];
+  children: Child[];
+  unions: UnionOf[];
+};
+
+const none: never[] = [];
+
 function read({ people, unions }: TreeSnapshot): Kin {
-  const byId = new Map<string, TreePerson>();
-  const indexes = new Map<string, number>();
+  const entries = new Map<string, Entry>();
   for (const person of people) {
-    if (byId.has(person.id)) continue;
-    indexes.set(person.id, byId.size);
-    byId.set(person.id, person);
+    if (entries.has(person.id)) continue;
+    const bornAt = person.birth?.sort ?? Infinity;
+    const index = entries.size;
+    entries.set(person.id, { person, index, bornAt, sets: none, children: [], unions: none });
   }
-  const ids = [...byId.keys()];
-  const index = (id: string): number => indexes.get(id) ?? -1;
+  const couples = readUnions(unions, entries);
 
-  const couples: Kin["couples"] = [];
-  const unionsOf = new Map<string, UnionOf[]>();
-  for (const union of unions) {
-    const [a, b] = union.partners;
-    if (!byId.has(a) || a === b || (b !== null && !byId.has(b))) continue;
-    const own = listOf(unionsOf, a);
-    if (b === null) {
-      own.push({ union, other: null });
-      continue;
-    }
-    if (own.some(({ other }) => other === b)) continue;
-    own.push({ union, other: b });
-    listOf(unionsOf, b).push({ union, other: a });
-    couples.push({ union, a, b });
-  }
-  const areCouple = (a: string, b: string): boolean =>
-    unionsOf.get(a)?.some(({ other }) => other === b) === true;
-
-  const setsOf = new Map<string, ParentSet[]>();
-  const childrenOf = new Map<string, Child[]>();
-  for (const { id, parents } of byId.values()) {
+  // In the order of birth, so that the children of every parent come in it too.
+  const born = [...entries.values()].sort((a, b) =>
+    a.bornAt === b.bornAt ? 0 : a.bornAt - b.bornAt,
+  );
+  for (const entry of born) {
+    const { id, parents } = entry.person;
     if (parents.length === 0) continue;
-    const sets = groupParents(
-      id,
-      parents.filter(({ parent }) => parent === null || (parent !== id && byId.has(parent))),
-      areCouple,
-    );
-    setsOf.set(id, sets);
-    for (const set of sets) {
-      for (const parent of set.known) listOf(childrenOf, parent).push({ child: id, set });
+    const isThere = ({ parent }: TreeParentage): boolean =>
+      parent === null || (parent !== id && entries.has(parent));
+    const there = parents.every(isThere) ? parents : parents.filter(isThere);
+    entry.sets = groupParents(id, there, (a, b) => isCouple(entries.get(a), b));
+    for (const set of entry.sets) {
+      const child = { child: id, set };
+      for (const parent of set.known) entries.get(parent)?.children.push(child);
     }
   }
+  for (const entry of entries.values()) if (entry.unions.length > 1) sortUnions(entry, entries);
 
-  const bornAt = (id: string): number => byId.get(id)?.birth?.sort ?? Infinity;
-  const byBirth = (a: string, b: string): number => {
-    const [first, second] = [bornAt(a), bornAt(b)];
-    return first === second ? index(a) - index(b) : first - second;
-  };
-  for (const children of childrenOf.values()) children.sort((a, b) => byBirth(a.child, b.child));
-  // An undated union began before its first child was born.
-  const beganAt = (person: string, { union, other }: UnionOf): number =>
-    union.began ??
-    Math.min(
-      ...(childrenOf.get(person) ?? [])
-        .filter(({ set }) => other !== null && set.known.includes(other))
-        .map(({ child }) => bornAt(child)),
-      Infinity,
-    );
-  for (const [person, own] of unionsOf) {
-    if (own.length < 2) continue;
-    const times = new Map(own.map((one) => [one, beganAt(person, one)]));
-    const timeOf = (one: UnionOf): number => times.get(one) ?? Infinity;
-    own.sort((a, b) => (timeOf(a) === timeOf(b) ? 0 : timeOf(a) - timeOf(b)));
-  }
-
-  const none: never[] = [];
   return {
-    ids,
+    ids: [...entries.keys()],
     couples,
-    index,
-    byBirth,
-    person: (id) => byId.get(id),
-    sets: (child) => setsOf.get(child) ?? none,
-    children: (parent) => childrenOf.get(parent) ?? none,
-    unions: (person) => unionsOf.get(person) ?? none,
+    person: (id) => entries.get(id)?.person,
+    index: (id) => entries.get(id)?.index ?? -1,
+    byBirth: (a, b) => {
+      const [first, second] = [entries.get(a), entries.get(b)];
+      if (first === undefined || second === undefined) return 0;
+      return first.bornAt === second.bornAt
+        ? first.index - second.index
+        : first.bornAt - second.bornAt;
+    },
+    sets: (child) => entries.get(child)?.sets ?? none,
+    children: (parent) => entries.get(parent)?.children ?? none,
+    unions: (person) => entries.get(person)?.unions ?? none,
     lineOf: (person) => {
       const line = new Set<string>();
-      const queue = person !== null && byId.has(person) ? [person] : [];
+      const queue = person !== null && entries.has(person) ? [person] : [];
       for (let next = queue.pop(); next !== undefined; next = queue.pop()) {
         if (line.has(next)) continue;
         line.add(next);
-        for (const set of setsOf.get(next) ?? none) if (isOfLine(set)) queue.push(...set.known);
+        for (const set of entries.get(next)?.sets ?? none) {
+          if (isOfLine(set)) queue.push(...set.known);
+        }
       }
       return line;
     },
   };
+}
+
+const isCouple = (entry: Entry | undefined, partner: string): boolean =>
+  entry?.unions.some(({ other }) => other === partner) === true;
+
+/** Every couple once; a union with somebody who is not there is left out. */
+function readUnions(unions: TreeUnion[], entries: Map<string, Entry>): Kin["couples"] {
+  const couples: Kin["couples"] = [];
+  const add = (entry: Entry, union: UnionOf): void => {
+    if (entry.unions === none) entry.unions = [];
+    entry.unions.push(union);
+  };
+  for (const union of unions) {
+    const [a, b] = union.partners;
+    const first = entries.get(a);
+    if (first === undefined || a === b) continue;
+    if (b === null) {
+      add(first, { union, other: null });
+      continue;
+    }
+    const second = entries.get(b);
+    if (second === undefined || isCouple(first, b)) continue;
+    add(first, { union, other: b });
+    add(second, { union, other: a });
+    couples.push({ union, a, b });
+  }
+  return couples;
+}
+
+/** In the order of time. An undated union began before its first child was born. */
+function sortUnions({ unions, children }: Entry, entries: Map<string, Entry>): void {
+  const beganAt = ({ union, other }: UnionOf): number => {
+    if (union.began !== null) return union.began;
+    const first = children.find(({ set }) => other !== null && set.known.includes(other));
+    return entries.get(first?.child ?? "")?.bornAt ?? Infinity;
+  };
+  const times = new Map(unions.map((union) => [union, beganAt(union)]));
+  unions.sort((a, b) => {
+    const [first, second] = [times.get(a) ?? Infinity, times.get(b) ?? Infinity];
+    return first === second ? 0 : first - second;
+  });
 }
 
 export const isOfLine = ({ main, kind }: Pick<ParentSet, "main" | "kind">): boolean =>
@@ -157,6 +179,18 @@ function groupParents(
   parentages: TreeParentage[],
   areCouple: (a: string, b: string) => boolean,
 ): ParentSet[] {
+  const [first, second] = parentages;
+  if (first === undefined) return [];
+  // Most people have a father and a mother and nothing more to tell.
+  const isPlain =
+    parentages.length === 1 ||
+    (parentages.length === 2 &&
+      first.main &&
+      second?.main === true &&
+      first.kind === second.kind &&
+      (first.parent !== second.parent || first.parent === null));
+  if (isPlain) return [setOf(child, parentages)];
+
   const rank = ({ main, kind }: TreeParentage): number =>
     (main ? 0 : kindOrder.length) + kindOrder.indexOf(kind);
   const groups = new Map<number, TreeParentage[]>();
@@ -178,13 +212,14 @@ function groupParents(
       // Two main parents belong together even when nobody wrote down a union of theirs.
       const at = partner < 0 && main && group.length === 2 ? 0 : partner;
       const second = at < 0 ? undefined : rest.splice(at, 1)[0];
-      sets.push(setOf(child, second === undefined ? [first] : [first, second], first));
+      sets.push(setOf(child, second === undefined ? [first] : [first, second]));
     }
     return sets;
   });
 }
 
-function setOf(child: string, parentages: TreeParentage[], first: TreeParentage): ParentSet {
+function setOf(child: string, parentages: TreeParentage[]): ParentSet {
+  const first = parentages[0] as TreeParentage;
   const known: string[] = [];
   const unknown: string[] = [];
   let { certainty } = first;
@@ -195,8 +230,15 @@ function setOf(child: string, parentages: TreeParentage[], first: TreeParentage)
       certainty = parentage.certainty;
     }
   }
-  const members = parentages.map(({ parent, id }) => ({ parent, parentage: id }));
-  return { child, known, unknown, members, kind: first.kind, main: first.main, certainty };
+  return {
+    child,
+    known,
+    unknown,
+    members: parentages,
+    kind: first.kind,
+    main: first.main,
+    certainty,
+  };
 }
 
 export function listOf<K, V>(map: Map<K, V[]>, key: K): V[] {
