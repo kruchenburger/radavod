@@ -48,3 +48,7 @@ it.each(["/", "/people", "/apix", "/health/more", "//api/people"])(
     expect((await exports.default.fetch(`https://x${path}`)).status).toBe(404);
   },
 );
+
+it("denies API requests before any other route can answer", () => {
+  expect(app.routes[0]).toMatchObject({ method: "ALL", path: "/api/*" });
+});

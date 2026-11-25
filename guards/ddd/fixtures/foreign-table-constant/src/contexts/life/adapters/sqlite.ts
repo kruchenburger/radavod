@@ -1,2 +1,2 @@
 const TABLE = "kinship_person";
-export const select = `SELECT * FROM ${TABLE}`;
+export const select = (verb: string) => `${verb} ${TABLE}`;

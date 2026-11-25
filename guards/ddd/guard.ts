@@ -6,7 +6,7 @@ import { cruise, type ICruiseResult } from "dependency-cruiser";
 import { parse } from "./ast.ts";
 import contexts from "./contexts.json" with { type: "json" };
 import { checkImports } from "./imports.ts";
-import { checkTables } from "./tables.ts";
+import { checkTables, createdTables } from "./tables.ts";
 
 export type Violation = { rule: string; from: string; to: string };
 export type Report = { modules: number; edges: number; violations: Violation[] };
@@ -49,12 +49,13 @@ export async function check(root: string): Promise<Report> {
     from,
     to,
   }));
+  const tables = new Set([...asts.values()].flatMap(createdTables));
   let edges = 0;
   for (const [file, ast] of asts) {
     const dependencies = scanned.get(file) ?? [];
     edges += dependencies.length;
     violations.push(...checkImports(file, ast, new Set(dependencies.map(({ module }) => module))));
-    if (file.startsWith("src/")) violations.push(...checkTables(file, ast));
+    if (file.startsWith("src/")) violations.push(...checkTables(file, ast, tables));
     if (!homes.test(file)) violations.push({ rule: "every-module-has-a-home", from: file, to: "" });
   }
   // SQL in a file of its own would escape the table check.

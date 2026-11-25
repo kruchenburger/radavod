@@ -1,0 +1,1 @@
+CREATE TABLE person (id TEXT PRIMARY KEY);

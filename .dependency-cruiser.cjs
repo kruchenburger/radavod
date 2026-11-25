@@ -47,10 +47,22 @@ module.exports = {
       { pathNot: "^src/kernel/" },
     ),
     rule(
+      "index-is-for-outsiders",
+      "Inside a context, import the file itself: index.ts also leads to the adapters.",
+      { path: "^src/contexts/([^/]+)/" },
+      { path: "^src/contexts/$1/index.ts$" },
+    ),
+    rule(
       "inner-knows-no-outer",
-      "Contexts and shared schemas do not know who calls them.",
-      { path: "^src/(?:contexts|shared)/" },
+      "Contexts do not know who calls them.",
+      { path: "^src/contexts/" },
       { path: "^src/(?:scenarios|worker)/" },
+    ),
+    rule(
+      "inner-knows-no-outer",
+      "Contexts may import shared schemas, so shared schemas may not lead to another context.",
+      { path: "^src/shared/" },
+      { path: "^src/(?:contexts|scenarios|worker)/" },
     ),
     rule(
       "inner-knows-no-outer",
@@ -75,6 +87,16 @@ module.exports = {
       "Adapters never end up in the browser bundle, not even through index.ts.",
       { path: "^web/" },
       { path: "^src/contexts/[^/]+/adapters/", reachable: true },
+    ),
+    rule(
+      "stays-in-src-and-web",
+      "No rule judges a module outside src and web, so nothing there may be imported.",
+      { path: "^(?:src|web)/" },
+      {
+        pathNot: ["^(?:src|web)/", "(?:^|/)node_modules/"],
+        dependencyTypesNot: ["core"],
+        couldNotResolve: false,
+      },
     ),
     rule(
       "every-import-resolves",

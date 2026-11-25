@@ -25,7 +25,7 @@ pnpm guard:ddd
 
 Seven bounded contexts in `src/contexts`. `.agents/skills/ddd-steward/SKILL.md` says what each one owns, which may import which, and how to write the DDD verdict. Read it before you change `src/` or `web/`.
 
-`pnpm guard:ddd` fails on a forbidden import, an import it cannot see, a module outside its place, a table without an owner, and a scan that missed a file. There are no exceptions. `guards/ddd/fixtures` holds one violation per folder; do not fix them.
+`pnpm guard:ddd` fails on a forbidden import, an import dependency-cruiser cannot see, a module outside its place, a table without an owner, and a scan that missed a file. There are no exceptions. `guards/ddd/fixtures` holds one case per folder, most of them broken on purpose; do not fix them.
 
 dependency-cruiser parses with swc, because TypeScript 7 has no compiler API.
 

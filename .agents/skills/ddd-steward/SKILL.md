@@ -31,9 +31,10 @@ src/contexts/<name>/
   domain/                  rules; imports its own files and src/kernel only
   application/             use cases and ports; knows no adapters
   adapters/                SQLite, HTTP
-  index.ts                 the only file importable from outside
+  index.ts                 the only file importable from outside, never from inside
 src/scenarios/             use cases that span contexts, through their index.ts
-src/shared/                request and response schemas used by the Worker and the browser
+src/shared/                request and response schemas used by the Worker and the browser;
+                           imports no context
 src/worker/                Worker entry, routes, the two Durable Objects
 web/                       the browser app; never reaches adapters
 test/                      tests, outside src, so the guard needs no exceptions

@@ -36,6 +36,13 @@ const bad: [fixture: string, rule: string][] = [
   ["web-imports-worker", "web-knows-no-server"],
   ["server-imports-web", "server-knows-no-web"],
   ["unresolved-import", "every-import-resolves"],
+  ["outside-module", "stays-in-src-and-web"],
+  ["outside-sql", "stays-in-src-and-web"],
+  ["outside-web", "stays-in-src-and-web"],
+  ["shared-imports-context", "inner-knows-no-outer"],
+  ["own-index", "index-is-for-outsiders"],
+  ["deep-import-url", "every-import-is-seen"],
+  ["deep-import-glob-cast", "every-import-is-seen"],
   ["no-home", "every-module-has-a-home"],
   ["no-home-context", "every-module-has-a-home"],
   ["no-home-folder", "every-module-has-a-home"],
@@ -59,7 +66,7 @@ it.each(bad)("rejects %s", async (fixture, rule) => {
 it("accepts the clean fixture", async () => {
   const { modules, violations } = await runGuard("clean");
   expect(violations).toEqual([]);
-  expect(modules).toBe(18);
+  expect(modules).toBe(19);
 });
 
 it.each(["empty", "no-such-fixture"])("fails when nothing was scanned: %s", async (fixture) => {

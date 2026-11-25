@@ -5,7 +5,7 @@ import { expect, it } from "vitest";
 const cli = fileURLToPath(new URL("cli.ts", import.meta.url));
 
 it.each([
-  ["clean", 0, "18 modules"],
+  ["clean", 0, "19 modules"],
   ["deep-import", 1, "only-index-is-public: src/contexts/life/application/events.ts"],
   ["empty", 1, "no modules scanned"],
 ])("turns the result for %s into exit code %i", (fixture, code, output) => {
