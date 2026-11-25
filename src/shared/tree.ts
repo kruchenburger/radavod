@@ -1,4 +1,5 @@
 import { z } from "zod";
+import { certaintySchema, languageSchema, nameKindSchema, scriptSchema } from "./values";
 
 /**
  * The tree as the browser gets it: what the drawing and the search need. Citations, the journal and
@@ -8,20 +9,10 @@ import { z } from "zod";
 const id = z.string().min(1);
 const text = z.object({ ru: z.string(), en: z.string() });
 
-const language = z.enum(["ru", "be", "pl", "lt", "yi", "la", "en", "other"]);
-
-export const certaintySchema = z.enum([
-  "hypothesis",
-  "one-source",
-  "confirmed",
-  "contradiction",
-  "unresolved",
-]);
-
 const nameFormSchema = z.object({
-  kind: z.enum(["birth", "married", "church", "nickname", "variant"]),
-  language,
-  script: z.enum(["Cyrl", "Latn", "Hebr", "other"]),
+  kind: nameKindSchema,
+  language: languageSchema,
+  script: scriptSchema,
   given: z.string().nullable(),
   patronymic: z.string().nullable(),
   surname: z.string().nullable(),
@@ -92,7 +83,7 @@ const branchSchema = z.object({
 
 const placeSchema = z.object({
   id,
-  names: z.array(z.object({ text: z.string(), language })),
+  names: z.array(z.object({ text: z.string(), language: languageSchema })),
 });
 
 export const treeSnapshotSchema = z.object({

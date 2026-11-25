@@ -1,4 +1,5 @@
 /** People, names, parentage, unions and branches. */
+export { kinshipTables, sqliteKinship } from "./adapters/sqlite-kinship";
 export {
   type Kinship,
   type KinshipCommand,

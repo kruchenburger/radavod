@@ -42,6 +42,12 @@ dependency-cruiser parses with swc, because TypeScript 7 has no compiler API.
 
 `src/kernel` holds the values every context means the same thing by. It imports nothing and knows no clock and no locale. `parseFuzzyDate` reads a whole text or nothing and says above itself what it does not read: a new way to write a date is a line in `test/kernel/fuzzy-date.test.ts`, with the texts it must not read. `foldName` compares names by the table above it: a new letter comes with a pair that must meet and a pair that must not.
 
+## Storage
+
+A scenario runs in `unitOfWork.run` (`src/scenarios/unit-of-work.ts`): one transaction, one journal entry, each row written once at the end. The version of an aggregate is the number of the entry that changed it last, so it never comes back. Fields that follow from other aggregates (`children`, `unions`, `takesPart`) make no version and no patch; who is in a branch lies with the branch.
+
+Each context has its tables and its adapter, which parses every row by a strict schema, `src/shared/rows.ts` reads and writes the rows, and `src/shared/values.ts` has the schemas of the kernel. A change of the tables is a new step in `src/worker/schema.ts`; a step that is out is never edited, and `test/storage/schema-1.ts` is frozen. `test/budgets.test.ts` counts rows over 5 000 invented people.
+
 ## Texts
 
 Every text a person reads is in `web/i18n/ru.ts` and `web/i18n/en.ts`, reached through `t`. Words come from `docs/glossary.md`, wording from `.agents/skills/copy-steward/SKILL.md`. Read both before you add or change a text. Errors and API answers carry codes, not sentences.

@@ -33,8 +33,9 @@ src/contexts/<name>/
   adapters/                SQLite, HTTP
   index.ts                 the only file importable from outside, never from inside
 src/scenarios/             use cases that span contexts, through their index.ts
-src/shared/                request and response schemas used by the Worker and the browser;
-                           imports no context
+src/shared/                request and response schemas used by the Worker and the browser, the
+                           schemas of the kernel, and rows as adapters keep them; imports no
+                           context
 src/worker/                Worker entry, routes, the two Durable Objects
 web/                       the browser app; never reaches adapters
 test/                      tests, outside src, so the guard needs no exceptions

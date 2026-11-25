@@ -15,5 +15,6 @@ The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), and
 - Dates as families, archives and GEDCOM write them, in Russian, Belarusian, Polish and English, and names compared across spellings. The search uses the names, no screen the dates yet.
 - The rules of kinship: parents, unions, branches and the order of children. No screen uses them yet.
 - Places with names and affiliations by period, sources and citations, events with versions of a birth and a death, and warnings about odd dates. No screen uses them yet.
+- The database of the tree: every edit in one transaction with one entry of the journal, and steps that bring an older database up to date.
 - Guards for the architecture, the texts, licenses and a real family's data. The last one reads every commit of a pull request and, with the hook turned on, every commit before a push.
 - Checks on every pull request: browser tests, accessibility, secrets and known vulnerabilities.

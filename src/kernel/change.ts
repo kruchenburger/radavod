@@ -17,7 +17,7 @@ export function writes<Kind extends string, Id, Value>(
 }
 
 /** Aggregates are plain data. The order of its keys says nothing. */
-function differ(a: unknown, b: unknown): boolean {
+export function differ(a: unknown, b: unknown): boolean {
   return JSON.stringify(a, inOrder) !== JSON.stringify(b, inOrder);
 }
 

@@ -1,8 +1,7 @@
 {
   "extends": "./tsconfig.json",
   "compilerOptions": {
-    "types": ["node"],
-    "allowImportingTsExtensions": true
+    "types": ["node"]
   },
   "include": ["guards", "examples", "test/e2e", "*.config.ts"],
   "exclude": ["guards/*/fixtures"]
