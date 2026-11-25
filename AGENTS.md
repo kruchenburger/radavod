@@ -22,7 +22,11 @@ pnpm guard:ddd
 pnpm guard:data
 pnpm examples                          # writes examples/family.json
 pnpm guard:copy
+pnpm guard:licenses
+pnpm format
 pnpm build                             # the browser app, into dist/client
+pnpm test:e2e                          # the built app in a browser, over local workerd
+git config core.hooksPath .githooks    # checks every commit before a push
 ```
 
 ## Architecture
@@ -49,9 +53,15 @@ Every text a person reads is in `web/i18n/ru.ts` and `web/i18n/en.ts`, reached t
 
 ## Data guard
 
-`pnpm guard:data` reads every tracked or staged file and fails on GEDCOM (by name or content), the backup marker in quotes, SQLite and archives, whatever the file is called. It fails when it scans nothing or cannot read a file, so submodules and Git LFS do not work here. A file in `examples/` must be listed in `guards/data/examples.json`, with the rules it may break.
+`pnpm guard:data` reads every tracked or staged file, with `--commits <range>` every file of every commit, and fails on GEDCOM (by name or content), the backup marker in quotes, SQLite and archives, whatever the file is called. It fails when it scans nothing or cannot read a file, so submodules and Git LFS do not work here. A file in `examples/` must be listed in `guards/data/examples.json`, with the rules it may break.
 
 The guard has no other exception. Its broken examples are built by `guards/data/fixtures.ts` in temporary repositories and are never files here. Code that needs the backup marker spells it in backticks; code, tests and docs that need GEDCOM build it from separate levels and tags, as the fixtures do, or keep it in a listed example. What the guard cannot see is listed above `check` in `guards/data/guard.ts`.
+
+## CI
+
+`check` in `.github/workflows/ci.yml` is the job to require on `main`: it passes only if every other job ran and passed. `guards/ci` keeps it so, and refuses an unpinned action, a write permission it does not list, a secret and an expression inside `run`.
+
+`.githooks/pre-push` runs `guards/push`: the data guard and gitleaks over the commits about to leave the machine.
 
 ## Settings
 
@@ -69,7 +79,7 @@ Local workerd has no jurisdictions, so tests run with `none`.
 - English in code, comments, commits and the changelog.
 - Test first. Tests live in `test/`, guard and example tests next to what they test.
 - A real family's data never enters the repository. Examples use invented people.
-- Dependencies that ship must be MIT, ISC, BSD or Apache-2.0. Fonts, and only fonts, may also be OFL-1.1; the build puts their licence texts into `dist/client/licences`. Development tools may bring other licenses, for example lightningcss (MPL-2.0) and sharp's libvips (LGPL-3.0).
+- Dependencies that ship must be MIT, ISC, BSD, Apache-2.0, 0BSD or CC0-1.0. Fonts, and only fonts, may also be OFL-1.1; the build puts their license texts into `dist/client/licences`. A development tool under another license is listed in `guards/licenses/exceptions.ts`. `src` and `web` import no development dependency.
 - pnpm runs no install script of a dependency (`pnpm-workspace.yaml`).
-- Workflows pin actions by full commit SHA, read only, and use no secrets on pull requests.
+- Workflows pin actions by full commit SHA, read only, and use no secrets.
 - Conventional Commits with the work item, as in `feat: add unions (RAD-12)`.

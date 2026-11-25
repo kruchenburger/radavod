@@ -21,8 +21,10 @@
     "zod": "^4.6.7"
   },
   "devDependencies": {
+    "@axe-core/playwright": "^4.14.1",
     "@cloudflare/vitest-plugin": "^1.9.2",
     "@cloudflare/workers-types": "^5.20261124.1",
+    "@playwright/test": "^1.65.1",
     "@swc/core": "^1.16.22",
     "@testing-library/dom": "^10.4.2",
     "@testing-library/react": "^16.3.3",
@@ -34,18 +36,26 @@
     "jsdom": "^31.0.1",
     "oxc-parser": "^0.160.0",
     "oxlint": "^1.95.0",
+    "prettier": "^3.10.1",
     "typescript": "7.0.2",
     "vite": "^8.3.8",
-    "vitest": "4.1.12"
+    "vitest": "4.1.12",
+    "wrangler": "^4.168.0",
+    "yaml": "^2.9.1"
   },
   "scripts": {
     "build": "vite build",
     "test": "vitest run",
+    "test:e2e": "playwright test",
     "lint": "oxlint",
+    "format": "prettier --write .",
+    "format:check": "prettier --check .",
     "typecheck": "tsc --noEmit && tsc --noEmit -p tsconfig.node.json && tsc --noEmit -p tsconfig.web.json",
     "guard:ddd": "node guards/ddd/cli.ts",
     "guard:copy": "node guards/copy/cli.ts",
     "guard:data": "node guards/data/cli.ts",
+    "guard:secrets": "node guards/push/cli.ts --secrets",
+    "guard:licenses": "node guards/licenses/cli.ts",
     "examples": "node examples/write.ts"
   }
 }

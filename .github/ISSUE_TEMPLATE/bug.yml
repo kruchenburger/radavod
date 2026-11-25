@@ -1,0 +1,42 @@
+name: Bug
+description: Something works differently than it should
+labels: [bug]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        This page is public. Describe the bug with invented people, including in screenshots, logs and files.
+  - type: textarea
+    id: steps
+    attributes:
+      label: What did you do?
+      placeholder: |
+        1. Open the page of a person
+        2. Add a second birth date
+    validations:
+      required: true
+  - type: textarea
+    id: result
+    attributes:
+      label: What did you expect, and what happened instead?
+    validations:
+      required: true
+  - type: input
+    id: version
+    attributes:
+      label: Version
+      description: The start page shows it at the bottom.
+    validations:
+      required: true
+  - type: input
+    id: browser
+    attributes:
+      label: Browser and device
+      placeholder: Safari on an iPhone 12
+  - type: checkboxes
+    id: data
+    attributes:
+      label: Family data
+      options:
+        - label: Nothing here is about a real family, screenshots included.
+          required: true

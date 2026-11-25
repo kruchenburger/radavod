@@ -1,0 +1,3 @@
+#!/bin/sh
+# Turned on with: git config core.hooksPath .githooks
+exec node "$(dirname "$0")/../guards/push/cli.ts" "$@"
