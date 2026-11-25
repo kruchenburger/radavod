@@ -10,23 +10,39 @@
     "node": ">=26"
   },
   "dependencies": {
-    "hono": "^4.13.21"
+    "@fontsource-variable/roboto-slab": "^5.3.0",
+    "@mantine/core": "^9.8.2",
+    "@mantine/hooks": "^9.8.2",
+    "@tanstack/react-query": "^5.108.4",
+    "hono": "^4.13.21",
+    "react": "^19.3.1",
+    "react-dom": "^19.3.1",
+    "zod": "^4.6.7"
   },
   "devDependencies": {
     "@cloudflare/vitest-plugin": "^1.9.2",
     "@cloudflare/workers-types": "^5.20261124.1",
     "@swc/core": "^1.16.22",
+    "@testing-library/dom": "^10.4.2",
+    "@testing-library/react": "^16.3.3",
     "@types/node": "^26.6.6",
+    "@types/react": "^19.3.0",
+    "@types/react-dom": "^19.3.0",
+    "@vitejs/plugin-react": "^6.3.0",
     "dependency-cruiser": "^18.9.0",
+    "jsdom": "^31.0.1",
+    "oxc-parser": "^0.160.0",
     "oxlint": "^1.95.0",
     "typescript": "7.0.2",
     "vite": "^8.3.8",
     "vitest": "4.1.12"
   },
   "scripts": {
+    "build": "vite build",
     "test": "vitest run",
     "lint": "oxlint",
-    "typecheck": "tsc --noEmit && tsc --noEmit -p tsconfig.node.json",
-    "guard:ddd": "node guards/ddd/cli.ts"
+    "typecheck": "tsc --noEmit && tsc --noEmit -p tsconfig.node.json && tsc --noEmit -p tsconfig.web.json",
+    "guard:ddd": "node guards/ddd/cli.ts",
+    "guard:copy": "node guards/copy/cli.ts"
   }
 }
