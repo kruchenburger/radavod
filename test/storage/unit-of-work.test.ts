@@ -347,6 +347,7 @@ describe("a version", () => {
         "",
         `person/${union("u")}`,
         `place/${person("ada")}`,
+        `life/${union("u")}`,
         `cited/${place("town")}`,
         `union-branch/${person("ada")}`,
       ]) {
