@@ -43,6 +43,20 @@ export function editBranch(
   return { ok: true, value: draft.change() };
 }
 
+/** Removes a branch, and its people and unions are in none. */
+export function removeBranch(g: FamilyGraph, id: BranchId): Result<Change, Missing> {
+  if (g.branch(id) === null) return missing(id);
+  const draft = new Draft(g);
+  const { people, unions } = g.membersOf(id);
+  for (const person of people) draft.editPerson(person, () => ({ branch: null }));
+  for (const member of unions) {
+    const union = g.union(member);
+    if (union !== null) draft.putUnion({ ...union, branch: null });
+  }
+  draft.removeBranch(id);
+  return { ok: true, value: draft.change() };
+}
+
 /**
  * The person gets the branch whatever they had. A descendant who has another one keeps it unless told
  * to overwrite, and those below belong with them.

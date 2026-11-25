@@ -170,7 +170,8 @@ describe("a cycle", () => {
       certainty: "hypothesis",
     });
     family.add("seed");
-    const like = family.get("seed");
+    const like = store.people.get(person("seed"));
+    if (like === undefined) throw new Error("no seed");
     for (let i = 0; i < generations; i++) {
       const up = i + 1 < generations;
       const parents = up ? [link("f", `m${i + 1}`), link("s", `w${i + 1}`)] : [];
@@ -470,9 +471,9 @@ describe("a branch", () => {
   };
   const branches = (family: Family) =>
     Object.fromEntries(
-      [...family.store.people.values()].map(({ id, branch: b }) => [
+      [...family.store.people.keys()].map((id) => [
         id.slice("person_".length),
-        b?.slice("branch_".length) ?? null,
+        family.store.branchOf.get(id)?.slice("branch_".length) ?? null,
       ]),
     );
 
@@ -570,6 +571,42 @@ describe("a branch", () => {
     const family = line();
     expect(assign(family, "top", "none", true)).toEqual(refused("missing", { id: branch("none") }));
     expect(assign(family, "x", "green", true)).toEqual(refused("missing", { id: person("x") }));
+  });
+
+  it("is removed from its people and unions, and nothing else is written", () => {
+    const family = line();
+    family.withUnion("couple", "son", "unknown");
+    family.do({ do: "edit-union", id: union("couple"), patch: { branch: branch("green") } });
+    assign(family, "top", "green", true);
+    assign(family, "ward", "red", false);
+    const result = family.apply({ do: "remove-branch", id: branch("green") });
+    expect(result.ok && result.value.map(({ kind, id }) => [kind, id])).toEqual([
+      ["person-branch", person("top")],
+      ["person-branch", person("son")],
+      ["person-branch", person("daughter")],
+      ["person-branch", person("grandson")],
+      ["union-branch", union("couple")],
+      ["branch", branch("green")],
+    ]);
+    expect(family.kinship.branch(branch("green"))).toBeNull();
+    expect(family.kinship.union(union("couple"))?.branch).toBeNull();
+    expect(branches(family)).toMatchObject({ top: null, son: null, ward: "red" });
+    expect(family.apply({ do: "remove-branch", id: branch("green") })).toEqual(
+      refused("missing", { id: branch("green") }),
+    );
+  });
+
+  it("is given to a union without a write of the union", () => {
+    const family = line();
+    family.withUnion("couple", "son", "unknown");
+    const change = family.do({
+      do: "edit-union",
+      id: union("couple"),
+      patch: { branch: branch("red") },
+    });
+    expect(change).toEqual([
+      { kind: "union-branch", id: union("couple"), before: null, after: branch("red") },
+    ]);
   });
 
   it("is added, changed and not added twice", () => {

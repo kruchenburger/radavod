@@ -1,6 +1,7 @@
 import fc from "fast-check";
 import { expect, it } from "vitest";
 import type { Change, KinshipCommand, Parentage } from "../../src/contexts/kinship";
+import type { PersonId, UnionId } from "../../src/kernel/id";
 import { branch, Family, type MemoryKinship, person, union } from "./memory-kinship";
 
 const people = ["a", "b", "c", "d", "e"];
@@ -88,6 +89,15 @@ const command: fc.Arbitrary<KinshipCommand> = fc.oneof(
     patch: fc.record({ partners, branch: maybe(branchId), certainty }, { requiredKeys: [] }),
   }),
   fc.record({ do: fc.constant("remove-union" as const), id: unionId }),
+  fc.record({ do: fc.constant("remove-branch" as const), id: branchId }),
+  fc.record({
+    do: fc.constant("add-branch" as const),
+    branch: fc.record({
+      id: branchId,
+      title: fc.constant({ ru: "", en: "" }),
+      color: fc.constant(0 as const),
+    }),
+  }),
   fc.record({
     do: fc.constant("assign-branch" as const),
     person: anyone,
@@ -115,7 +125,10 @@ const command: fc.Arbitrary<KinshipCommand> = fc.oneof(
 const commands = fc.array(command, { minLength: 20, maxLength: 80, size: "max" });
 
 /** What is wrong with a family, found without the code under test. */
-function problems({ people: all, unions, branches }: MemoryKinship): string[] {
+function problems({ people, unions: records, branches, branchOf }: MemoryKinship): string[] {
+  const branchIn = (id: PersonId | UnionId) => branchOf.get(id) ?? null;
+  const all = new Map([...people].map(([id, one]) => [id, { ...one, branch: branchIn(id) }]));
+  const unions = new Map([...records].map(([id, one]) => [id, { ...one, branch: branchIn(id) }]));
   const found: string[] = [];
   const has = (where: ReadonlyMap<string, unknown>, id: string | null, from: string) => {
     if (id !== null && id !== "unknown" && !where.has(id)) found.push(`${from} names ${id}`);
@@ -149,6 +162,11 @@ function problems({ people: all, unions, branches }: MemoryKinship): string[] {
     if (two[0] === two[1]) found.push(`${id} of one person`);
     for (const partner of two) has(all, partner, id);
     has(branches, own, id);
+  }
+  for (const [member, own] of branchOf) {
+    if (!people.has(member as PersonId) && !records.has(member as UnionId)) {
+      found.push(`${member} is gone and in ${own}`);
+    }
   }
   // Whoever has no parents left is taken away, until nobody is left: else there is a circle.
   const left = new Map(
@@ -204,6 +222,7 @@ it("a family stays possible after any commands", { timeout: 30_000 }, () => {
   // The commands are not refused out of hand, and each refusal is met.
   expect([...seen].sort()).toEqual(
     [
+      "add-branch",
       "add-parent",
       "add-person",
       "add-union",
@@ -218,6 +237,7 @@ it("a family stays possible after any commands", { timeout: 30_000 }, () => {
       "not-a-partner",
       "order-children",
       "put-name",
+      "remove-branch",
       "remove-name",
       "remove-parent",
       "remove-union",

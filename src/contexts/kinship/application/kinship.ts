@@ -9,6 +9,7 @@ import {
   type BranchPatch,
   editBranch,
   type NewBranch,
+  removeBranch,
 } from "../domain/branch";
 import type { Change, FamilyGraph } from "../domain/family-graph";
 import {
@@ -56,6 +57,7 @@ export type KinshipCommand =
   | { do: "remove-union"; id: UnionId }
   | { do: "add-branch"; branch: NewBranch }
   | { do: "edit-branch"; id: BranchId; patch: BranchPatch }
+  | { do: "remove-branch"; id: BranchId }
   | ({ do: "assign-branch" } & Assignment);
 
 export type KinshipError = ParentageError | UnionError | NotAChild;
@@ -112,6 +114,8 @@ function resultOf(g: FamilyGraph, command: KinshipCommand): Result<Change, Kinsh
       return addBranch(g, command.branch);
     case "edit-branch":
       return editBranch(g, command.id, command.patch);
+    case "remove-branch":
+      return removeBranch(g, command.id);
     case "assign-branch":
       return assignBranch(g, command);
   }

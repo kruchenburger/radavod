@@ -5,17 +5,21 @@ import {
   type KinshipCommand,
   type KinshipStore,
   kinshipOver,
+  type Members,
   type Parentage,
   type Person,
+  type PersonRecord,
   type Union,
+  type UnionRecord,
 } from "../../src/contexts/kinship";
 import type { BranchId, PersonId, UnionId } from "../../src/kernel/id";
 
 /** A store that holds copies, as a database does: nobody can change what it holds but by `save`. */
 export class MemoryKinship implements KinshipStore {
-  readonly people = new Map<PersonId, Person>();
-  readonly unions = new Map<UnionId, Union>();
+  readonly people = new Map<PersonId, PersonRecord>();
+  readonly unions = new Map<UnionId, UnionRecord>();
   readonly branches = new Map<BranchId, Branch>();
+  readonly branchOf = new Map<PersonId | UnionId, BranchId>();
   /** Whose parents were asked for, and who was read. */
   asked: PersonId[] = [];
   read: PersonId[] = [];
@@ -23,11 +27,17 @@ export class MemoryKinship implements KinshipStore {
 
   person(id: PersonId): Person | null {
     this.read.push(id);
-    return structuredClone(this.people.get(id) ?? null);
+    const record = this.people.get(id);
+    return record === undefined
+      ? null
+      : structuredClone({ ...record, branch: this.branchOf.get(id) ?? null });
   }
 
   union(id: UnionId): Union | null {
-    return structuredClone(this.unions.get(id) ?? null);
+    const record = this.unions.get(id);
+    return record === undefined
+      ? null
+      : structuredClone({ ...record, branch: this.branchOf.get(id) ?? null });
   }
 
   branch(id: BranchId): Branch | null {
@@ -39,41 +49,42 @@ export class MemoryKinship implements KinshipStore {
     return structuredClone(this.people.get(id)?.parents ?? []);
   }
 
+  membersOf(id: BranchId): Members {
+    const of = <Id extends PersonId | UnionId>(ids: Iterable<Id>) =>
+      [...ids].filter((one) => this.branchOf.get(one) === id);
+    return { people: of(this.people.keys()), unions: of(this.unions.keys()) };
+  }
+
   save(change: Change): void {
     this.saves++;
     for (const write of structuredClone(change)) {
       switch (write.kind) {
-        case "person": {
-          const branch = this.people.get(write.id)?.branch ?? null;
-          if (write.after === null) this.people.delete(write.id);
-          else this.people.set(write.id, { ...write.after, branch });
+        case "person":
+          put(this.people, write.id, write.after);
           break;
-        }
-        case "person-branch": {
-          const person = this.people.get(write.id);
-          if (person === undefined) throw new Error(`no ${write.id}`);
-          person.branch = write.after;
-          break;
-        }
         case "union":
-          if (write.after === null) this.unions.delete(write.id);
-          else this.unions.set(write.id, write.after);
+          put(this.unions, write.id, write.after);
           break;
         case "branch":
-          if (write.after === null) this.branches.delete(write.id);
-          else this.branches.set(write.id, write.after);
+          put(this.branches, write.id, write.after);
+          break;
+        case "person-branch":
+        case "union-branch":
+          put(this.branchOf, write.id, write.after);
           break;
       }
     }
   }
 
   snapshot(): unknown {
-    return structuredClone({
-      people: this.people,
-      unions: this.unions,
-      branches: this.branches,
-    });
+    const { people, unions, branches, branchOf } = this;
+    return structuredClone({ people, unions, branches, branchOf });
   }
+}
+
+function put<Id, Value>(rows: Map<Id, Value>, id: Id, value: Value | null): void {
+  if (value === null) rows.delete(id);
+  else rows.set(id, value);
 }
 
 export const person = (name: string): PersonId => `person_${name}` as PersonId;

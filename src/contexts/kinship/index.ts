@@ -1,4 +1,5 @@
 /** People, names, parentage, unions and branches. */
+export { kinshipTables, sqliteKinship } from "./adapters/sqlite-kinship";
 export {
   type Kinship,
   type KinshipCommand,
@@ -7,7 +8,7 @@ export {
 } from "./application/kinship";
 export type { KinshipStore } from "./application/ports";
 export type { Assignment, Branch, BranchColor, BranchPatch, NewBranch } from "./domain/branch";
-export type { Change, PersonRecord } from "./domain/family-graph";
+export type { Change, Members, PersonRecord, UnionRecord } from "./domain/family-graph";
 export { descends, type ParentagePatch } from "./domain/parentage";
 export {
   type NewPerson,
