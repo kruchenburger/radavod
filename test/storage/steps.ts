@@ -3,11 +3,23 @@ import type { KinshipCommand } from "../../src/contexts/kinship";
 import type { LifeEvent } from "../../src/contexts/life";
 import { parseFuzzyDate } from "../../src/kernel/fuzzy-date";
 import type { Result } from "../../src/kernel/result";
+import { removePlace } from "../../src/scenarios/remove-place";
 import { restoreTo } from "../../src/scenarios/restore-to";
 import { restore, trash } from "../../src/scenarios/trash";
 import { undo } from "../../src/scenarios/undo";
 import type { Contexts } from "../../src/scenarios/unit-of-work";
-import { addBranch, anna, branch, event, form, parentage, person, type Tree, union } from "./tree";
+import {
+  addBranch,
+  anna,
+  branch,
+  event,
+  form,
+  parentage,
+  person,
+  place,
+  type Tree,
+  union,
+} from "./tree";
 
 /** Random steps over a few people, of every kind a tree knows, and what they leave behind. */
 
@@ -61,6 +73,17 @@ export const someStep = fc.oneof(
     ofUnion: fc.boolean(),
   }),
   fc.record({ do: fc.constant("forget" as const), who: anyone }),
+  fc.record({ do: fc.constant("place" as const), text: fc.constantFrom("Вильня", "Wilno") }),
+  fc.record({ do: fc.constant("unplace" as const) }),
+  fc.record({
+    do: fc.constant("born" as const),
+    who: anyone,
+    id: fc.constantFrom("b1", "b2"),
+    main: fc.boolean(),
+    there: fc.boolean(),
+  }),
+  fc.record({ do: fc.constant("colour" as const), color: fc.constantFrom(1 as const, 2 as const) }),
+  fc.record({ do: fc.constant("couple" as const) }),
   fc.record({ do: fc.constant("branch" as const), who: anyone }),
   fc.record({ do: fc.constant("trash" as const), who: anyone }),
   fc.record({ do: fc.constant("back" as const), who: anyone }),
@@ -149,6 +172,38 @@ export function take(tree: Tree, step: Step): boolean {
           overwrite: false,
         });
       }
+      case "place": {
+        const names = [{ text: step.text, language: "ru" as const, period: null }];
+        return c.places.get(place("town")) === null
+          ? c.places.add({ id: place("town"), names, affiliations: [], coordinates: null })
+          : c.places.edit(place("town"), { names });
+      }
+      case "unplace":
+        // Through the scenario: a place an event is at stays.
+        return removePlace(c, place("town"));
+      case "born": {
+        const told: LifeEvent = {
+          ...wedding({ id: event(`${step.id} ${step.who}`), kind: "birth" }),
+          participants: [{ person: person(step.who), role: "principal" }],
+          main: step.main,
+          place: step.there ? place("town") : null,
+        };
+        const known = c.life.event(person(step.who), told.id);
+        return known ? c.life.edit(person(step.who), told) : c.life.add(told);
+      }
+      case "colour":
+        return c.kinship.apply({
+          do: "edit-branch",
+          id: branch("green"),
+          patch: { color: step.color },
+        });
+      case "couple":
+        if (c.kinship.branch(branch("green")) === null) addBranch(c, "green");
+        return c.kinship.apply({
+          do: "edit-union",
+          id: union("u"),
+          patch: { branch: branch("green") },
+        });
       case "trash":
         return trash(c, person(step.who), { actor: anna, now: 5 });
       case "back":

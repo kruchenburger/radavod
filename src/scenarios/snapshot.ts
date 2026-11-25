@@ -1,6 +1,7 @@
 import { sqliteCheckpoints, sqliteSnapshots } from "../contexts/history";
 import type { EventId, PersonId } from "../kernel/id";
 import { snapshotOf, touchedBy } from "../shared/snapshot";
+import { erasing } from "./erase";
 import type { Changed, UnitOfWork } from "./unit-of-work";
 
 /** The snapshot of the last version as the browser gets it: packed, and not unpacked on the way. */
@@ -21,8 +22,9 @@ export interface TreeSnapshots {
   changesSince(version: number, epoch: string): Changes | "reload";
 }
 
-/** More than this many entries and the whole snapshot is the cheaper answer. */
+/** More than this many entries, or aggregates, and the whole snapshot is the cheaper answer. */
 const mostEntries = 500;
+const mostChanged = 1_000;
 
 export function snapshotsOf(
   storage: Pick<DurableObjectStorage, "sql" | "transactionSync">,
@@ -51,12 +53,20 @@ export function snapshotsOf(
       return { ...head, encoding: "gzip", body };
     }
   };
+  /** One making at a time for one version: those who open the tree meanwhile wait for it. */
+  let making: { version: number; epoch: string; packed: Promise<Packed> } | null = null;
   return {
     async snapshot() {
       const snapshot = kept.get();
       const head = headOf();
       if (snapshot === null || snapshot.version !== head.version || snapshot.epoch !== head.epoch) {
-        return rebuild();
+        if (making?.version !== head.version || making.epoch !== head.epoch) {
+          const packed = rebuild().finally(() => {
+            if (making?.packed === packed) making = null;
+          });
+          making = { ...head, packed };
+        }
+        return making.packed;
       }
       return {
         version: snapshot.version,
@@ -79,11 +89,12 @@ export function snapshotsOf(
         for (let number = version + 1; number <= last; number++) {
           const entry = c.history.entry(number);
           if (entry === null) continue;
-          if (entry.scenario === "erase") return "reload";
+          if (entry.scenario === erasing) return "reload";
           for (const aggregate of touchedBy(entry.patches, unionOf)) {
             latest.delete(aggregate);
             latest.set(aggregate, number);
           }
+          if (latest.size > mostChanged) return "reload";
         }
         const changed = [...latest].map(([aggregate, at]) => ({ aggregate, version: at }));
         return { version: last, changed };

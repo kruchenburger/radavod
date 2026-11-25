@@ -59,6 +59,14 @@ describe("the snapshot of a tree", () => {
       expect(again).toEqual(first);
     }));
 
+  it("is made once for those who open the tree while it is made", () =>
+    inTree(async (tree) => {
+      tree.do((c) => addPerson(c, "ada"));
+      const snapshots = snapshotsOf(tree.storage, tree.work);
+      const [first, second] = await Promise.all([snapshots.snapshot(), snapshots.snapshot()]);
+      expect(second).toBe(first);
+    }));
+
   it("is made again after an edit, and in another epoch", () =>
     inTree(async (tree) => {
       tree.do((c) => addPerson(c, "ada"));
@@ -183,6 +191,14 @@ describe("changes since a version", () => {
       const newId = () => event("new");
       await eraseForever(ledger, tree.work, { actor: anna, now: 5 }, person("eve"), newId);
       expect(since(tree, 2)).toBe("reload");
+    }));
+
+  it("ask for a reload when more changed than the snapshot weighs", () =>
+    inTree((tree) => {
+      tree.do((c) => {
+        for (let i = 0; i < 1_001; i++) addPerson(c, `p ${i}`);
+      });
+      expect(since(tree, 0)).toBe("reload");
     }));
 
   it(

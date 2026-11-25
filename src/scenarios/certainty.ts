@@ -1,6 +1,6 @@
 import type { EvidenceError } from "../contexts/evidence";
 import type { KinshipError, Parentage, Union } from "../contexts/kinship";
-import { eventOf, type LifeError, type LifeEvent } from "../contexts/life";
+import { eventOf, factOf, type LifeError, type LifeEvent } from "../contexts/life";
 import { type Certainty, needsCitation } from "../kernel/certainty";
 import { type FactRef, isId, type PersonId, type UnionId } from "../kernel/id";
 import type { NameForm } from "../kernel/name-form";
@@ -73,6 +73,41 @@ export function uncite(
   const now = certaintyOf(c, fact);
   if (taken.value.left > 0 || now === null || now === "hypothesis") return { ok: true, value: {} };
   return put(c, fact, "hypothesis");
+}
+
+/**
+ * Makes a hypothesis again of each fact of some subjects that is called known from a source while no
+ * citation stands behind it. An undo or a return to a version can leave one so: a citation is taken
+ * back by itself.
+ */
+export function settle(c: Contexts, subjects: Iterable<string>): Result<object, CertaintyError> {
+  for (const subject of new Set(subjects)) {
+    for (const { fact, certainty } of factsOf(c, subject)) {
+      if (!needsCitation(certainty) || c.evidence.countFor(fact) > 0) continue;
+      const done = put(c, fact, "hypothesis");
+      if (!done.ok) return done;
+    }
+  }
+  return { ok: true, value: {} };
+}
+
+/** Every fact of a subject that has a certainty. */
+function factsOf(c: Contexts, subject: string): { fact: FactRef; certainty: Certainty }[] {
+  if (isId("union", subject)) {
+    const union = c.kinship.union(subject);
+    return union ? [{ fact: { subject, fact: "union" }, certainty: union.certainty }] : [];
+  }
+  const person = isId("person", subject) ? c.kinship.get(subject) : null;
+  if (person === null) return [];
+  const own = (fact: string) => ({ subject: person.id, fact });
+  return [
+    ...person.names.map(({ id, certainty }) => ({ fact: own(`name:${id}`), certainty })),
+    ...person.parents.map(({ id, certainty }) => ({ fact: own(`parentage:${id}`), certainty })),
+    ...c.life
+      .eventsOf(person.id)
+      .map((event) => ({ fact: factOf(event), certainty: event.certainty }))
+      .filter(({ fact }) => fact.subject === person.id),
+  ];
 }
 
 /**

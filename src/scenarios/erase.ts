@@ -26,6 +26,9 @@ export interface Ledger {
 export type EraseError = TrashError | StaleVersion;
 /** Where others still write the whole name in words of their own, as "kind/id". */
 export type Erased = { mentions: string[] };
+
+/** The scenario of an erasure, as the journal names it. */
+export const erasing = "erase";
 export type Eraser = { actor: MemberId; now: number };
 
 /**
@@ -66,7 +69,7 @@ export function eraseHere(
   let forms: NameForm[] = [];
   let others: NameForm[] = [];
   const done = unit.run(
-    { ...act, scenario: "erase", expected: {} },
+    { ...act, scenario: erasing, expected: {} },
     (c): Result<Erased, EraseError> => {
       forms = formsOf(c, id);
       const state = c.history.state();

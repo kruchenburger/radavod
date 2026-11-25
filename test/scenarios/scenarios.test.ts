@@ -3,6 +3,7 @@ import { addRelative } from "../../src/scenarios/add-relative";
 import { assignBranch } from "../../src/scenarios/assign-branch";
 import { certaintyOf, citeFact, setCertainty, uncite } from "../../src/scenarios/certainty";
 import { editPerson } from "../../src/scenarios/edit-person";
+import { undo } from "../../src/scenarios/undo";
 import { factOf } from "../../src/contexts/life";
 import { parseFuzzyDate } from "../../src/kernel/fuzzy-date";
 import type { FactRef } from "../../src/kernel/id";
@@ -266,6 +267,21 @@ describe("certainty", () => {
       accepted(tree.run((c) => uncite(c, { fact: name, citation: citation("c1") })));
       expect(tree.read((c) => certaintyOf(c, name))).toBe("one-source");
       accepted(tree.run((c) => uncite(c, { fact: name, citation: citation("c2") })));
+      expect(tree.read((c) => certaintyOf(c, name))).toBe("hypothesis");
+    }));
+
+  it("comes back to a hypothesis when an undo takes the citation back", () =>
+    inTree((tree) => {
+      withAda(tree);
+      accepted(
+        tree.run((c) =>
+          citeFact(c, { fact: name, source: source("book"), citation: citation("c1") }),
+        ),
+      );
+      const cited = tree.read((c) => c.history.last());
+      accepted(tree.run((c) => setCertainty(c, { fact: name, certainty: "confirmed" })));
+      accepted(tree.run((c) => undo(c, cited)));
+      expect(tree.read((c) => c.evidence.countFor(name))).toBe(0);
       expect(tree.read((c) => certaintyOf(c, name))).toBe("hypothesis");
     }));
 
