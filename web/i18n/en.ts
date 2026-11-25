@@ -77,7 +77,7 @@ export const en = {
   "tree.version": "Another version",
 
   "map.loading": "Arranging the branches",
-  "map.failed": "The branches couldn't be arranged. Reload the page or open them as a list.",
+  "map.failed": "The browser couldn't arrange the branches. Reload the page.",
   "map.far": "Far",
   "map.closer": "Closer",
   "map.near": "Near",
@@ -93,7 +93,7 @@ export const en = {
 
   "card.back": "Back to the tree",
   "card.show": "Show in the tree",
-  "card.showBranches": "Show in the branches",
+  "card.showBranches": "Show among the branches",
   "card.direct": "On the direct line",
   "card.place": "Place",
   "card.years": "Years",

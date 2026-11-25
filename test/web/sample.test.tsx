@@ -355,7 +355,7 @@ describe("the card of a person", () => {
     expect(address()).toBe(`/sample/person/${parent}`);
     const href = (text: string) => screen.getByRole("link", { name: text }).getAttribute("href");
     expect(href("Показать в древе")).toBe(`/sample/tree/${parent}`);
-    expect(href("Показать на ветвях")).toBe(`/sample/branches?level=near&person=${parent}`);
+    expect(href("Показать среди ветвей")).toBe(`/sample/branches?level=near&person=${parent}`);
   });
 
   it("leads back to the tree one came from", async () => {
@@ -419,7 +419,7 @@ describe("the list", () => {
     answers["/sample/tree.json"] = () => Promise.resolve(Response.json(structuredClone(sample)));
     await open(`/sample/list/${start}`);
     expect((await screen.findByRole("alert")).textContent).toBe(
-      "Ветви не разложились. Обновите страницу или откройте их списком.",
+      "Браузер не смог разложить ветви. Обновите страницу.",
     );
   });
 });
@@ -502,7 +502,9 @@ describe("all branches", () => {
     FakeWorker.isMissing = true;
     answers["/sample/tree.json"] = () => Promise.resolve(Response.json(structuredClone(sample)));
     await open("/sample/branches");
-    expect((await screen.findByRole("alert")).textContent).toContain("Ветви не разложились");
+    expect((await screen.findByRole("alert")).textContent).toContain(
+      "Браузер не смог разложить ветви.",
+    );
     press(screen.getByRole("button", { name: "Списком" }));
     expect(address()).toBe(`/sample/list/${start}`);
   });

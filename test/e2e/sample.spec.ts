@@ -368,7 +368,9 @@ test.describe("all branches", () => {
         route.fulfill({ body: "throw 1", contentType: "text/javascript" }),
       );
       await page.goto("/sample/branches");
-      await expect(page.getByRole("alert")).toContainText("The branches couldn't be arranged.");
+      await expect(page.getByRole("alert")).toContainText(
+        "The browser couldn't arrange the branches.",
+      );
       await page.getByRole("button", { name: "As a list" }).click();
       await expect(page.getByRole("heading", { level: 1, name: nameOf(start) })).toBeVisible();
     });

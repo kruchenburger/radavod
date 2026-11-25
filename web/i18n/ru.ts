@@ -91,7 +91,7 @@ export const ru = {
   "tree.version": "Другая версия",
 
   "map.loading": "Раскладываем ветви",
-  "map.failed": "Ветви не разложились. Обновите страницу или откройте их списком.",
+  "map.failed": "Браузер не смог разложить ветви. Обновите страницу.",
   "map.far": "Издали",
   "map.closer": "Ближе",
   "map.near": "Вблизи",
@@ -107,7 +107,7 @@ export const ru = {
 
   "card.back": "К древу",
   "card.show": "Показать в древе",
-  "card.showBranches": "Показать на ветвях",
+  "card.showBranches": "Показать среди ветвей",
   "card.direct": "На прямой линии",
   "card.place": "Место",
   "card.years": "Годы жизни",
