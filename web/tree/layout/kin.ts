@@ -78,7 +78,7 @@ function read({ people, unions }: TreeSnapshot): Kin {
     if (entries.has(person.id)) continue;
     const bornAt = person.birth?.sort ?? Infinity;
     const index = entries.size;
-    entries.set(person.id, { person, index, bornAt, sets: none, children: [], unions: none });
+    entries.set(person.id, { person, index, bornAt, sets: none, children: none, unions: none });
   }
   const couples = readUnions(unions, entries);
 
@@ -95,7 +95,11 @@ function read({ people, unions }: TreeSnapshot): Kin {
     entry.sets = groupParents(id, there, (a, b) => isCouple(entries.get(a), b));
     for (const set of entry.sets) {
       const child = { child: id, set };
-      for (const parent of set.known) entries.get(parent)?.children.push(child);
+      for (const id of set.known) {
+        const parent = entries.get(id) as Entry;
+        if (parent.children === none) parent.children = [child];
+        else parent.children.push(child);
+      }
     }
   }
   for (const entry of entries.values()) if (entry.unions.length > 1) sortUnions(entry, entries);
