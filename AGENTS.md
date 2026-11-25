@@ -38,6 +38,10 @@ Seven bounded contexts in `src/contexts`. `.agents/skills/ddd-steward/SKILL.md` 
 
 dependency-cruiser parses with swc, because TypeScript 7 has no compiler API.
 
+## Dates and names
+
+`src/kernel` holds the values every context means the same thing by. It imports nothing and knows no clock and no locale. `parseFuzzyDate` reads a whole text or nothing and says above itself what it does not read: a new way to write a date is a line in `test/kernel/fuzzy-date.test.ts`, with the texts it must not read. `foldName` compares names by the table above it: a new letter comes with a pair that must meet and a pair that must not.
+
 ## Texts
 
 Every text a person reads is in `web/i18n/ru.ts` and `web/i18n/en.ts`, reached through `t`. Words come from `docs/glossary.md`, wording from `.agents/skills/copy-steward/SKILL.md`. Read both before you add or change a text. Errors and API answers carry codes, not sentences.

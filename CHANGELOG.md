@@ -11,5 +11,6 @@ The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), and
 - The look of the site, described in `docs/design.md`.
 - An invented family of 300 for tests and screenshots.
 - The layout of the tree: around a person, as a list for a phone, and the map of all branches. No screen draws it yet.
+- Dates as families, archives and GEDCOM write them, in Russian, Belarusian, Polish and English, and names compared across spellings. No screen uses them yet.
 - Guards for the architecture, the texts, licenses and a real family's data. The last one reads every commit of a pull request and, with the hook turned on, every commit before a push.
 - Checks on every pull request: browser tests, accessibility, secrets and known vulnerabilities.
