@@ -35,9 +35,11 @@ export function sqlitePlaces(sql: SqlStorage): PlacesStore & Kept {
 }
 
 class SqlitePlaces implements PlacesStore, Kept {
+  readonly #sql: SqlStorage;
   readonly #places: Rows<PlaceId, Place>;
 
   constructor(sql: SqlStorage) {
+    this.#sql = sql;
     this.#places = new Rows<PlaceId, Place>("place", placeSchema, {
       read: (id) =>
         sql.exec<RawRow>("SELECT version, data FROM places_place WHERE id = ?", id).toArray()[0],
@@ -66,6 +68,17 @@ class SqlitePlaces implements PlacesStore, Kept {
 
   current(kind: string, id: string): number | undefined {
     return kind === "place" && isId("place", id) ? this.#places.version(id) : undefined;
+  }
+
+  authored(kind: string, id: string): unknown {
+    return kind === "place" && isId("place", id) ? this.#places.authored(id) : undefined;
+  }
+
+  everything() {
+    const rows = this.#sql.exec<RawRow & { id: PlaceId }>(
+      "SELECT id, version, data FROM places_place",
+    );
+    return this.#places.authoredAmong(rows.toArray());
   }
 
   flush(version: number): Written[] {

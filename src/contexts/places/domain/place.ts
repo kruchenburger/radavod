@@ -40,6 +40,19 @@ export function editPlace(
   return { ok: true, value: writes("place", id, place, { ...place, ...patch }) };
 }
 
+/** A place as it was, or null when it was not there. */
+export type PlaceTarget = { kind: "place"; id: PlaceId; value: PlaceWritten | null };
+export type PlaceWritten = Omit<Place, "id" | "version">;
+
+/** Puts places as they were. Whether an event happens at one that goes is asked by others. */
+export function putPlacesBack(reader: PlaceReader, targets: readonly PlaceTarget[]): Change {
+  return targets.flatMap(({ id, value }) => {
+    const stored = reader.place(id);
+    const after = value && { ...value, id, version: stored?.version ?? 0 };
+    return writes("place", id, stored, after);
+  });
+}
+
 /** Removes a place. Whether an event happened there is asked before, by whoever knows the events. */
 export function removePlace(reader: PlaceReader, id: PlaceId): Result<Change, Missing> {
   const place = reader.place(id);

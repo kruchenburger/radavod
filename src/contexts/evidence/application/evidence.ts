@@ -7,6 +7,8 @@ import {
   citationsOf,
   cite,
   countFor,
+  type EvidenceTarget,
+  putCitationsBack,
   removeSource,
   type SubjectId,
   type Uncited,
@@ -29,6 +31,8 @@ export interface Evidence {
   addSource(source: NewSource): Result<Change, EvidenceError>;
   editSource(id: SourceId, patch: SourcePatch): Result<Change, EvidenceError>;
   removeSource(id: SourceId): Result<Change, EvidenceError>;
+  /** Puts sources and citations as they were. */
+  putBack(targets: readonly EvidenceTarget[]): Result<Change, EvidenceError>;
   citationsOf(subject: SubjectId): Citation[];
   countFor(fact: FactRef): number;
   cite(citation: Citation): Result<Change, EvidenceError>;
@@ -45,6 +49,19 @@ export function evidenceOver(store: EvidenceStore): Evidence {
     addSource: (source) => saved(addSource(store, source)),
     editSource: (id, patch) => saved(editSource(store, id, patch)),
     removeSource: (id) => saved(removeSource(store, id)),
+    putBack(targets) {
+      const back = saved(putCitationsBack(store, targets));
+      if (!back.ok) return back;
+      // What goes is asked last: the citations of it may have gone before.
+      const change = [...back.value];
+      for (const { kind, id, value } of targets) {
+        if (kind !== "source" || value !== null || store.source(id) === null) continue;
+        const removed = saved(removeSource(store, id));
+        if (!removed.ok) return removed;
+        change.push(...removed.value);
+      }
+      return { ok: true, value: change };
+    },
     citationsOf: (subject) => citationsOf(store, subject),
     countFor: (fact) => countFor(store, fact),
     cite: (citation) => saved(cite(store, citation)),

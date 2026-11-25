@@ -79,6 +79,36 @@ export function sqliteJournal(sql: SqlStorage): JournalStore {
       if (!parsed.success) throw new CorruptRow(`subject/${subject}`);
       return parsed.data;
     },
+    putBulk(number) {
+      sql.exec("INSERT INTO history_bulk (number) VALUES (?)", number);
+    },
+    bulksOf(subject) {
+      return sql
+        .exec<{ number: number }>(
+          `SELECT DISTINCT number FROM history_entry
+            WHERE number IN (SELECT number FROM history_bulk) AND instr(data, ?) > 0`,
+          subject,
+        )
+        .toArray()
+        .map(({ number }) => number);
+    },
+    titleOf(number) {
+      const [row] = sql
+        .exec<{ title: string }>("SELECT title FROM history_name WHERE number = ?", number)
+        .toArray();
+      return row?.title ?? null;
+    },
+    putTitle(number, title) {
+      if (title === "") sql.exec("DELETE FROM history_name WHERE number = ?", number);
+      else {
+        sql.exec(
+          `INSERT INTO history_name (number, title) VALUES (?, ?)
+            ON CONFLICT (number) DO UPDATE SET title = excluded.title`,
+          number,
+          title,
+        );
+      }
+    },
     putNumbers(subject, numbers) {
       sql.exec(
         `INSERT INTO history_subject (id, entries) VALUES (?, ?)

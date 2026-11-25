@@ -11,7 +11,9 @@ import {
   type EventError,
   eventOf,
   eventsOf,
+  type LifeTarget,
   mainOf,
+  putLivesBack,
   removeEvent,
 } from "../domain/life";
 import { type Descent, type Warning, warningsOf } from "../domain/warnings";
@@ -34,6 +36,8 @@ export interface Life {
   add(event: LifeEvent): Result<Change, LifeError>;
   edit(home: PersonId, event: LifeEvent): Result<Change, LifeError>;
   remove(home: PersonId, id: EventId): Result<Change, LifeError>;
+  /** Puts the events about people as they were. */
+  putBack(targets: readonly LifeTarget[]): Result<Change, LifeError>;
   /** What is odd about a person. It blocks nothing. */
   warnings(id: PersonId): Warning[];
 }
@@ -73,6 +77,16 @@ export function lifeOver(
       return id === null ? saved(editEvent(store, home, event)) : missing(id);
     },
     remove: (home, id) => saved(removeEvent(store, home, id)),
+    putBack(targets) {
+      for (const { value } of targets) {
+        for (const event of value?.events ?? []) {
+          // A union may go while the event of it stays.
+          const id = lost({ ...event, union: null }, null);
+          if (id !== null) return missing(id);
+        }
+      }
+      return saved(putLivesBack(store, targets));
+    },
     warnings: (id) => warningsOf(store, id, descentsOf(kinship, id)),
   };
 }

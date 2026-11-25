@@ -84,6 +84,48 @@ function hasTwice({ participants }: LifeEvent): boolean {
   return new Set(roles).size < roles.length;
 }
 
+/** The events about a person as they were, or null when there were none. */
+export type LifeTarget = { kind: "life"; id: PersonId; value: Pick<PersonLife, "events"> | null };
+
+/** Puts events as they were, and tells those who take part in them. */
+export function putLivesBack(
+  reader: LifeReader,
+  targets: readonly LifeTarget[],
+): Result<Change, EventError> {
+  const lives = new Map<PersonId, PersonLife>();
+  const now = (id: PersonId) => lives.get(id) ?? lifeOf(reader, id);
+  for (const { id, value } of targets) {
+    const events = withMains(value?.events ?? []);
+    if (events.some(({ participants }) => participants[0]?.person !== id)) {
+      return { ok: false, error: { code: "another-subject" } };
+    }
+    const before = now(id);
+    lives.set(id, { ...before, events });
+    for (const event of before.events) {
+      for (const other of othersIn(event)) {
+        const life = now(other);
+        const takesPart = life.takesPart.filter((one) => one.event !== event.id);
+        lives.set(other, { ...life, takesPart });
+      }
+    }
+    for (const event of events) {
+      for (const other of othersIn(event)) {
+        const life = now(other);
+        const takesPart = [...life.takesPart, { event: event.id, home: id }];
+        lives.set(other, { ...life, takesPart });
+      }
+    }
+  }
+  const gone = new Set(targets.filter(({ value }) => value === null).map(({ id }) => id));
+  return {
+    ok: true,
+    value: [...lives].flatMap(([id, life]) => {
+      const isGone = gone.has(id) && life.takesPart.length === 0;
+      return writes("life", id, reader.lifeOf(id), isGone ? null : life);
+    }),
+  };
+}
+
 /** Every event a person takes part in by the first day, those without one last, as recorded. */
 export function eventsOf(reader: LifeReader, id: PersonId): LifeEvent[] {
   const { events, takesPart } = lifeOf(reader, id);

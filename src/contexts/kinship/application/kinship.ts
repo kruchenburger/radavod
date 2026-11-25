@@ -12,6 +12,7 @@ import {
   removeBranch,
 } from "../domain/branch";
 import type { Change, FamilyGraph } from "../domain/family-graph";
+import { type FamilyTarget, type PutBackError, putFamilyBack } from "../domain/put-back";
 import {
   addParent,
   editParent,
@@ -60,7 +61,7 @@ export type KinshipCommand =
   | { do: "remove-branch"; id: BranchId }
   | ({ do: "assign-branch" } & Assignment);
 
-export type KinshipError = ParentageError | UnionError | NotAChild;
+export type KinshipError = ParentageError | UnionError | NotAChild | PutBackError;
 
 export interface Kinship {
   get(id: PersonId): Person | null;
@@ -70,19 +71,22 @@ export interface Kinship {
   relatives(id: PersonId): PersonId[];
   /** Stores what the rules make of a command. One that is refused or changes nothing is not. */
   apply(command: KinshipCommand): Result<Change, KinshipError>;
+  /** Puts aggregates as they were, with what follows from them. */
+  putBack(targets: readonly FamilyTarget[]): Result<Change, KinshipError>;
 }
 
 export function kinshipOver(store: KinshipStore): Kinship {
+  const saved = (result: Result<Change, KinshipError>) => {
+    if (result.ok && result.value.length > 0) store.save(result.value);
+    return result;
+  };
   return {
     get: (id) => store.person(id),
     union: (id) => store.union(id),
     branch: (id) => store.branch(id),
     relatives: (id) => relativesOf(store, id),
-    apply(command) {
-      const result = resultOf(store, command);
-      if (result.ok && result.value.length > 0) store.save(result.value);
-      return result;
-    },
+    apply: (command) => saved(resultOf(store, command)),
+    putBack: (targets) => saved(putFamilyBack(store, targets)),
   };
 }
 

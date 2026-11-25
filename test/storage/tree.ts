@@ -57,6 +57,8 @@ export function inNamed<T>(name: string, work: (tree: Tree) => T | Promise<T>): 
 export class Tree {
   readonly storage: DurableObjectStorage;
   readonly work: UnitOfWork;
+  /** The same database, whose rows are counted. */
+  readonly counted: Pick<DurableObjectStorage, "sql" | "transactionSync">;
   #cursors: SqlStorageCursor<Record<string, SqlStorageValue>>[] = [];
 
   constructor(storage: DurableObjectStorage) {
@@ -69,10 +71,11 @@ export class Tree {
         return cursor;
       },
     } as unknown as SqlStorage;
-    this.work = unitOfWork({
+    this.counted = {
       sql: counted,
       transactionSync: (closure) => storage.transactionSync(closure),
-    });
+    };
+    this.work = unitOfWork(this.counted);
   }
 
   /** Runs a scenario. Without `expected` the editor believes nothing. */
@@ -104,9 +107,19 @@ export class Tree {
   count(work: () => void): { read: number; written: number } {
     this.#cursors = [];
     work();
+    return this.#sum();
+  }
+
+  #sum(): { read: number; written: number } {
     const sum = (key: "rowsRead" | "rowsWritten") =>
       this.#cursors.reduce((all, cursor) => all + cursor[key], 0);
     return { read: sum("rowsRead"), written: sum("rowsWritten") };
+  }
+
+  async countAsync(work: () => Promise<unknown>): Promise<{ read: number; written: number }> {
+    this.#cursors = [];
+    await work();
+    return this.#sum();
   }
 
   /** Every row of every table, as it lies there. */

@@ -1,5 +1,5 @@
 import { evidenceTables } from "../contexts/evidence";
-import { historyTables, type Migration } from "../contexts/history";
+import { historyTables, type Migration, upgradeHistory } from "../contexts/history";
 import { kinshipTables } from "../contexts/kinship";
 import { lifeTables } from "../contexts/life";
 import { placesTables } from "../contexts/places";
@@ -13,4 +13,5 @@ export const steps: Migration[] = [
       for (const table of tables.flat()) sql.exec(table);
     },
   },
+  { number: 2, up: upgradeHistory },
 ];

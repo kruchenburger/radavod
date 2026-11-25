@@ -1,4 +1,5 @@
 /** The edit journal and the trash. */
+export { sqliteCheckpoints, upgradeHistory } from "./adapters/sqlite-checkpoints";
 export { type Migration, migrate } from "./adapters/migrate";
 export { historyTables, sqliteJournal } from "./adapters/sqlite-journal";
 export { type Act, type Journal, journalOver } from "./application/journal";

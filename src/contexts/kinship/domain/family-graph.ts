@@ -35,10 +35,10 @@ export type Change = (
 )[];
 
 /** Changes to the family that nobody has stored yet. */
-export class Draft {
+export class Draft implements FamilyGraph {
   readonly #graph: FamilyGraph;
   readonly #stored = new Map<PersonId, Person | null>();
-  readonly #people = new Map<PersonId, Person>();
+  readonly #people = new Map<PersonId, Person | null>();
   readonly #unions = new Map<UnionId, Union | null>();
   readonly #branches = new Map<BranchId, Branch | null>();
 
@@ -48,11 +48,45 @@ export class Draft {
 
   /** A person with the changes. Each is read once. */
   person(id: PersonId): Person | null {
-    return this.#people.get(id) ?? this.#storedPerson(id);
+    const drafted = this.#people.get(id);
+    return drafted === undefined ? this.#storedPerson(id) : drafted;
+  }
+
+  union(id: UnionId): Union | null {
+    const drafted = this.#unions.get(id);
+    return drafted === undefined ? this.#graph.union(id) : drafted;
+  }
+
+  branch(id: BranchId): Branch | null {
+    const drafted = this.#branches.get(id);
+    return drafted === undefined ? this.#graph.branch(id) : drafted;
+  }
+
+  parentsOf(id: PersonId): readonly Parentage[] {
+    return this.#people.has(id) ? (this.#people.get(id)?.parents ?? []) : this.#graph.parentsOf(id);
+  }
+
+  membersOf(id: BranchId): Members {
+    const stored = this.#graph.membersOf(id);
+    const people = new Set([...stored.people, ...this.#people.keys()]);
+    const unions = new Set([...stored.unions, ...this.#unions.keys()]);
+    return {
+      people: [...people].filter((one) => this.person(one)?.branch === id),
+      unions: [...unions].filter((one) => this.union(one)?.branch === id),
+    };
+  }
+
+  /** The people who have changes, or are gone. */
+  get drafted(): PersonId[] {
+    return [...this.#people.keys()];
   }
 
   putPerson(person: Person): void {
     this.#people.set(person.id, person);
+  }
+
+  removePerson(id: PersonId): void {
+    this.#people.set(id, null);
   }
 
   /** Changes a person who is there; somebody else's end of a link may be unknown. */
@@ -81,8 +115,10 @@ export class Draft {
     const change: Change = [];
     for (const [id, person] of this.#people) {
       const stored = this.#storedPerson(id);
-      change.push(...writes("person", id, stored && withoutBranch(stored), withoutBranch(person)));
-      change.push(...writes("person-branch", id, stored?.branch ?? null, person.branch));
+      change.push(
+        ...writes("person", id, stored && withoutBranch(stored), person && withoutBranch(person)),
+      );
+      change.push(...writes("person-branch", id, stored?.branch ?? null, person?.branch ?? null));
     }
     for (const [id, after] of this.#unions) {
       const before = this.#graph.union(id);

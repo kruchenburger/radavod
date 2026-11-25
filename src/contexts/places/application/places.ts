@@ -12,6 +12,8 @@ import {
   type NewPlace,
   type Place,
   type PlacePatch,
+  type PlaceTarget,
+  putPlacesBack,
   removePlace,
 } from "../domain/place";
 import type { PlacesStore } from "./ports";
@@ -22,6 +24,7 @@ export interface Places {
   add(place: NewPlace): Result<Change, Duplicate>;
   edit(id: PlaceId, patch: PlacePatch): Result<Change, Missing>;
   remove(id: PlaceId): Result<Change, Missing>;
+  putBack(targets: readonly PlaceTarget[]): void;
   /** What a place was called on a date. Null for a place without names and for one not there. */
   nameOn(id: PlaceId, date: FuzzyDate | null, language: Language): string | null;
   /** What a place belonged to on a date. */
@@ -38,6 +41,9 @@ export function placesOver(store: PlacesStore): Places {
     add: (place) => saved(addPlace(store, place)),
     edit: (id, patch) => saved(editPlace(store, id, patch)),
     remove: (id) => saved(removePlace(store, id)),
+    putBack(targets) {
+      store.save(putPlacesBack(store, targets));
+    },
     nameOn(id, date, language) {
       const place = store.place(id);
       return place && nameOn(place, date, language);
