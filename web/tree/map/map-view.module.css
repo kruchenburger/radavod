@@ -1,0 +1,137 @@
+.window {
+  position: relative;
+  flex: 1;
+  min-height: 0;
+  overflow: hidden;
+  cursor: grab;
+  touch-action: none;
+  user-select: none;
+}
+
+.window:active {
+  cursor: grabbing;
+}
+
+.canvas {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+}
+
+.world {
+  position: absolute;
+  top: 0;
+  left: 0;
+  transform-origin: 0 0;
+  will-change: transform;
+}
+
+.person {
+  position: absolute;
+  color: inherit;
+  text-decoration: none;
+}
+
+.person:hover > span > span {
+  text-decoration: underline;
+  text-underline-offset: 3px;
+}
+
+.person:focus-visible {
+  z-index: 2;
+  background-color: var(--surface);
+  outline-width: 3px;
+}
+
+.person[data-chosen] {
+  background-color: var(--ink);
+  box-shadow:
+    -0.25rem 0 var(--ink),
+    0.25rem 0 var(--ink);
+}
+
+.person[data-chosen] > span > span {
+  color: var(--paper) !important;
+}
+
+.heads {
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+}
+
+.page {
+  position: absolute;
+  top: 0;
+  left: 0;
+  overflow: hidden;
+  text-decoration: none;
+}
+
+.window[data-level="far"] .page {
+  overflow: visible;
+}
+
+a.page {
+  pointer-events: auto;
+}
+
+.page:focus-visible {
+  outline-width: 3px;
+  outline-offset: -3px;
+}
+
+.title {
+  box-sizing: border-box;
+  display: flex;
+  align-items: flex-end;
+  border-bottom: 2px solid currentColor;
+}
+
+.title[data-double] {
+  border-bottom: 5px double currentColor;
+}
+
+.title > span {
+  min-width: 0;
+  padding: 0 0.5rem 0.25rem;
+  overflow: hidden;
+  line-height: 1.25;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.title b {
+  font: 700 1.0625rem/1 var(--serif);
+}
+
+a.page:hover b {
+  text-decoration: underline;
+  text-underline-offset: 3px;
+}
+
+.title i {
+  color: var(--muted);
+  font: 400 0.875rem/1 var(--sans);
+}
+
+.window:not([data-level="far"]) .title {
+  background-color: var(--surface);
+}
+
+.window[data-level="closer"] .title > span {
+  padding: 0 1.125rem 0.625rem;
+}
+
+.window[data-level="closer"] .title b {
+  font-size: 1.5rem;
+}
+
+.window[data-level="near"] .title > span {
+  padding: 0 1.375rem 0.75rem;
+}
+
+.window[data-level="near"] .title b {
+  font-size: 1.875rem;
+}

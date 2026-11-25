@@ -1,0 +1,143 @@
+.years h2 {
+  margin: 0 0 0.5rem;
+  font: italic 400 1.375rem/1.2 var(--serif);
+}
+
+.strip {
+  position: relative;
+  overflow: hidden;
+}
+
+.strip > svg {
+  position: absolute;
+  inset: 0;
+}
+
+.span {
+  fill: var(--surface);
+}
+
+.tick {
+  stroke: var(--edge);
+  stroke-width: 1;
+}
+
+.today {
+  stroke: var(--action);
+  stroke-width: 1.2;
+}
+
+.bar {
+  fill: none;
+  stroke: currentColor;
+}
+
+.about {
+  fill: none;
+  stroke: currentColor;
+  stroke-dasharray: 3 2.6;
+  /* The gap comes first, so that the dashes are seen beside the solid part. */
+  stroke-dashoffset: 3;
+}
+
+.cap {
+  fill: none;
+  stroke: var(--ink);
+  stroke-width: 1.4;
+}
+
+.cut {
+  fill: none;
+  stroke: currentColor;
+  stroke-width: 2;
+}
+
+.question {
+  fill: var(--ink);
+  font: 500 0.875rem var(--sans);
+}
+
+.year,
+.now {
+  position: absolute;
+  top: 0;
+  color: var(--muted);
+  font-size: 0.875rem;
+  line-height: 1.25rem;
+}
+
+.year {
+  transform: translateX(-50%);
+}
+
+.now {
+  right: 0;
+  color: var(--action);
+  font-weight: 500;
+}
+
+.end {
+  position: absolute;
+  font: 700 1.0625rem/1.25rem var(--serif);
+  white-space: nowrap;
+}
+
+.words {
+  position: absolute;
+  color: var(--muted);
+}
+
+.strip .head {
+  position: absolute;
+  left: 0;
+  margin: 0;
+  color: var(--muted);
+  font: italic 400 1.0625rem/1.375rem var(--serif);
+}
+
+.strip .label {
+  position: absolute;
+  margin: 0;
+  line-height: 1.375rem;
+  white-space: nowrap;
+}
+
+.name {
+  font: 400 1.0625rem/1.375rem var(--serif);
+}
+
+.name[data-direct] {
+  font-weight: 700;
+}
+
+.name[data-unnamed] {
+  font-style: italic;
+}
+
+.detail {
+  color: var(--muted);
+  font-size: 0.875rem;
+}
+
+.detail b {
+  font-weight: 500;
+}
+
+.years .legend {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.25rem 1.5rem;
+  margin: 0.75rem 0 0;
+  color: var(--muted);
+  font-size: 0.9375rem;
+}
+
+.legend span {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.5rem;
+}
+
+.legend svg {
+  color: var(--ink);
+}

@@ -1,0 +1,142 @@
+.screen {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  min-height: 0;
+}
+
+.head {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0 1.375rem;
+  padding: 0.75rem 1.75rem 0.5rem;
+}
+
+.head h1 {
+  margin: 0;
+  font: 600 1.625rem/1.1 var(--serif);
+}
+
+.head > a {
+  display: inline-flex;
+  align-items: center;
+  min-height: 2rem;
+  color: var(--action);
+  text-underline-offset: 3px;
+}
+
+.mark,
+.press,
+.head .close {
+  display: none;
+}
+
+.mark {
+  padding: 0.0625rem 0.625rem;
+  border: 1.5px solid var(--action);
+  border-radius: 3px;
+  color: var(--action);
+  font-size: 0.9375rem;
+  font-weight: 500;
+}
+
+.count,
+.legend {
+  color: var(--muted);
+  font-size: 0.9375rem;
+}
+
+.legend {
+  display: inline-flex;
+  flex-wrap: wrap;
+  gap: 0 1.125rem;
+}
+
+.levels {
+  display: flex;
+  gap: 1.75rem;
+  margin-left: auto;
+}
+
+.levels a {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-height: 2.5rem;
+  border-bottom: 2px solid transparent;
+  color: var(--muted);
+  text-decoration: none;
+  white-space: nowrap;
+}
+
+.levels a:hover {
+  color: var(--ink);
+}
+
+.levels a[aria-current] {
+  border-color: var(--ink);
+  color: var(--ink);
+  font-weight: 500;
+}
+
+.keys,
+.hint {
+  margin: 0;
+  padding: 0.5rem 1.75rem 0.75rem;
+  color: var(--muted);
+  font-size: 0.9375rem;
+}
+
+.keys b {
+  color: var(--ink);
+  font-weight: 500;
+}
+
+@media (max-width: 44.99em) {
+  .head {
+    gap: 0 0.75rem;
+    padding: 0.25rem 1rem 0;
+  }
+
+  .mark {
+    display: inline-block;
+  }
+
+  .count,
+  .legend,
+  .keys {
+    display: none;
+  }
+
+  .press {
+    display: block;
+    margin: 0;
+    padding: 0.5rem 1rem;
+    color: var(--muted);
+    font-size: 0.9375rem;
+  }
+
+  .head > a {
+    min-height: 2.75rem;
+  }
+
+  .head .close {
+    display: inline-flex;
+    justify-content: center;
+    min-width: 2.75rem;
+    margin: 0 -0.75rem 0 auto;
+    color: var(--ink);
+  }
+
+  .levels {
+    width: 100%;
+    gap: 0;
+    margin: 0;
+  }
+
+  .levels a {
+    flex: 1;
+    min-height: 2.75rem;
+  }
+}
