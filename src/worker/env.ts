@@ -7,4 +7,6 @@ export type Env = {
   ASSETS: Fetcher;
   APP_VERSION: string;
   JURISDICTION: "eu" | "none";
+  /** "on" opens the invented family to anybody. */
+  SAMPLE: string;
 };
