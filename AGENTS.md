@@ -39,6 +39,10 @@ Every text a person reads is in `web/i18n/ru.ts` and `web/i18n/en.ts`, reached t
 
 `pnpm guard:copy` fails on text outside the catalogs, on keys, parameters and plural forms that do not match, on banned phrases and on a file it cannot read. There are no exceptions. A folder in `guards/copy/fixtures/bad` is laid over `clean` and breaks one rule on purpose.
 
+## Look
+
+`docs/design.md` is the design: read it before you build or change a screen. Colors and fonts come from `web/app/tokens.ts`; a color or a font name typed into a style is a mistake. A new color needs its place in `test/web/tokens.test.ts` and in the tables of `docs/design.md`, which a test compares with the tokens.
+
 ## Example family
 
 `examples/` holds an invented family of 300. `generateFamily(seed, size)` makes it and `examples/family.json` is its output for seed 1; a test compares them, so change the generator and run `pnpm examples`. Every invented name is in `examples/names.ts`. The app never imports `examples/`, and its types are not the domain model.
@@ -65,7 +69,7 @@ Local workerd has no jurisdictions, so tests run with `none`.
 - English in code, comments, commits and the changelog.
 - Test first. Tests live in `test/`, guard and example tests next to what they test.
 - A real family's data never enters the repository. Examples use invented people.
-- Dependencies that ship must be MIT, ISC, BSD or Apache-2.0. Development tools may bring other licenses, for example lightningcss (MPL-2.0) and sharp's libvips (LGPL-3.0).
+- Dependencies that ship must be MIT, ISC, BSD or Apache-2.0. Fonts, and only fonts, may also be OFL-1.1; the build puts their licence texts into `dist/client/licences`. Development tools may bring other licenses, for example lightningcss (MPL-2.0) and sharp's libvips (LGPL-3.0).
 - pnpm runs no install script of a dependency (`pnpm-workspace.yaml`).
 - Workflows pin actions by full commit SHA, read only, and use no secrets on pull requests.
 - Conventional Commits with the work item, as in `feat: add unions (RAD-12)`.
