@@ -9,7 +9,7 @@ import {
   wholeNames,
 } from "../contexts/history";
 import type { PersonWritten } from "../contexts/kinship";
-import type { LifeEvent } from "../contexts/life";
+import { factOf, type LifeEvent } from "../contexts/life";
 import type { EventId, MemberId, PersonId } from "../kernel/id";
 import type { NameForm } from "../kernel/name-form";
 import type { Result } from "../kernel/result";
@@ -177,10 +177,11 @@ function handOver(
     bin.put(person, { ...theirs, guest: [...theirs.guest, { home, event: id, roles: [role] }] });
   }
   const here = rest.filter(({ person }) => person === home || c.kinship.get(person) !== null);
-  const told = clean({ ...event, id, participants: [next, ...here] });
+  const moved = { ...event, id, participants: [next, ...here] };
+  const told = clean(moved);
   const citations = (trashed.citations as Citation[])
-    .filter(({ fact }) => fact.fact === `event:${event.id}`)
-    .map((citation) => clean({ ...citation, fact: { subject: home, fact: `event:${id}` } }));
+    .filter(({ fact }) => fact.fact === factOf(event).fact)
+    .map((citation) => clean({ ...citation, fact: factOf(moved) }));
   const theirs = bin.get(home);
   if (theirs !== null) {
     bin.put(home, {

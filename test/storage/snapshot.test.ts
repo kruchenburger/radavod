@@ -3,7 +3,7 @@ import fc from "fast-check";
 import { describe, expect, it } from "vitest";
 import { stateOf } from "../../examples/snapshot.ts";
 import { generateFamily } from "../../examples/generate.ts";
-import { eraseForever } from "../../src/scenarios/erase";
+import { eraseForever, eraseHere } from "../../src/scenarios/erase";
 import { type Packed, snapshotsOf } from "../../src/scenarios/snapshot";
 import { versionsOf } from "../../src/scenarios/versions";
 import { snapshotOf } from "../../src/shared/snapshot";
@@ -86,6 +86,22 @@ describe("the snapshot of a tree", () => {
       expect(tree.rows().history_snapshot).toEqual([]);
       const snapshot = await opened(tree);
       expect(snapshot.people.map((one) => one.id)).toEqual([person("eve")]);
+    }));
+});
+
+describe("a snapshot made while somebody is erased", () => {
+  it("is neither given nor kept with them", () =>
+    inTree(async (tree) => {
+      tree.do((c) => addPerson(c, "ada"));
+      tree.do((c) => addPerson(c, "eve"));
+      const id = person("ada");
+      // It reads the tree at once and is packed after a wait, in which the erasure comes.
+      const pending = snapshotsOf(tree.storage, tree.work).rebuild();
+      const erased = eraseHere(tree.work, { actor: anna, now: 5 }, id, () => event("new"));
+      expect(erased.ok).toBe(true);
+      const snapshot = await unpacked(await pending);
+      expect(snapshot.people.map((one) => one.id)).toEqual([person("eve")]);
+      expect(JSON.stringify(tree.rows())).not.toContain(id);
     }));
 });
 
