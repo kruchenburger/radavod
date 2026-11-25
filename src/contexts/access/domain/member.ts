@@ -31,14 +31,21 @@ export type Change = (
 /** A setup code that let a keeper in, by its hash. Each code does so once. */
 export type SetupCode = { hash: string; usedAt: number };
 
-/** What the access of a family holds. A family has few members: they are read all at once. */
+/**
+ * What the access of a family holds. A family has few members: they are read all at once. Lists come
+ * in the order of their identifiers.
+ */
 export interface AccessReader {
   member(id: MemberId): Member | null;
   members(): Member[];
   invitation(id: string): Invitation | null;
   invitationByHash(hash: string): Invitation | null;
+  /** Every invitation that is kept: a family gives few. */
+  invitations(): Invitation[];
   /** The recovery links of a member that are not spent. */
   recoveriesOf(member: MemberId): Invitation[];
+  /** Whether a person was erased from the tree: nobody is tied to them again. */
+  isErased(person: PersonId): boolean;
   /** Whether a setup code, by its hash, ever let a keeper in. */
   isCodeUsed(hash: string): boolean;
   credential(id: string): Credential | null;
@@ -182,4 +189,19 @@ export function deleteAccount(reader: AccessReader, id: MemberId): Result<Change
       ...writes("member", id, member.value, null),
     ],
   };
+}
+
+/** Members and invitations tied to people erased from the tree are tied to nobody now. */
+export function withoutPeople(reader: AccessReader, people: readonly PersonId[]): Change {
+  const gone = new Set<string>(people);
+  return [
+    ...reader
+      .members()
+      .filter(({ person }) => person !== null && gone.has(person))
+      .flatMap((one) => writes("member", one.id, one, { ...one, person: null })),
+    ...reader
+      .invitations()
+      .filter(({ person }) => person !== null && gone.has(person))
+      .flatMap((one) => writes("invitation", one.id, one, { ...one, person: null })),
+  ];
 }

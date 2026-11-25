@@ -1,4 +1,4 @@
-import type { AccessStore, Change } from "../../src/contexts/access";
+import type { AccessStore, Change, Limit, LogEntry } from "../../src/contexts/access";
 import type { MemberId } from "../../src/kernel/id";
 
 type Saved<Kind extends string> = NonNullable<Extract<Change[number], { kind: Kind }>["after"]>;
@@ -19,7 +19,7 @@ export class MemoryAccess implements AccessStore {
   }
 
   members() {
-    return [...this.rows.member.values()].map((one) => structuredClone(one));
+    return byKey([...this.rows.member.values()].map((one) => structuredClone(one)));
   }
 
   invitation(id: string) {
@@ -31,13 +31,63 @@ export class MemoryAccess implements AccessStore {
   }
 
   recoveriesOf(member: MemberId) {
-    return [...this.rows.invitation.values()]
-      .filter((one) => one.kind === "recovery" && one.member === member && one.spentAt === null)
-      .map((one) => structuredClone(one));
+    return byKey(
+      [...this.rows.invitation.values()]
+        .filter((one) => one.kind === "recovery" && one.member === member && one.spentAt === null)
+        .map((one) => structuredClone(one)),
+    );
+  }
+
+  readonly erased = new Set<string>();
+
+  isErased(person: string) {
+    return this.erased.has(person);
+  }
+
+  salt() {
+    return "salt";
   }
 
   isCodeUsed(hash: string) {
     return this.rows.setup.has(hash);
+  }
+
+  invitations() {
+    return byKey([...this.rows.invitation.values()].map((one) => structuredClone(one)));
+  }
+
+  readonly tries: { limit: string; key: string; at: number }[] = [];
+  readonly entries: LogEntry[] = [];
+
+  triesOf(limit: Limit, key: string, since: number) {
+    return this.tries
+      .filter((one) => one.limit === limit && one.key === key && one.at > since)
+      .map(({ at }) => at);
+  }
+
+  tried(limit: Limit, key: string, at: number) {
+    this.tries.push({ limit, key, at });
+  }
+
+  log(entry: LogEntry) {
+    this.entries.unshift(structuredClone(entry));
+  }
+
+  logged() {
+    return structuredClone(this.entries);
+  }
+
+  clean(now: number, triesBefore: number) {
+    for (const [hash, one] of this.rows.session)
+      if (one.expiresAt <= now) this.rows.session.delete(hash);
+    for (const [id, one] of this.rows.invitation) {
+      if (one.expiresAt <= now) this.rows.invitation.delete(id);
+    }
+    this.tries.splice(0, this.tries.length, ...this.tries.filter(({ at }) => at > triesBefore));
+  }
+
+  isWaiting() {
+    return this.rows.session.size + this.rows.invitation.size + this.tries.length > 0;
   }
 
   credential(id: string) {
@@ -45,9 +95,11 @@ export class MemoryAccess implements AccessStore {
   }
 
   credentialsOf(member: MemberId) {
-    return [...this.rows.credential.values()]
-      .filter((one) => one.member === member)
-      .map((one) => structuredClone(one));
+    return byKey(
+      [...this.rows.credential.values()]
+        .filter((one) => one.member === member)
+        .map((one) => structuredClone(one)),
+    );
   }
 
   session(hash: string) {
@@ -55,9 +107,11 @@ export class MemoryAccess implements AccessStore {
   }
 
   sessionsOf(member: MemberId) {
-    return [...this.rows.session.values()]
-      .filter((one) => one.member === member)
-      .map((one) => structuredClone(one));
+    return byKey(
+      [...this.rows.session.values()]
+        .filter((one) => one.member === member)
+        .map((one) => structuredClone(one)),
+    );
   }
 
   save(change: Change): void {
@@ -68,6 +122,12 @@ export class MemoryAccess implements AccessStore {
       else rows.set(id, structuredClone(after));
     }
   }
+}
+
+/** In the order of their keys, as the database gives them. */
+function byKey<T extends { id?: string; hash?: string }>(list: T[]): T[] {
+  const key = (one: T) => one.id ?? one.hash ?? "";
+  return list.sort((a, b) => (key(a) < key(b) ? -1 : key(a) > key(b) ? 1 : 0));
 }
 
 function copy<T>(value: T | undefined): T | null {
