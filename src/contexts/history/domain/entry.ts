@@ -31,8 +31,9 @@ export function patchesOf(changed: Changed): Patch[] {
 
 /**
  * Under whose identifiers an entry is found: the aggregate itself, and every person the patches name,
- * so that erasing somebody finds all that is said of them. Of those who went from one branch to
- * another there may be hundreds: they are found under the branches.
+ * so that erasing somebody finds all that is said of them. An edit that does not name them, as of the
+ * note of an event they were at, is found by the aggregate, which the entry that named them tells. Of
+ * those who went from one branch to another there may be hundreds: they are found under the branches.
  */
 export function subjectsOf(changed: Changed, patches: readonly Patch[]): string[] {
   const { kind, id, before, after } = changed;

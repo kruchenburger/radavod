@@ -1,4 +1,5 @@
 import { describe, expect, it } from "vitest";
+import { journalOver, sqliteJournal } from "../../src/contexts/history";
 import { sqliteKinship } from "../../src/contexts/kinship";
 import type { LifeEvent } from "../../src/contexts/life";
 import { parseFuzzyDate } from "../../src/kernel/fuzzy-date";
@@ -123,6 +124,44 @@ describe("a scenario", () => {
       expect(tree.rows()).toEqual(before);
       inner();
       expect(tree.entries).toBe(1);
+    }));
+
+  it("is found by everybody it ever tied to somebody, what came after by the aggregate", () =>
+    inTree((tree) => {
+      const journal = journalOver(sqliteJournal(tree.storage.sql));
+      tree.do((c) => {
+        for (const who of ["ada", "eve", "kid"]) addPerson(c, who);
+      });
+      const guest = birth("eve", {
+        participants: [
+          { person: person("eve"), role: "principal" },
+          { person: person("ada"), role: "guest" },
+        ],
+      });
+      tree.do((c) => accepted(c.life.add(guest)));
+      tree.do((c) => accepted(c.life.edit(person("eve"), { ...guest, note: "пришла поздно" })));
+      tree.do((c) => accepted(c.life.remove(person("eve"), guest.id)));
+      tree.do((c) => addUnion(c, "u", "ada", "eve"));
+      const kind = { do: "edit-union", id: union("u"), patch: { kind: "civil" } } as const;
+      tree.do((c) => accepted(c.kinship.apply(kind)));
+      tree.do((c) => accepted(c.kinship.apply({ do: "remove-union", id: union("u") })));
+      tree.do((c) => addParent(c, "kid", "ada"));
+      tree.do((c) =>
+        accepted(c.kinship.apply({ do: "remove-parent", child: person("kid"), id: "ada" })),
+      );
+
+      const named = journal.entriesOf(person("ada"));
+      const all = Array.from({ length: tree.entries }, (_, i) => i + 1);
+      const says = all.filter((n) => JSON.stringify(journal.entry(n)).includes(person("ada")));
+      expect(named).toEqual(says);
+      // The note and the kind name nobody. They are entries 3 and 6.
+      expect(all.filter((n) => !named.includes(n))).toEqual([3, 6]);
+      const aggregates = named.flatMap((n) => journal.entry(n)?.patches ?? []);
+      const around = aggregates.flatMap(({ aggregate }) => {
+        const [, id = ""] = aggregate.split("/");
+        return journal.entriesOf(id);
+      });
+      expect([...new Set(around)].sort((a, b) => a - b)).toEqual(all);
     }));
 
   it("cannot change what it read behind the journal", () =>

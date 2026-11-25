@@ -159,6 +159,7 @@ describe("the journal", () => {
         .exec<{ size: number }>("SELECT length(CAST(data AS BLOB)) AS size FROM history_entry")
         .toArray();
       expect(parts.length).toBeGreaterThan(10);
+      expect(parts.length).toBeLessThan(40);
       expect(Math.max(...parts.map(({ size }) => size))).toBeLessThan(1_900_000);
     }));
 
