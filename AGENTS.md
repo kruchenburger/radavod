@@ -60,6 +60,10 @@ The journal is never thinned, and any version can be rebuilt from it: `src/share
 
 An erasure is remembered in `FamilyAccess` first, then takes the person out of the tree, the trash and the whole journal in one transaction (`src/scenarios/erase.ts`). In the journal "erased" stands where others were tied to them. A new table or text that can name a person must be covered by `test/storage/erase.test.ts`, which looks into every raw row of both objects.
 
+## Access
+
+`src/contexts/access/domain/rights.ts` is the role table of the spec as data, and `can` is the only thing a route asks. The domain knows secrets by their hashes and time by the `now` it is given. Every change of access goes through `keepsAKeeper` in `accessOver`, so no order of operations leaves a set-up family without a keeper who can sign in. A reader may bind one device; an editor and a keeper sign in by passkey. A recovery link revokes the old credentials and sessions of its member at once. The erasure ledger is apart from all this and stays as it is.
+
 ## Texts
 
 Every text a person reads is in `web/i18n/ru.ts` and `web/i18n/en.ts`, reached through `t`. Words come from `docs/glossary.md`, wording from `.agents/skills/copy-steward/SKILL.md`. Read both before you add or change a text. Errors and API answers carry codes, not sentences.
