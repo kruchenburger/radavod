@@ -41,7 +41,7 @@ If the hook refuses, nothing has been sent.
      git reset --soft "$(git merge-base origin/main HEAD)"
      ```
 
-   - If the file doesn't belong here, run `git rm --cached <file>` and move it out of the repository. If it does, take the data out of it and run `git add <file>`.
+   - If the file doesn't belong here, run `git rm --cached --ignore-unmatch <file>` and move it out of the repository. If it does, take the data out of it and run `git add <file>`.
    - Run `git commit` and push.
 
 3. If the file is an invented example, put it in `examples/` and list it in `guards/data/examples.json` with the rules it may break.
