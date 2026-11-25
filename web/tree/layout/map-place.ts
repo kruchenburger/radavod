@@ -24,7 +24,7 @@ export function placeNodes(model: MapModel, metrics: MapMetrics): Placed {
   const entering = lanesInto(model);
   const room = (node: MapNode): { left: number; right: number } => ({
     left: tick + step * Math.max(1, entering.get(node)?.size ?? 0),
-    right: step * (node.exits.length + 1),
+    right: step * node.exits.length,
   });
 
   // Children come after their parents in the list, so from its end every subtree is ready.

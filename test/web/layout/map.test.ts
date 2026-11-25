@@ -318,15 +318,67 @@ describe("levels of one map", () => {
     expect(carry([3, 5], far, { ...near, cards: [] })).toEqual([3, 5]);
   });
 
-  it("are between 2:1 and 2.5:1 from far, for ten branches and for twenty-four", () => {
-    const [far] = maps as [BranchMap];
-    expect(far.width / far.height).toBeGreaterThan(1.9);
-    expect(far.width / far.height).toBeLessThan(2.6);
+  it.each([10, 24])("are between 2:1 and 2.5:1 from far with %i branches", (count) => {
+    const { width, height } = drawn(withBranches(count), { level: "far" });
+    expect(width / height).toBeGreaterThan(2);
+    expect(width / height).toBeLessThan(2.5);
   });
 });
 
-it("draws five thousand people", () => {
+it("draws five thousand people, and no ribbon of them", () => {
   const family = generateFamily(1, 5000);
+  const snapshot = snapshotOf(family);
   const last = family.unions.find(({ id }) => id === family.lastCouple);
-  drawn(snapshotOf(family), { level: "closer", lineOf: last?.partners[0] ?? null });
+  drawn(snapshot, { level: "closer", lineOf: last?.partners[0] ?? null });
+  const maps = levels.map((level) => draw(snapshot, { level }));
+  expect(new Set(maps.map(({ perRow }) => perRow)).size).toBe(1);
+  expect((maps[0]?.width ?? 0) / (maps[0]?.height ?? 1)).toBeLessThan(8);
 }, 60_000);
+
+/** The invented families of several seeds, until there are enough branches. */
+function withBranches(count: number): TreeSnapshot {
+  const all: TreeSnapshot = { ...familyOf({ people: [] }) };
+  const wanted = new Set<string>();
+  for (let seed = 1; wanted.size < count; seed += 1) {
+    const { people, unions, branches } = snapshotOf(generateFamily(seed, 300));
+    const own = (id: string): string => `${seed} ${id}`;
+    const kept = branches.slice(0, count - wanted.size);
+    for (const branch of kept) wanted.add(own(branch.id));
+    all.branches.push(...kept.map((branch) => ({ ...branch, id: own(branch.id) })));
+    const isKept = (branch: string | null): boolean =>
+      branch !== null && wanted.has(own(branch));
+    const ids = new Set(people.filter(({ branch }) => isKept(branch)).map(({ id }) => id));
+    for (const { partners } of unions) {
+      const [a, b] = partners;
+      if (b === null) continue;
+      // Partners without a branch come along; those of a branch left out do not.
+      const branchless = (id: string): boolean =>
+        people.find((person) => person.id === id)?.branch === null;
+      if (ids.has(a) && branchless(b)) ids.add(b);
+      if (ids.has(b) && branchless(a)) ids.add(a);
+    }
+    all.people.push(
+      ...people
+        .filter(({ id }) => ids.has(id))
+        .map((person) => ({
+          ...person,
+          id: own(person.id),
+          branch: person.branch === null ? null : own(person.branch),
+          parents: person.parents.map(({ parent, ...rest }) => ({
+            ...rest,
+            parent: parent === null ? null : own(parent),
+          })),
+        })),
+    );
+    all.unions.push(
+      ...unions
+        .filter(({ partners: [a, b] }) => ids.has(a) && b !== null && ids.has(b))
+        .map(({ partners: [a, b], ...union }) => ({
+          ...union,
+          id: own(union.id),
+          partners: [own(a), b === null ? null : own(b)] as [string, string | null],
+        })),
+    );
+  }
+  return all;
+}

@@ -1,7 +1,7 @@
 import type { TreeBranch, TreeSnapshot } from "../../../src/shared/tree";
 import { drawMapLines, planLines } from "./map-lines";
 import { type MapModel, mapModelOf } from "./map-model";
-import { placeNodes } from "./map-place";
+import { type Placed, placeNodes } from "./map-place";
 import type { Box, Card, Layout, Measure } from "./types";
 
 export type MapLevel = "far" | "closer" | "near";
@@ -27,11 +27,11 @@ export type MapMetrics = {
 export const mapMetrics: Record<MapLevel, MapMetrics> = {
   far: {
     step: 3,
-    w: 39,
-    line: 8,
+    w: 36,
+    line: 9,
     axis: 9,
     tick: 3,
-    rows: 21,
+    rows: 24,
     gutter: 21,
     padX: 15,
     padY: 15,
@@ -62,6 +62,23 @@ export const mapMetrics: Record<MapLevel, MapMetrics> = {
     head: 80,
   },
 };
+
+/** From far, when there are more branches than inks. */
+const farMetrics: MapMetrics = {
+  step: 3,
+  w: 24,
+  line: 8,
+  axis: 6,
+  tick: 3,
+  rows: 21,
+  gutter: 18,
+  padX: 9,
+  padY: 15,
+  head: 60,
+};
+
+export const metricsOf = (level: MapLevel, pages: number): MapMetrics =>
+  level === "far" && pages > 12 ? farMetrics : mapMetrics[level];
 
 export type MapOptions = {
   level: MapLevel;
@@ -112,8 +129,8 @@ export type BranchMap = Omit<Layout, "cards"> & {
  */
 export function branchMap(snapshot: TreeSnapshot, options: MapOptions): BranchMap {
   const { level } = options;
-  const metrics = { ...mapMetrics[level], ...options.metrics };
   const model = mapModelOf(snapshot, options.lineOf ?? null);
+  const metrics = { ...metricsOf(level, model.pages.length), ...options.metrics };
   const placed = placeNodes(model, metrics);
   const plan = planLines(model, placed, metrics);
   const sheets = sheetsOf(snapshot, model, { placed, gaps: plan.gaps, metrics, options });
@@ -192,7 +209,7 @@ function sheetsOf(
     metrics,
     options,
   }: {
-    placed: ReturnType<typeof placeNodes>;
+    placed: Placed;
     gaps: number[][];
     metrics: MapMetrics;
     options: MapOptions;
@@ -238,7 +255,7 @@ function sheetsOf(
       tops,
     };
   });
-  const perRow = fittingPerRow(list, metrics, options);
+  const perRow = fittingPerRow(list, placed, { metrics, options });
   list.forEach((sheet, i) => {
     sheet.row = Math.floor(i / perRow);
     sheet.column = i % perRow;
@@ -246,19 +263,48 @@ function sheetsOf(
   return { perRow, list };
 }
 
+/** A map more than so many times as wide as high gets fewer pages in a row. */
+const widest = 8;
+
 function fittingPerRow(
   sheets: Sheet[],
-  { gutter }: MapMetrics,
-  { perRow, width }: MapOptions,
+  placed: Placed,
+  { metrics, options: { perRow, width } }: { metrics: MapMetrics; options: MapOptions },
 ): number {
-  let count = Math.max(1, Math.floor(perRow ?? Math.round(Math.sqrt(sheets.length * 2.5))));
-  const widthOf = (columns: number): number => {
-    const widths = Array.from({ length: columns }, () => 0);
-    sheets.forEach(({ w }, i) => {
-      widths[i % columns] = Math.max(widths[i % columns] ?? 0, w);
-    });
-    return widths.reduce((sum, w) => sum + w + gutter, gutter);
+  let count = Math.max(1, Math.floor(perRow ?? Math.sqrt(sheets.length * 2.5) + 0.5));
+  const { gutter } = metrics;
+  while (width !== undefined && count > 1 && tableSize(sheets, count, gutter).w > width) count -= 1;
+  // Branches of hundreds make a ribbon nobody can read. Every level has to decide the same, so the
+  // pages are counted in people across and lines down, as they look from far.
+  const { far } = mapMetrics;
+  const counted = placed.pages.map(({ width: across, rowHeights }) => ({
+    w: (across / pitchOf(metrics)) * pitchOf(far),
+    h: rowHeights.reduce((sum, h) => sum + (h / metrics.line) * far.line + far.rows, far.head),
+  }));
+  const shape = (inRow: number): number => {
+    const { w, h } = tableSize(counted, inRow, far.gutter);
+    return w / h;
   };
-  while (width !== undefined && count > 1 && widthOf(count) > width) count -= 1;
+  while (perRow === undefined && count > 1 && shape(count) > widest) count -= 1;
   return count;
+}
+
+const pitchOf = ({ w, tick, step }: MapMetrics): number => w + tick + 2 * step;
+
+/** Columns are as wide as their widest page, rows as high as their highest. */
+function tableSize(
+  pages: { w: number; h: number }[],
+  inRow: number,
+  gutter: number,
+): { w: number; h: number } {
+  const widths: number[] = [];
+  const heights: number[] = [];
+  pages.forEach(({ w, h }, i) => {
+    const [column, row] = [i % inRow, Math.floor(i / inRow)];
+    widths[column] = Math.max(widths[column] ?? 0, w);
+    heights[row] = Math.max(heights[row] ?? 0, h);
+  });
+  const total = (sizes: number[]): number =>
+    sizes.reduce((sum, size) => sum + size + gutter, gutter);
+  return { w: total(widths), h: total(heights) };
 }
