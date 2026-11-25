@@ -275,6 +275,12 @@ describe("the affiliation of a place", () => {
     expect(ended.affiliationOn(id("a"), date("1918"))).toBe("Республика");
     expect(ended.affiliationOn(id("a"), date("1950"))).toBeNull();
     expect(ended.affiliationOn(id("a"), date("после 1917"))).toBeNull();
+    const { places: crossed } = start({
+      affiliations: [{ name: "Империя", period: period("до 1922", "1918") }],
+    });
+    expect(crossed.affiliationOn(id("a"), date("31.12.1918"))).toBe("Империя");
+    expect(crossed.affiliationOn(id("a"), date("1918"))).toBe("Империя");
+    expect(crossed.affiliationOn(id("a"), date("1921"))).toBeNull();
     const { places: after } = start({
       affiliations: [
         { name: "Империя", period: period("1795", "1917") },

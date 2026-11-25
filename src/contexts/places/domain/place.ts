@@ -84,12 +84,12 @@ function spanOf(date: FuzzyDate): Span | null {
  * day of 1921, and one that ended "after 1918" to the last day of 1918: more nobody knows.
  */
 function periodOf({ period }: Dated): Span {
-  const from = period?.from ? spanOf(period.from) : null;
-  const to = period?.to ? spanOf(period.to) : null;
-  return {
-    from: from && (from.from ?? from.to),
-    to: to && (to.to ?? (to.from === null ? null : to.from - 1)),
-  };
+  const start = period?.from ? spanOf(period.from) : null;
+  const end = period?.to ? spanOf(period.to) : null;
+  const from = start && (start.from ?? start.to);
+  const to = end && (end.to ?? (end.from === null ? null : end.from - 1));
+  // It began no later than it ended: "before 1922" and to 1918 is before 1918 was over.
+  return { from: from !== null && to !== null ? Math.min(from, to) : from, to };
 }
 
 /**
