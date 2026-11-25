@@ -1,7 +1,7 @@
 import type { BranchId, PersonId } from "../../../kernel/id";
 import type { Result } from "../../../kernel/result";
 import { type Change, Draft, type FamilyGraph } from "./family-graph";
-import { type Duplicate, duplicate, type Missing, missing } from "./refusal";
+import { type Duplicate, duplicate, type Missing, missing } from "../../../kernel/refusal";
 
 export type Branch = {
   id: BranchId;

@@ -1,3 +1,4 @@
+import { type Write, writes } from "../../../kernel/change";
 import type { BranchId, PersonId, UnionId } from "../../../kernel/id";
 import type { Branch } from "./branch";
 import type { Parentage, Person } from "./person";
@@ -11,14 +12,6 @@ export interface FamilyGraph {
   /** The parents of a person, for a walk up that needs nothing else. */
   parentsOf(id: PersonId): readonly Parentage[];
 }
-
-/** One aggregate before and after. Null stands for one that is not there. */
-type Write<Kind extends string, Id, Value> = {
-  kind: Kind;
-  id: Id;
-  before: Value | null;
-  after: Value | null;
-};
 
 /** A branch may be given to hundreds at once, so it is told apart from the person. */
 export type PersonRecord = Omit<Person, "branch">;
@@ -78,18 +71,14 @@ export class Draft {
     const change: Change = [];
     for (const [id, person] of this.#people) {
       const stored = this.#storedPerson(id);
-      const [before, after] = [stored && recordOf(stored), recordOf(person)];
-      if (differ(before, after)) change.push({ kind: "person", id, before, after });
-      const [from, to] = [stored?.branch ?? null, person.branch];
-      if (from !== to) change.push({ kind: "person-branch", id, before: from, after: to });
+      change.push(...writes("person", id, stored && recordOf(stored), recordOf(person)));
+      change.push(...writes("person-branch", id, stored?.branch ?? null, person.branch));
     }
     for (const [id, after] of this.#unions) {
-      const before = this.#graph.union(id);
-      if (differ(before, after)) change.push({ kind: "union", id, before, after });
+      change.push(...writes("union", id, this.#graph.union(id), after));
     }
     for (const [id, after] of this.#branches) {
-      const before = this.#graph.branch(id);
-      if (differ(before, after)) change.push({ kind: "branch", id, before, after });
+      change.push(...writes("branch", id, this.#graph.branch(id), after));
     }
     return change;
   }
@@ -107,14 +96,4 @@ function recordOf(person: Person): PersonRecord {
   const { id, version, sex, living, names, mainName, parents, children, unions, childOrder } =
     person;
   return { id, version, sex, living, names, mainName, parents, children, unions, childOrder };
-}
-
-/** Aggregates are plain data. The order of its keys says nothing. */
-function differ(a: unknown, b: unknown): boolean {
-  return JSON.stringify(a, inOrder) !== JSON.stringify(b, inOrder);
-}
-
-function inOrder(_: string, value: unknown): unknown {
-  if (typeof value !== "object" || value === null || Array.isArray(value)) return value;
-  return Object.fromEntries(Object.entries(value).sort(([a], [b]) => (a < b ? -1 : 1)));
 }

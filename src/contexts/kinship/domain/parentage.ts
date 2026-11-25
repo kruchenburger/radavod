@@ -2,7 +2,7 @@ import type { PersonId } from "../../../kernel/id";
 import type { Result } from "../../../kernel/result";
 import { type Change, Draft, type FamilyGraph } from "./family-graph";
 import type { Parentage, Person } from "./person";
-import { type Duplicate, duplicate, type Missing, missing } from "./refusal";
+import { type Duplicate, duplicate, type Missing, missing } from "../../../kernel/refusal";
 import { newcomers } from "./sets";
 
 export type ParentageError =
@@ -83,7 +83,7 @@ function refusalOf(
 }
 
 /** Whether a parentage makes an ancestor: guardianship and an unknown kind may go in a circle. */
-function descends({ kind }: Parentage): boolean {
+export function descends({ kind }: Parentage): boolean {
   return kind === "blood" || kind === "adoption";
 }
 
