@@ -36,7 +36,9 @@ export type NarrowMetrics = {
   detail: number;
   focusName: number;
   focusDetail: number;
+  /** Room for buttons: on the card of the person, and under a partner with several unions. */
   actions: number;
+  children: number;
 };
 
 export const narrowMetrics: NarrowMetrics = {
@@ -54,6 +56,7 @@ export const narrowMetrics: NarrowMetrics = {
   focusName: 31,
   focusDetail: 21,
   actions: 52,
+  children: 44,
 };
 
 export type NarrowOptions = Reach & {
@@ -154,7 +157,8 @@ export function aroundNarrow(
     const most = Math.max(
       ...(["left", "right"] as const).map((side) => sides.get(`${side} ${entry.key}`)?.length ?? 0),
     );
-    const h = Math.max(own.h, (most + 2) * step);
+    const room = entry.role === "partner" && model.open !== null ? metrics.children : 0;
+    const h = Math.max(own.h + room, (most + 2) * step);
     cards.push({ ...entry, lines: own.lines, x, y, w: right - x, h });
     y += h;
   }

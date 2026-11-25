@@ -1,0 +1,239 @@
+.said {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  margin: 0;
+  overflow: hidden;
+  clip-path: inset(50%);
+  white-space: nowrap;
+}
+
+.screen {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+}
+
+.halves {
+  display: flex;
+  gap: 1.5rem;
+  padding: 0.5rem 1.75rem 0;
+}
+
+.halves a {
+  display: inline-flex;
+  align-items: center;
+  min-height: 2.5rem;
+  border-bottom: 2px solid transparent;
+  color: var(--muted);
+  text-decoration: none;
+}
+
+.halves a[aria-current] {
+  border-color: var(--ink);
+  color: var(--ink);
+  font-weight: 500;
+}
+
+.scroller {
+  flex: 1;
+  display: flex;
+  overflow-x: auto;
+}
+
+.sheet {
+  display: flex;
+  margin: 0 auto;
+}
+
+.body {
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  padding: 3rem 0 1rem;
+}
+
+.canvas {
+  position: relative;
+}
+
+.columns {
+  position: absolute;
+  inset: 0 auto 0;
+}
+
+.columns h2 {
+  position: absolute;
+  top: 1rem;
+  margin: 0;
+  color: var(--muted);
+  font: italic 400 0.9375rem/1.2 var(--serif);
+}
+
+.strip {
+  position: absolute;
+  inset: 2.5rem auto 0;
+  background-color: var(--surface);
+}
+
+.card {
+  position: absolute;
+  top: 0;
+  left: 0;
+}
+
+.name {
+  position: absolute;
+  inset: 0;
+  color: inherit;
+  text-decoration: none;
+}
+
+a.name:hover > span > span {
+  text-decoration: underline;
+  text-underline-offset: 3px;
+}
+
+.folded {
+  position: absolute;
+  top: 0.25rem;
+  right: 0;
+  color: var(--action);
+  font-size: 0.875rem;
+  line-height: 1.3125rem;
+}
+
+.screen[data-as="wide"] .card[data-role="partner"]::before {
+  content: "";
+  position: absolute;
+  inset: 0 1.375rem auto;
+  border-top: 1px solid var(--edge);
+}
+
+.actions {
+  position: absolute;
+  inset: auto 1.375rem 0.5rem;
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  pointer-events: none;
+}
+
+.actions a {
+  display: inline-flex;
+  align-items: center;
+  min-height: 1.75rem;
+  color: var(--action);
+  font-size: 0.9375rem;
+  text-underline-offset: 3px;
+  pointer-events: auto;
+}
+
+.children {
+  position: absolute;
+  bottom: 0.125rem;
+  left: 1.375rem;
+  display: inline-flex;
+  align-items: center;
+  min-height: 1.5rem;
+  color: var(--action);
+  font-size: 0.9375rem;
+  font-weight: 400;
+  text-underline-offset: 3px;
+}
+
+.children[aria-expanded="true"] {
+  color: var(--ink);
+  font-weight: 500;
+  text-decoration: none;
+}
+
+.legend {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0.25rem 1.625rem;
+  padding: 0.5rem 1.75rem;
+  color: var(--muted);
+  font-size: 0.9375rem;
+}
+
+.legend a {
+  display: inline-flex;
+  align-items: center;
+  min-height: 1.75rem;
+  color: var(--action);
+  text-underline-offset: 3px;
+}
+
+.screen[data-as="narrow"] .scroller {
+  overflow: visible;
+}
+
+.screen[data-as="narrow"] .sheet {
+  margin: 0;
+}
+
+.screen[data-as="narrow"] .body {
+  justify-content: flex-start;
+  padding: 0.75rem 1rem;
+}
+
+.screen[data-as="narrow"] .card[data-focus]::before {
+  content: "";
+  position: absolute;
+  inset: 0 -1rem;
+  z-index: -1;
+  background-color: var(--surface);
+}
+
+.screen[data-as="narrow"] .canvas {
+  isolation: isolate;
+}
+
+.actions[data-as="narrow"] {
+  inset: auto 0 0.25rem;
+  flex-direction: row;
+  flex-wrap: wrap;
+  justify-content: space-between;
+  gap: 0 1rem;
+}
+
+.actions[data-as="narrow"] a {
+  min-height: 2.75rem;
+}
+
+.children[data-as="narrow"] {
+  bottom: 0;
+  left: 1.125rem;
+  min-height: 2.75rem;
+}
+
+/* A near miss must not put the partner in the centre. */
+.card[data-families] > .name {
+  bottom: 1.625rem;
+}
+
+.screen[data-as="narrow"] .card[data-families] > .name {
+  bottom: 2.75rem;
+}
+
+.screen[data-as="narrow"] .legend {
+  padding: 0.5rem 1rem 1rem;
+}
+
+.screen[data-as="narrow"] .legend a {
+  min-height: 2.75rem;
+}
+
+.screen[data-as="narrow"] .hint {
+  display: none;
+}
+
+@media (hover: none) {
+  .hint {
+    display: none;
+  }
+}

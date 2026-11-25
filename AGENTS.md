@@ -6,7 +6,7 @@ A private family tree site that a family runs on its own Cloudflare account. Thi
 
 TypeScript in strict mode, pnpm, Hono on Cloudflare Workers, two SQLite Durable Objects, Vitest in the Workers runtime, oxlint, dependency-cruiser. The browser app in `web` is React and Mantine, built by Vite. Node 26 or newer runs the tools.
 
-`src/worker` serves `/health` and `/api/*`. `FamilyTree` holds the tree, `FamilyAccess` holds members and sign-in. Every `/api/*` route answers 401 unless a session allows it.
+`src/worker` serves `/health`, `/config` and `/api/*`, and the app at the addresses of the example (`src/shared/sample-path.ts`). `FamilyTree` holds the tree, `FamilyAccess` holds members and sign-in. Every `/api/*` route answers 401 unless a session allows it.
 
 ## Commands
 
@@ -56,11 +56,15 @@ Every text a person reads is in `web/i18n/ru.ts` and `web/i18n/en.ts`, reached t
 
 `examples/` holds an invented family of 300. `generateFamily(seed, size)` makes it and `examples/family.json` is its output for seed 1; a test compares them, so change the generator and run `pnpm examples`. Every invented name is in `examples/names.ts`. The app never imports `examples/`, and its types are not the domain model.
 
-`examples/snapshot.ts` turns the family into a tree snapshot. `pnpm build` writes it with the person to begin with to `dist/client/sample/tree.json`, and the app fetches it from there.
+`examples/snapshot.ts` turns the family into a tree snapshot. `pnpm build` writes it with the person to begin with (`examples/start.ts`) and the owner of the direct line to `dist/client/sample/tree.json`, and the app fetches it from there.
 
 ## Tree
 
 `src/shared/tree.ts` is the snapshot of the tree that the server will send. `web/tree/layout` turns it into places: `around` and `aroundNarrow` for the view around a person, `branchMap` for the map, following `docs/design.md`. These are pure functions with no DOM, no clock and no texts; they judge nothing and draw what the snapshot says. `web/tree/map-layouter.ts` runs the map in a worker.
+
+`web/sample` holds the screens of the example and `web/sample/places.ts` their addresses: a place, a person and a zoom are in the address, and nothing a person would lose with a link is kept elsewhere. `web/tree/type.ts` measures names in the fonts of the page; lengths of the layout go to styles through `rem`, so the tree grows with the text. `web/tree/map/view.ts` is the math of the map, `paint.ts` its canvas, `map-view.tsx` the links over it.
+
+`test/e2e/frames.spec.ts` prints the frame times of panning the map and fails on none of them.
 
 A layout is tested by `test/web/layout/geometry.ts`, not by snapshots of coordinates: nothing overlaps, no line enters a card, everybody stands once, every link is there. A new rule of drawing becomes a check there and a planted defect in `geometry.test.ts`. A family that is hard to draw goes to `cases.ts`.
 
@@ -82,6 +86,7 @@ The guard has no other exception. Its broken examples are built by `guards/data/
 | -------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
 | `APP_VERSION`  | Version shown by `/health`, `dev` by default                                                                                                                                             |
 | `JURISDICTION` | Where the Durable Objects live: `eu` (default) or `none`. Any other value is refused. Choose before the first run: another value opens new, empty objects and leaves the old data behind |
+| `SAMPLE`       | `on` opens the invented family to anybody, under `/sample`. Anything else is off, and so is the default                                                                                  |
 
 Local workerd has no jurisdictions, so tests run with `none`.
 

@@ -1,0 +1,5 @@
+/* Whatever has no ring of its own. Low specificity, so that a component may move it. */
+:where(:focus-visible) {
+  outline: 2px solid var(--action);
+  outline-offset: 2px;
+}

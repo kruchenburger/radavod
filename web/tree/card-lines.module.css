@@ -1,0 +1,48 @@
+.said {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  overflow: hidden;
+  clip-path: inset(50%);
+  white-space: nowrap;
+}
+
+.lines > span {
+  position: absolute;
+  white-space: pre;
+}
+
+.lines .given,
+.lines .surname {
+  color: var(--ink);
+}
+
+.lines .given[data-unnamed] {
+  font-style: italic !important;
+}
+
+.lines .years,
+.lines .detail,
+.lines .title,
+.lines .unknown,
+.lines .sign {
+  color: var(--muted);
+}
+
+.lines .years {
+  font-weight: 400 !important;
+}
+
+.lines .years[data-chosen] {
+  color: var(--ink);
+}
+
+.lines .branch {
+  color: var(--no-branch);
+}
+
+.lines .sign {
+  display: flex;
+  align-items: center;
+  font-size: 0.9375rem;
+}

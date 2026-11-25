@@ -1,7 +1,7 @@
 import { cleanup } from "@testing-library/react";
 import { afterEach, vi } from "vitest";
 
-// jsdom has neither; Mantine needs both.
+// jsdom has none of these.
 window.matchMedia = (query) =>
   ({
     matches: false,
@@ -9,6 +9,8 @@ window.matchMedia = (query) =>
     addEventListener() {},
     removeEventListener() {},
   }) as unknown as MediaQueryList;
+HTMLCanvasElement.prototype.getContext = () => null;
+window.scrollTo = () => {};
 globalThis.ResizeObserver = class {
   observe() {}
   unobserve() {}

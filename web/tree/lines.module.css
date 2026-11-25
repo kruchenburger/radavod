@@ -1,0 +1,29 @@
+.lines {
+  position: absolute;
+  top: 0;
+  left: 0;
+  overflow: visible;
+  pointer-events: none;
+}
+
+.line,
+.direct {
+  fill: none;
+  stroke: var(--rule);
+  stroke-linejoin: round;
+}
+
+.direct {
+  stroke: var(--ink);
+}
+
+.legend {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.5rem;
+  white-space: nowrap;
+}
+
+.legend svg {
+  flex: none;
+}

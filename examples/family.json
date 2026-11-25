@@ -1,15 +1,15 @@
 {
 "branches": [
-{"id":"b1","name":{"ru":"Ольхуничи","en":"The Olkhunich family"},"color":1},
-{"id":"b2","name":{"ru":"Вересуничи","en":"The Veresunich family"},"color":2},
-{"id":"b3","name":{"ru":"Журавени","en":"The Zhuraven family"},"color":3},
-{"id":"b4","name":{"ru":"Калинени","en":"The Kalinen family"},"color":4},
-{"id":"b5","name":{"ru":"Лозовени","en":"The Lozoven family"},"color":5},
-{"id":"b6","name":{"ru":"Мятлики","en":"The Myatlik family"},"color":6},
-{"id":"b7","name":{"ru":"Лаздутисы","en":"The Lazdutis family"},"color":7},
-{"id":"b8","name":{"ru":"Сосенники","en":"The Sosennik family"},"color":8},
-{"id":"b9","name":{"ru":"Осочники","en":"The Osochnik family"},"color":9},
-{"id":"b10","name":{"ru":"Вайсройзы","en":"The Vaysroyz family"},"color":10}
+{"id":"b1","name":{"ru":"Ольхуничи","en":"Olkhuniches"},"color":1},
+{"id":"b2","name":{"ru":"Вересуничи","en":"Veresuniches"},"color":2},
+{"id":"b3","name":{"ru":"Журавени","en":"Zhuravens"},"color":3},
+{"id":"b4","name":{"ru":"Калинени","en":"Kalinens"},"color":4},
+{"id":"b5","name":{"ru":"Лозовени","en":"Lozovens"},"color":5},
+{"id":"b6","name":{"ru":"Мятлики","en":"Myatliks"},"color":6},
+{"id":"b7","name":{"ru":"Лаздутисы","en":"Lazdutises"},"color":7},
+{"id":"b8","name":{"ru":"Сосенники","en":"Sosenniks"},"color":8},
+{"id":"b9","name":{"ru":"Осочники","en":"Osochniks"},"color":9},
+{"id":"b10","name":{"ru":"Вайсройзы","en":"Vaysroyzes"},"color":10}
 ],
 "people": [
 {"id":"p1","sex":"male","living":"unknown","branch":"b1","names":[{"id":"n1","kind":"birth","language":"ru","script":"Cyrl","given":"Демьян","patronymic":"Павлович","surname":"Ольхунич","certainty":"hypothesis"},{"id":"n2","kind":"birth","language":"be","script":"Cyrl","given":"Дзям’ян","patronymic":"Паўлавіч","surname":"Альхуніч","certainty":"hypothesis"},{"id":"n3","kind":"variant","language":"ru","script":"Cyrl","given":"Демьянъ","patronymic":null,"surname":"Ольхуничъ","certainty":"hypothesis"}]},

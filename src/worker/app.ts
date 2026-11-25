@@ -1,5 +1,7 @@
 import { Hono } from "hono";
+import type { Config } from "../shared/config";
 import type { Health } from "../shared/health";
+import { parseSamplePath, SAMPLE_FILE } from "../shared/sample-path";
 import type { Env } from "./env";
 import { FAMILY_ID, stubFor } from "./stub";
 
@@ -17,6 +19,25 @@ app.get("/health", async (c) => {
   const health: Health = { status: ok ? "ok" : "error", version: c.env.APP_VERSION, tree, access };
   return c.json(health, ok ? 200 : 503);
 });
+
+app.get("/config", (c) => {
+  const config: Config = { sample: hasSample(c.env) };
+  return c.json(config, 200, { "cache-control": "no-store" });
+});
+
+// The app reads the address itself; every screen is the same page. The tree itself is a file.
+app.on("GET", ["/sample", "/sample/*"], (c) => {
+  const url = new URL(c.req.url);
+  if (!hasSample(c.env)) return c.notFound();
+  if (url.pathname === SAMPLE_FILE) return c.env.ASSETS.fetch(c.req.raw);
+  if (parseSamplePath(url.pathname) === null) return c.notFound();
+  return c.env.ASSETS.fetch(new Request(new URL("/", url), c.req.raw));
+});
+
+/** Anything but "on" is off, a typo too: the example never opens by chance. */
+function hasSample({ SAMPLE }: Pick<Env, "SAMPLE">): boolean {
+  return SAMPLE === "on";
+}
 
 async function check(name: string, ping: () => Promise<"ok">): Promise<"ok" | "error"> {
   try {

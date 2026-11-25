@@ -1,25 +1,32 @@
-import { SegmentedControl, Text, Title, useMantineColorScheme } from "@mantine/core";
+import { Button, SegmentedControl, Text, Title, useMantineColorScheme } from "@mantine/core";
 import { useQuery } from "@tanstack/react-query";
 import { type ReactNode, useId } from "react";
 import { locales } from "../i18n/t";
+import { useArrival } from "./arrival";
 import { brace } from "./brace";
+import { configQuery } from "./config";
 import { healthQuery } from "./health";
 import classes from "./home.module.css";
 import { useLanguage } from "./language";
+import { Link } from "./router";
 
 const themes = ["light", "dark"] as const;
 
 export function Home() {
   const { t, locale, setLocale } = useLanguage();
   const { colorScheme, setColorScheme } = useMantineColorScheme();
+  const heading = useArrival<HTMLHeadingElement>();
   return (
     <main className={classes.page}>
       <div className={classes.left}>
         <Blank />
       </div>
       <div className={classes.right}>
-        <Title className={classes.name}>{t("app.name")}</Title>
+        <Title ref={heading} tabIndex={-1} className={classes.name}>
+          {t("app.name")}
+        </Title>
         <Text className={classes.about}>{t("app.about")}</Text>
+        <Example />
         <div className={classes.settings}>
           <Choice
             label={t("settings.language")}
@@ -40,6 +47,21 @@ export function Home() {
         <Server />
       </div>
     </main>
+  );
+}
+
+/** Only where the installation allows it. Who cannot be asked allows nothing. */
+function Example() {
+  const { t } = useLanguage();
+  const { data } = useQuery(configQuery);
+  if (data?.sample !== true) return null;
+  return (
+    <div className={classes.example}>
+      <Button component={Link} href="/sample" size="md" variant="outline">
+        {t("sample.open")}
+      </Button>
+      <Text>{t("sample.invite")}</Text>
+    </div>
   );
 }
 

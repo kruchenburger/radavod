@@ -1,0 +1,145 @@
+.list {
+  box-sizing: border-box;
+  width: 100%;
+  max-width: 87rem;
+  margin: 0 auto;
+  padding: 1.375rem 1.75rem 3.75rem;
+}
+
+.list h1,
+.list h2,
+.list h3,
+.list h4,
+.list header p {
+  margin: 0;
+}
+
+.list header {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  gap: 0.25rem 1.125rem;
+  margin-bottom: 1.25rem;
+}
+
+.list header p {
+  flex: 1;
+  font-size: 1.125rem;
+}
+
+.list header p span {
+  margin-right: 0.5rem;
+}
+
+.list header b {
+  font-weight: 500;
+}
+
+.list h1 {
+  font: 700 2.875rem/1.1 var(--serif);
+  overflow-wrap: anywhere;
+}
+
+.list h1[data-unnamed] {
+  font-style: italic;
+}
+
+.list h2 {
+  margin-bottom: 0.625rem;
+  font: italic 400 1.375rem/1.2 var(--serif);
+}
+
+.columns {
+  display: grid;
+  grid-template-columns: minmax(0, 5fr) minmax(0, 6fr);
+  gap: 1.75rem 4rem;
+}
+
+.branch summary {
+  display: flex;
+  align-items: baseline;
+  gap: 0.625rem;
+  min-height: 2.75rem;
+  border-bottom: 1px solid var(--edge);
+  list-style: none;
+  cursor: pointer;
+}
+
+.branch summary::-webkit-details-marker {
+  display: none;
+}
+
+.branch summary::after {
+  content: "+";
+  margin-left: auto;
+  color: var(--action);
+  font-size: 1.375rem;
+  line-height: 1;
+}
+
+.branch[open] summary::after {
+  content: "–";
+}
+
+.branch summary:hover {
+  background-color: var(--hover);
+}
+
+.branch h3 {
+  font: 700 1.25rem/2 var(--serif);
+}
+
+.branch summary span {
+  color: var(--muted);
+}
+
+.branch ol,
+.branch ul {
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.branch ol {
+  padding: 0.5rem 0 0.875rem;
+}
+
+.branch ol > li {
+  display: grid;
+  grid-template-columns: 7rem minmax(0, 1fr);
+  padding: 0.25rem 0;
+}
+
+.branch h4 {
+  color: var(--muted);
+  font: italic 400 1.0625rem/1.6 var(--serif);
+}
+
+@media (max-width: 62em) {
+  .columns {
+    grid-template-columns: minmax(0, 1fr);
+  }
+}
+
+@media (max-width: 44.99em) {
+  .list {
+    padding: 1rem 1rem 2.5rem;
+  }
+
+  .list h1 {
+    font-size: 2rem;
+  }
+
+  .list header p {
+    flex: 1 0 100%;
+  }
+
+  .list header > a {
+    width: 100%;
+    margin-top: 0.5rem;
+  }
+
+  .branch ol > li {
+    display: block;
+  }
+}
