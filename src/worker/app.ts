@@ -1,4 +1,5 @@
 import { Hono } from "hono";
+import type { Health } from "../shared/health";
 import type { Env } from "./env";
 import { FAMILY_ID, stubFor } from "./stub";
 
@@ -13,10 +14,8 @@ app.get("/health", async (c) => {
     check("access", async () => stubFor(c.env.ACCESS, FAMILY_ID, c.env).ping()),
   ]);
   const ok = tree === "ok" && access === "ok";
-  return c.json(
-    { status: ok ? "ok" : "error", version: c.env.APP_VERSION, tree, access },
-    ok ? 200 : 503,
-  );
+  const health: Health = { status: ok ? "ok" : "error", version: c.env.APP_VERSION, tree, access };
+  return c.json(health, ok ? 200 : 503);
 });
 
 async function check(name: string, ping: () => Promise<"ok">): Promise<"ok" | "error"> {
