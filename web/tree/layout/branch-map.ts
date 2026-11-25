@@ -43,7 +43,7 @@ export const mapMetrics: Record<MapLevel, MapMetrics> = {
   closer: {
     step: 6,
     apart: 6,
-    w: 138,
+    w: 156,
     line: 19,
     axis: 24,
     tick: 12,
@@ -56,7 +56,7 @@ export const mapMetrics: Record<MapLevel, MapMetrics> = {
   near: {
     step: 8,
     apart: 8,
-    w: 184,
+    w: 208,
     line: 42,
     axis: 24,
     tick: 16,

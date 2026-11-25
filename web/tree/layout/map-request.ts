@@ -7,6 +7,8 @@ export type MapRequest = {
   levels: MapLevel[];
   /** Widths of the heads of pages by branch. Only the page has the fonts. */
   headWidths: [branch: string, width: number][];
+  /** The height of the heads from far, where the map shrinks and the names of its pages do not. */
+  farHead?: number;
 } & Pick<MapOptions, "lineOf" | "perRow" | "width">;
 
 /**
@@ -18,6 +20,7 @@ export function answer({
   levels,
   headWidths,
   lineOf = null,
+  farHead,
   ...first
 }: MapRequest): BranchMap[] {
   const widths = new Map(headWidths);
@@ -29,6 +32,7 @@ export function answer({
         ...(perRow === undefined ? first : { perRow }),
         lineOf,
         level,
+        ...(level === "far" && farHead !== undefined ? { metrics: { head: farHead } } : {}),
         headOf: ({ id }) => id,
         measure: (id) => widths.get(id) ?? 0,
       }),

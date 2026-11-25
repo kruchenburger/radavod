@@ -141,6 +141,8 @@ function textOf(
     const lines = flow([given, surname, years], {
       ...size(box, metrics.name),
       width: box.width - metrics.count,
+      // A name with a break leaves a line for the years.
+      lines: 3,
     });
     return { lines, h: Math.max(bottomOf(lines), box.top + metrics.name) + metrics.padY };
   }
@@ -149,7 +151,8 @@ function textOf(
     indent: entry.isSpouse ? metrics.ring : 0,
   });
   const below = Math.max(bottomOf(name), box.top + metrics.name);
-  const detail = flow(detailRuns(text), { ...size(box, metrics.detail), y: below });
+  // Dates told in words are long, and the branch still has to stand after them.
+  const detail = flow(detailRuns(text), { ...size(box, metrics.detail), y: below, lines: 3 });
   return { lines: [...name, ...detail], h: Math.max(bottomOf(detail), below) + metrics.padY };
 }
 
