@@ -15,7 +15,7 @@ beforeEach(() => {
   element.hasPointerCapture = () => false;
   pressed = vi.fn<() => void>();
   link.addEventListener("click", pressed);
-  asked = { pan: vi.fn(), zoom: vi.fn(), rest: vi.fn(), begin: vi.fn() };
+  asked = { pan: vi.fn(), zoom: vi.fn(), rest: vi.fn(), begin: vi.fn(), release: vi.fn() };
   stop = listen(element, asked as Asked);
 });
 
@@ -47,6 +47,9 @@ describe("a press", () => {
     expect(pressed).toHaveBeenCalledOnce();
     expect(asked.pan).not.toHaveBeenCalled();
     expect(asked.rest).not.toHaveBeenCalled();
+    // What was moving when the finger came down goes on.
+    expect(asked.begin).toHaveBeenCalledOnce();
+    expect(asked.release).toHaveBeenCalledOnce();
   });
 
   it("does not fire after a drag, and fires the next time", () => {
@@ -122,6 +125,15 @@ describe("a wheel", () => {
     wheel({ deltaX: 12, deltaY: 7.5 });
     expect(asked.pan).toHaveBeenCalledWith(-12, -7.5);
     wheel({ deltaY: 3.25, ctrlKey: true });
+    expect(asked.zoom).toHaveBeenCalledOnce();
+  });
+
+  it("is told from a pad by its first step, until the hand rests", () => {
+    wheel({ deltaX: 2, deltaY: 11.5 });
+    wheel({ deltaY: 120 });
+    expect(asked.zoom).not.toHaveBeenCalled();
+    vi.advanceTimersByTime(300);
+    wheel({ deltaY: 120 });
     expect(asked.zoom).toHaveBeenCalledOnce();
   });
 

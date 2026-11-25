@@ -52,6 +52,16 @@ describe.each([
   });
 });
 
+it.each([
+  ["on", 200],
+  ["off", 404],
+])("the tree itself is closed with the rest: %s", async (value, status) => {
+  asked.length = 0;
+  const res = await app.request("/sample/tree.json", {}, envWith(value));
+  expect(res.status).toBe(status);
+  expect(asked).toEqual(value === "on" ? ["/sample/tree.json"] : []);
+});
+
 it("serves the page of the app, whatever the address", async () => {
   asked.length = 0;
   await app.request("/sample/person/p1", {}, on);

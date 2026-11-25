@@ -82,7 +82,7 @@ export function readPlace(path: string, search: string): Place | null {
     person: idOf("person"),
     branch: idOf("branch"),
     at: person === undefined ? null : { person, dx: Number(dx), dy: Number(dy) },
-    scale: scale > 0 && scale <= 8 ? scale : 1,
+    scale: scale > 0 && scale <= 100 ? scale : 1,
   });
 }
 

@@ -167,8 +167,8 @@
   }
 
   /* The map is a sheet over the tree, with a head of its own. */
-  .frame[data-screen="branches"] .mark,
-  .frame[data-screen="branches"] .top {
+  .frame[data-sheet] .mark,
+  .frame[data-sheet] .top {
     display: none;
   }
 }

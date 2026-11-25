@@ -58,7 +58,7 @@ function Screens({ place, sample }: { place: Place; sample: TreeSample }) {
 
   return (
     <DataContext value={data}>
-      <Frame place={place} sample={sample}>
+      <Frame place={place} sample={sample} isSheet={place.screen === "branches" && !isUnknown}>
         {isUnknown ? (
           <Message
             text={t("person.unknown")}

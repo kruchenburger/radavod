@@ -12,7 +12,9 @@ import { useMaps } from "../tree/map/use-maps";
 import {
   fit,
   isNarrow,
+  isWhole,
   type Maps,
+  restingScale,
   type Size,
   spotOf,
   toLevel,
@@ -33,7 +35,7 @@ export function BranchesScreen({ place }: { place: BranchesPlace }) {
   const { snapshot, start } = useData();
   const heading = useArrival<HTMLHeadingElement>();
   const page = usePage();
-  const latest: LatestRef = useRef(null);
+  const [latest, setLatest] = useState<Latest | null>(null);
   const hint = useId();
   const isPhone = page.width < phone;
   // Two pages in a row on the phone, three when there are many. A window that is not wide has less
@@ -89,10 +91,13 @@ export function BranchesScreen({ place }: { place: BranchesPlace }) {
               {t("map.loading")}
             </p>
           )}
-          <PlacedMap place={place} maps={maps.of} hint={hint} latest={latest} />
+          <PlacedMap place={place} maps={maps.of} hint={hint} onLatest={setLatest} />
         </>
       )}
-      {place.level === "far" && <p className={classes.press}>{t("map.press")}</p>}
+      {/* It keeps its room on the other levels, so that the map does not change its height. */}
+      <p className={classes.press} data-off={place.level !== "far" || undefined}>
+        {t("map.press")}
+      </p>
       <p id={hint} className={classes.keys}>
         <b>{t("map.keyboard")}</b> {t(place.level === "far" ? "map.keysFar" : "map.keysNear")}
       </p>
@@ -101,12 +106,16 @@ export function BranchesScreen({ place }: { place: BranchesPlace }) {
 }
 
 type Latest = { view: View; window: Size; maps: Maps };
-type LatestRef = React.RefObject<Latest | null>;
 
-type PlacedMapProps = { place: BranchesPlace; maps: Maps; hint: string; latest: LatestRef };
+type PlacedMapProps = {
+  place: BranchesPlace;
+  maps: Maps;
+  hint: string;
+  onLatest: (latest: Latest) => void;
+};
 
 /** The view as the address tells it, and the address as the view is. */
-function PlacedMap({ place, maps, hint, latest }: PlacedMapProps) {
+function PlacedMap({ place, maps, hint, onLatest }: PlacedMapProps) {
   const { t } = useLanguage();
   const { snapshot, words } = useData();
   const href = hrefOf(place);
@@ -123,11 +132,12 @@ function PlacedMap({ place, maps, hint, latest }: PlacedMapProps) {
   const onRest = useCallback(
     (view: View, window: Size): void => {
       const { place: old, maps: own } = now.current;
-      latest.current = { view, window, maps: own };
-      written.current = hrefOf(placeOf(latest.current, old));
+      const latest = { view, window, maps: own };
+      onLatest(latest);
+      written.current = hrefOf(placeOf(latest, old));
       go(written.current, "replace");
     },
-    [latest],
+    [onLatest],
   );
   const onAway = useCallback((view: View, window: Size): void => {
     const { place: old, maps: own } = now.current;
@@ -174,7 +184,12 @@ function viewOf({ level, person, branch, at, scale }: BranchesPlace) {
     const map = maps[level];
     const whole = fit(maps.far, window, isNarrow(window));
     if (at !== null) {
-      const spot = viewOfSpot(at, level, level === "far" ? whole.k * scale : scale, map);
+      const spot = viewOfSpot(
+        at,
+        level,
+        restingScale(level, level === "far" ? whole.k * scale : scale),
+        map,
+      );
       if (spot !== null) return spot;
     }
     if (level === "far") return whole;
@@ -192,13 +207,9 @@ function viewOf({ level, person, branch, at, scale }: BranchesPlace) {
 /** The whole map from far has no place of its own: it is the same on every screen. */
 function placeOf({ view, window, maps }: Latest, { person }: BranchesPlace): BranchesPlace {
   const { level } = view;
+  if (isWhole(view, maps, window)) return branchesPlace({ person });
   const whole = fit(maps.far, window, isNarrow(window));
   const scale = level === "far" ? view.k / whole.k : view.k;
-  const isWhole =
-    level === "far" &&
-    Math.abs(scale - 1) < 0.01 &&
-    Math.hypot(view.x - whole.x, view.y - whole.y) * view.k < 4;
-  if (isWhole) return branchesPlace({ person });
   return branchesPlace({
     level,
     person,
@@ -217,14 +228,14 @@ function atLevel(level: MapLevel, place: BranchesPlace, latest: Latest | null): 
   return { ...base, at: spotOf(toLevel(view, level, 1, middle), maps[level]) };
 }
 
-function Levels({ place, latest }: { place: BranchesPlace; latest: LatestRef }) {
+function Levels({ place, latest }: { place: BranchesPlace; latest: Latest | null }) {
   const { t } = useLanguage();
   return (
     <nav className={classes.levels} aria-label={t("map.zoom")}>
       {levels.map((level) => (
         <Link
           key={level}
-          href={hrefOf(atLevel(level, place, latest.current))}
+          href={hrefOf(atLevel(level, place, latest))}
           aria-current={level === place.level ? "true" : undefined}
         >
           {t(`map.${level}`)}

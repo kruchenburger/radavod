@@ -117,6 +117,10 @@
     font-size: 0.9375rem;
   }
 
+  .press[data-off] {
+    visibility: hidden;
+  }
+
   .head > a {
     min-height: 2.75rem;
   }

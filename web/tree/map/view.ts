@@ -35,6 +35,32 @@ export function fit({ width, height }: BranchMap, window: Size, isNarrow: boolea
   return { level: "far", x: width / 2, y, k };
 }
 
+/** Whether this is the whole map from far, which is the same on every screen. */
+export function isWhole(view: View, maps: Pick<Maps, "far">, window: Size): boolean {
+  if (view.level !== "far") return false;
+  const whole = fit(maps.far, window, isNarrow(window));
+  return (
+    Math.abs(whole.k / view.k - 1) < 0.01 &&
+    Math.hypot(view.x - whole.x, view.y - whole.y) * view.k < 4
+  );
+}
+
+type Shown = { maps: Maps; window: Size };
+
+/** The same place after the map or the window has changed. */
+export function kept(view: View, before: Shown, now: Shown): View {
+  if (isWhole(view, before.maps, before.window)) {
+    return fit(now.maps.far, now.window, isNarrow(now.window));
+  }
+  const spot = spotOf(view, before.maps[view.level]);
+  const same = spot && viewOfSpot(spot, view.level, view.k, now.maps[view.level]);
+  return same ?? view;
+}
+
+/** A scale the level may rest at, whatever an address asks for. */
+export const restingScale = (level: MapLevel, k: number): number =>
+  Math.min(Math.max(k, rest[level].least), rest[level].most);
+
 /** The same view, with the map not further away than it has to be. */
 export function hold(view: View, map: BranchMap, window: Size): View {
   const along = (at: number, length: number, room: number): number => {

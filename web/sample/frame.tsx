@@ -10,16 +10,22 @@ import classes from "./frame.module.css";
 import { branchesPlace, hrefOf, type Place, treePlace } from "./places";
 import { SearchBox } from "./search-box";
 
-type FrameProps = { place: Place; sample: TreeSample | null; children: ReactNode };
+type FrameProps = {
+  place: Place;
+  sample: TreeSample | null;
+  /** The screen is the sheet of the map, with the mark and a way out of its own. */
+  isSheet?: boolean;
+  children: ReactNode;
+};
 
 /** What stands around every screen of the example. On the phone the map is a sheet over it. */
-export function Frame({ place, sample, children }: FrameProps) {
+export function Frame({ place, sample, isSheet = false, children }: FrameProps) {
   const { t } = useLanguage();
   const person = "person" in place ? place.person : null;
   const tree = hrefOf(treePlace(person));
   const branches = hrefOf(branchesPlace({ person }));
   return (
-    <div className={classes.frame} data-screen={place.screen}>
+    <div className={classes.frame} data-screen={place.screen} data-sheet={isSheet || undefined}>
       <div className={classes.mark}>
         <b>{t("sample.mark")}</b>
         <span>{t("sample.note")}</span>

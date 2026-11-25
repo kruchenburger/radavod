@@ -27,23 +27,22 @@ import classes from "./map-view.module.css";
 import { type Drawing, drawingOf, type Paint, paint } from "./paint";
 import {
   between,
-  fit,
   hold,
-  isNarrow,
+  kept,
   type Maps,
   pan,
   reveal,
   settle,
   type Size,
-  spotOf,
   toLevel,
   type View,
-  viewOfSpot,
   zoom,
 } from "./view";
 
+type Goal = (maps: Maps, window: Size) => View;
+
 /** A view to go to. The same object is gone to once. */
-export type Target = { view: (maps: Maps, window: Size) => View; isSmooth: boolean };
+export type Target = { view: Goal; isSmooth: boolean };
 
 export type MapViewProps = {
   snapshot: TreeSnapshot;
@@ -109,6 +108,8 @@ export function MapView(props: MapViewProps) {
     placeWorld(world.current, held, window);
     placeHeads(heads.current, map, held, window);
     // A window of cards is kept until the view comes to its edge.
+    const isOther = sameLevel.current !== held.level;
+    sameLevel.current = held.level;
     setSeen((old) => {
       const here = {
         x: -left / held.k,
@@ -123,8 +124,7 @@ export function MapView(props: MapViewProps) {
         here.x + here.w <= old.x + old.w &&
         here.y + here.h <= old.y + old.h &&
         old.w <= here.w + 6 * ahead;
-      if (isInside && sameLevel.current === held.level) return old;
-      sameLevel.current = held.level;
+      if (isInside && !isOther) return old;
       return { x: here.x - ahead, y: here.y - ahead, w: here.w + 2 * ahead, h: here.h + 2 * ahead };
     });
     const brush = canvas.current?.getContext("2d");
@@ -143,15 +143,22 @@ export function MapView(props: MapViewProps) {
     },
     [show],
   );
+  /** Where a movement goes, told again when the window changes on the way. */
+  const running = useRef<Goal | null>(null);
   const stop = useCallback((): void => cancelAnimationFrame(frame.current), []);
   const goTo = useCallback(
-    (end: View, isSmooth: boolean): void => {
+    (goal: View | Goal, isSmooth: boolean): void => {
       cancelAnimationFrame(frame.current);
       const { maps: own, size: window } = state.current;
       const from = view.current;
       if (window === null) return;
+      const end = typeof goal === "function" ? goal(own, window) : goal;
       const to = hold(end, own[end.level], window);
+      const before = { maps: own, window };
+      running.current =
+        typeof goal === "function" ? goal : (maps, window) => kept(to, before, { maps, window });
       const rest = (): void => {
+        running.current = null;
         show(to);
         setRests((count) => count + 1);
         state.current.onRest(to, window);
@@ -211,11 +218,14 @@ export function MapView(props: MapViewProps) {
     const before = shown.current;
     shown.current = { target, maps, size };
     const now = view.current;
-    if (before === null || now === null) goTo(target.view(maps, size), false);
-    else if (before.target !== target) goTo(target.view(maps, size), target.isSmooth);
-    else if (before.maps !== maps || before.size !== size)
-      goTo(kept(now, before, shown.current), false);
-    else show(now);
+    if (before === null || now === null) goTo(target.view, false);
+    else if (before.target !== target) goTo(target.view, target.isSmooth);
+    else if (before.maps === maps && before.size === size) show(now);
+    else if (running.current !== null) goTo(running.current, before.maps === maps);
+    else {
+      const was = { maps: before.maps, window: before.size };
+      goTo(kept(now, was, { maps, window: size }), false);
+    }
   }, [target, maps, size, drawings, goTo, show]);
 
   // What React has just put on the page has no place yet.
@@ -249,14 +259,19 @@ export function MapView(props: MapViewProps) {
     };
     return listen(element, {
       begin: stop,
+      release: () => {
+        if (running.current !== null) goTo(running.current, true);
+      },
       pan: (dx, dy) => {
         const unit = unitOf();
+        running.current = null;
         if (view.current !== null) request(pan(view.current, dx / unit, dy / unit));
       },
       zoom: (factor, px, py) => {
         const at = about(px, py);
         if (view.current === null || at === null) return;
         direction = factor > 1 ? "in" : "out";
+        running.current = null;
         request(zoom(view.current, factor, at));
       },
       rest: (px, py) => {
@@ -309,29 +324,13 @@ export function MapView(props: MapViewProps) {
   );
 }
 
-/** The same place after the map or the window changed. */
-function kept(
-  view: View,
-  before: { maps: Maps; size: Size },
-  now: { maps: Maps; size: Size },
-): View {
-  if (view.level === "far") {
-    const whole = fit(before.maps.far, before.size, isNarrow(before.size));
-    if (Math.abs(whole.k / view.k - 1) < 0.01)
-      return fit(now.maps.far, now.size, isNarrow(now.size));
-  }
-  const spot = spotOf(view, before.maps[view.level]);
-  const same = spot && viewOfSpot(spot, view.level, view.k, now.maps[view.level]);
-  return same ?? view;
-}
-
 const unitOf = (): number =>
   Number.parseFloat(getComputedStyle(document.documentElement).fontSize) / 16 || 1;
 
 type MovingProps = {
   map: BranchMap;
   view: React.RefObject<View | null>;
-  goTo: (view: View, isSmooth: boolean) => void;
+  goTo: (view: View | Goal, isSmooth: boolean) => void;
   size: Size | null;
 };
 
@@ -394,6 +393,15 @@ function People(
       ?.focus({ preventScroll: true });
   }, [isAsked, current]);
 
+  // A card that stays as it was must not bring itself into a window that was.
+  const focused = useRef((_: MapCard): void => {});
+  focused.current = (card) => {
+    lastPage.current = card.page;
+    setCurrent(card.key);
+    bring(card);
+  };
+  const onFocus = useCallback((card: MapCard): void => focused.current(card), []);
+
   const onKeyDown = (event: KeyboardEvent): void => {
     const arrow = arrows[event.key];
     const key = (event.target as HTMLElement).dataset["press"];
@@ -420,11 +428,7 @@ function People(
           isStop={card === stop}
           hrefOfPerson={hrefOfPerson}
           hrefOfReference={hrefOfReference}
-          onFocus={() => {
-            lastPage.current = card.page;
-            setCurrent(card.key);
-            bring(card);
-          }}
+          onFocus={onFocus}
         />
       ))}
     </div>
@@ -434,7 +438,13 @@ function People(
 type PersonOnMapProps = Pick<
   MapViewProps,
   "words" | "snapshot" | "hrefOfPerson" | "hrefOfReference"
-> & { card: MapCard; map: BranchMap; isChosen: boolean; isStop: boolean; onFocus: () => void };
+> & {
+  card: MapCard;
+  map: BranchMap;
+  isChosen: boolean;
+  isStop: boolean;
+  onFocus: (card: MapCard) => void;
+};
 
 const PersonOnMap = memo(
   function PersonOnMap({
@@ -498,7 +508,7 @@ const PersonOnMap = memo(
         aria-current={isChosen ? "true" : undefined}
         style={style}
         onFocus={({ target }) => {
-          if (target.matches(":focus-visible")) rest.onFocus();
+          if (target.matches(":focus-visible")) rest.onFocus(card);
         }}
       >
         <CardLines
@@ -513,7 +523,11 @@ const PersonOnMap = memo(
     );
   },
   (a, b) =>
-    a.card === b.card && a.words === b.words && a.isChosen === b.isChosen && a.isStop === b.isStop,
+    a.card === b.card &&
+    a.words === b.words &&
+    a.isChosen === b.isChosen &&
+    a.isStop === b.isStop &&
+    a.hrefOfReference === b.hrefOfReference,
 );
 
 /** The heads of the pages stand over the drawing and do not shrink with it. */
@@ -607,7 +621,6 @@ function placeHeads(box: HTMLElement | null, map: BranchMap, view: View, window:
     const aside = Math.min(Math.max(0, -x), Math.max(0, w - 160));
     title.style.transform = stuck === 0 ? "" : `translateY(${rem(stuck)})`;
     title.style.paddingLeft = rem(aside);
-    title.style.maxWidth = "";
   });
 }
 

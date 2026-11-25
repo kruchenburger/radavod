@@ -6,11 +6,15 @@ export type Asked = {
   rest: (px: number, py: number) => void;
   /** The first thing of a gesture: whatever moves on its own has to stop. */
   begin: () => void;
+  /** It was a press and no more: what was stopped goes on. */
+  release: () => void;
 };
 
 /** Less than this is a press with an unsteady hand. */
 const slack = 6;
 const wheelRest = 180;
+/** What a step of a wheel is in pixels: told in pixels, in lines or in pages. */
+const pixels = [1, 33, 400];
 
 /** Listens until the returned function is called. A press after a drag does not fire. */
 export function listen(element: HTMLElement, asked: Asked): () => void {
@@ -18,6 +22,8 @@ export function listen(element: HTMLElement, asked: Asked): () => void {
   let start: { x: number; y: number } | null = null;
   let isDragging = false;
   let wheelTimer: ReturnType<typeof setTimeout> | undefined;
+  /** One movement of a hand stays what it began as: a flick on a pad is as fast as a notch. */
+  let turning: "wheel" | "pad" | null = null;
 
   const placeOf = (event: MouseEvent): { x: number; y: number } => {
     const { left, top } = element.getBoundingClientRect();
@@ -62,10 +68,10 @@ export function listen(element: HTMLElement, asked: Asked): () => void {
   };
   const onUp = (event: PointerEvent): void => {
     if (!fingers.delete(event.pointerId)) return;
-    if (fingers.size === 0 && isDragging) {
-      const { x, y } = placeOf(event);
-      asked.rest(x, y);
-    }
+    if (fingers.size > 0) return;
+    const { x, y } = placeOf(event);
+    if (isDragging) asked.rest(x, y);
+    else asked.release();
   };
   const onClick = (event: MouseEvent): void => {
     // A press of a key is a click without a place.
@@ -77,10 +83,10 @@ export function listen(element: HTMLElement, asked: Asked): () => void {
     event.preventDefault();
     asked.begin();
     const { x, y } = placeOf(event);
-    if (event.ctrlKey || isMouseWheel(event)) {
-      const delta =
-        event.deltaMode === WheelEvent.DOM_DELTA_LINE ? event.deltaY * 33 : event.deltaY;
-      const most = event.ctrlKey && !isMouseWheel(event) ? 40 : 120;
+    turning ??= isMouseWheel(event) ? "wheel" : "pad";
+    if (event.ctrlKey || turning === "wheel") {
+      const delta = event.deltaY * (pixels[event.deltaMode] ?? 1);
+      const most = turning === "pad" ? 40 : 120;
       asked.zoom(
         Math.exp(-Math.max(-most, Math.min(most, delta)) / (event.ctrlKey ? 100 : 400)),
         x,
@@ -89,7 +95,10 @@ export function listen(element: HTMLElement, asked: Asked): () => void {
     } else if (event.shiftKey && event.deltaX === 0) asked.pan(-event.deltaY, 0);
     else asked.pan(-event.deltaX, -event.deltaY);
     clearTimeout(wheelTimer);
-    wheelTimer = setTimeout(() => asked.rest(x, y), wheelRest);
+    wheelTimer = setTimeout(() => {
+      turning = null;
+      asked.rest(x, y);
+    }, wheelRest);
   };
   const onDragStart = (event: Event): void => event.preventDefault();
 

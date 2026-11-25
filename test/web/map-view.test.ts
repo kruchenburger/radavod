@@ -8,9 +8,12 @@ import {
   between,
   fit,
   hold,
+  isWhole,
+  kept,
   type Maps,
   pan,
   pointAt,
+  restingScale,
   reveal,
   settle,
   spotOf,
@@ -59,6 +62,37 @@ describe("from far", () => {
     expect(top).toBeLessThanOrEqual(0);
     expect(top).toBeGreaterThan(-40);
   });
+});
+
+describe("after the window or the map has changed", () => {
+  const before = { maps, window: wide };
+
+  it("the whole map is whole again", () => {
+    const now = { maps: mapsFor(2), window: narrow };
+    const view = kept(fit(maps.far, wide, false), before, now);
+    expect(view).toEqual(fit(now.maps.far, narrow, true));
+    expect(isWhole(view, now.maps, narrow)).toBe(true);
+  });
+
+  it("a place stays where it was, panned from far too", () => {
+    const own = mapsFor(2);
+    const whole = fit(own.far, narrow, true);
+    const down = hold(pan(whole, 0, -200), own.far, narrow);
+    expect(isWhole(down, own, narrow)).toBe(false);
+    const wider = { w: narrow.w, h: narrow.h - 60 };
+    const view = kept(down, { maps: own, window: narrow }, { maps: own, window: wider });
+    expect(view).toMatchObject({ level: "far", k: down.k });
+    expect(Math.abs(view.y - down.y)).toBeLessThan(2);
+    const near = viewOfPerson(start, "near", maps.near) as View;
+    const there = kept(near, before, { maps: own, window: narrow });
+    expect(spotOf(there, own.near)?.person).toBe(start);
+  });
+});
+
+it("rests at no scale at which nothing can be read", () => {
+  expect(restingScale("near", 0.05)).toBe(1);
+  expect(restingScale("closer", 9)).toBe(1.3);
+  expect(restingScale("far", 0.2)).toBe(0.2);
 });
 
 it("dragging takes the point under the finger along", () => {

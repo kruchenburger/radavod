@@ -23,6 +23,8 @@ it.each(["account_id", "route", "routes", "env", "zone_id", "secrets_store_secre
   },
 );
 
-it("sends every API, health and config request to the Worker, not to the assets", () => {
-  expect(config.assets).toMatchObject({ run_worker_first: ["/api/*", "/health", "/config"] });
+it("sends every API, health, config and example request to the Worker, not to the assets", () => {
+  expect(config.assets).toMatchObject({
+    run_worker_first: ["/api/*", "/health", "/config", "/sample/*"],
+  });
 });

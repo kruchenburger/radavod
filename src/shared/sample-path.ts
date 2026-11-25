@@ -5,6 +5,9 @@ export type SamplePath =
   | { screen: "person"; person: string }
   | { screen: "list"; person: string };
 
+/** The invented family, written by the build. */
+export const SAMPLE_FILE = "/sample/tree.json";
+
 const personal = /^\/sample\/(tree|person|list)\/([\w-]{1,64})$/;
 
 export function parseSamplePath(path: string): SamplePath | null {
