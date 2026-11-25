@@ -42,6 +42,7 @@
   "scripts": {
     "build": "vite build && node examples/write-sample.ts dist/client",
     "test": "vitest run",
+    "bench": "vitest bench --run --project web",
     "lint": "oxlint",
     "typecheck": "tsc --noEmit && tsc --noEmit -p tsconfig.node.json && tsc --noEmit -p tsconfig.web.json",
     "guard:ddd": "node guards/ddd/cli.ts",
