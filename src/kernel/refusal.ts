@@ -1,4 +1,4 @@
-/** Something a command names is not there: an aggregate, a parentage or a name. */
+/** Something a command names is not there. */
 export type Missing = { code: "missing"; id: string };
 /** It is there already. */
 export type Duplicate = { code: "duplicate" };

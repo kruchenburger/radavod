@@ -8,7 +8,7 @@ export {
 export type { KinshipStore } from "./application/ports";
 export type { Assignment, Branch, BranchColor, BranchPatch, NewBranch } from "./domain/branch";
 export type { Change, PersonRecord } from "./domain/family-graph";
-export type { ParentagePatch } from "./domain/parentage";
+export { descends, type ParentagePatch } from "./domain/parentage";
 export {
   type NewPerson,
   type Parentage,

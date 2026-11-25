@@ -2,7 +2,7 @@ import type { Certainty } from "../../../kernel/certainty";
 import type { BranchId, PersonId, UnionId } from "../../../kernel/id";
 import type { Result } from "../../../kernel/result";
 import { type Change, Draft, type FamilyGraph } from "./family-graph";
-import { type Duplicate, duplicate, type Missing, missing } from "./refusal";
+import { type Duplicate, duplicate, type Missing, missing } from "../../../kernel/refusal";
 import { newcomers } from "./sets";
 
 /** Two people as a couple. Relatives may be one, and the same two may be one again. */

@@ -1,6 +1,6 @@
 import fc from "fast-check";
 import { describe, expect, it } from "vitest";
-import { type ParsedDate, parseFuzzyDate, sortKey } from "../../src/kernel/fuzzy-date";
+import { lastDay, type ParsedDate, parseFuzzyDate, sortKey } from "../../src/kernel/fuzzy-date";
 
 const read = (text: string): ParsedDate | null => parseFuzzyDate(text).parsed;
 const exact = (year: number, month?: number, day?: number): ParsedDate => ({
@@ -780,5 +780,28 @@ describe("the sort key", () => {
     expect(key("не позднее 12.05.1885")).toBeNull();
     expect(key("на Покров 1885")).toBeNull();
     expect(key("")).toBeNull();
+  });
+});
+
+describe("the last day of a date", () => {
+  const last = (text: string) => lastDay(parseFuzzyDate(text));
+  const first = (text: string) => sortKey(parseFuzzyDate(text));
+
+  it("is the last it can be read as", () => {
+    expect(last("12.05.1885")).toBe(first("12.05.1885"));
+    expect(last("05.1885")).toBe(first("31.05.1885"));
+    expect(last("02.1884")).toBe(first("29.02.1884"));
+    expect(last("12.1885")).toBe(first("31.12.1885"));
+    expect(last("1885")).toBe(first("31.12.1885"));
+    expect(last("около 1885")).toBe(first("31.12.1885"));
+    expect(last("до 1885")).toBe(first("31.12.1885"));
+    expect(last("между 1880 и маем 1885")).toBe(first("31.05.1885"));
+    expect(last("1885 ст. ст.")).toBe(first("12.01.1886"));
+    expect(last("02.1900 ст. ст.")).toBe(first("13.03.1900"));
+  });
+
+  it("is none after a date and in an unread one", () => {
+    expect(last("после 1885")).toBeNull();
+    expect(last("на Покров 1885")).toBeNull();
   });
 });

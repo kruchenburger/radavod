@@ -60,6 +60,12 @@ export function sortKey({ parsed }: FuzzyDate): number | null {
     : dayNumber(parsed.from, parsed.calendar);
 }
 
+/** The last day a date can be read as, counted as `sortKey` counts. Null for "after" and an unread one. */
+export function lastDay({ parsed }: FuzzyDate): number | null {
+  if (parsed === null || parsed.qualifier === "after") return null;
+  return dayNumber(following(parsed.to ?? parsed.from), parsed.calendar) - 1;
+}
+
 const year = "([1-9]\\d{3})";
 const afterYear = `(?:-(?:й|го|м))?(?:\\s*(?:${yearWords})\\.?)?`;
 const anyYear = `(?:(?:of|roku|rokiem|r\\.)\\s+)?${year}${afterYear}`;
@@ -296,8 +302,15 @@ function build(y?: string, month = 0, day = 0): PartialDate | null {
 
 function exists({ year, month, day }: PartialDate, calendar: Calendar): boolean {
   if (month === undefined || day === undefined) return true;
-  const next = month === 12 ? { year: year + 1 } : { year, month: month + 1 };
-  return day <= dayNumber(next, calendar) - dayNumber({ year, month }, calendar);
+  const ofMonth = { year, month };
+  return day <= dayNumber(following(ofMonth), calendar) - dayNumber(ofMonth, calendar);
+}
+
+/** What begins when a year, a month or a day ends. `dayNumber` takes a 13th month and a 32nd day. */
+function following({ year, month, day }: PartialDate): PartialDate {
+  if (month === undefined) return { year: year + 1 };
+  if (day !== undefined) return { year, month, day: day + 1 };
+  return { year, month: month + 1 };
 }
 
 function isSameDay(julian: PartialDate, gregorian: PartialDate): boolean {
