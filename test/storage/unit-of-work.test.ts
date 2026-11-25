@@ -1,4 +1,5 @@
 import { describe, expect, it } from "vitest";
+import { sqliteKinship } from "../../src/contexts/kinship";
 import type { LifeEvent } from "../../src/contexts/life";
 import { parseFuzzyDate } from "../../src/kernel/fuzzy-date";
 import { missing } from "../../src/kernel/refusal";
@@ -91,6 +92,11 @@ describe("a scenario", () => {
         return missing("somebody");
       });
       expect(result).toEqual({ ok: false, error: { code: "missing", id: "somebody" } });
+      // What a scenario answers is given back as it is, a list too.
+      expect(tree.run(() => ({ ok: true, value: [1, 2] }))).toEqual({
+        ok: true,
+        value: { value: [1, 2], changed: [] },
+      });
       expect(tree.rows()).toEqual(before);
     }));
 
@@ -104,6 +110,35 @@ describe("a scenario", () => {
         }),
       ).toThrow("broken");
       expect(tree.rows()).toEqual(before);
+    }));
+
+  it("does not run inside another: it would not see what that one did", () =>
+    inTree((tree) => {
+      const before = tree.rows();
+      const inner = () => tree.do((c) => addPerson(c, "eve"));
+      expect(() => tree.do(inner)).toThrow("nested-scenario");
+      expect(() => tree.do(() => tree.read((c) => c.kinship.get(person("ada"))))).toThrow(
+        "nested-scenario",
+      );
+      expect(tree.rows()).toEqual(before);
+      inner();
+      expect(tree.entries).toBe(1);
+    }));
+
+  it("cannot change what it read behind the journal", () =>
+    inTree((tree) => {
+      tree.do((c) => addPerson(c, "ada"));
+      expect(() => tree.do((c) => c.kinship.get(person("ada"))?.names.push(form("n2")))).toThrow(
+        TypeError,
+      );
+      expect(() =>
+        tree.do((c) => {
+          const name = form("n2");
+          accepted(c.kinship.apply({ do: "put-name", person: person("ada"), name }));
+          name.given = "другое";
+        }),
+      ).toThrow(TypeError);
+      expect(tree.entries).toBe(1);
     }));
 
   it("that changes nothing writes no entry", () =>
@@ -255,7 +290,11 @@ describe("a version", () => {
           error: { code: "stale-version", aggregate, current: there[aggregate] },
         });
       }
-      expect(() => tree.do(() => {}, { expected: { "horse/1": 1 } })).toThrow("unknown-aggregate");
+      for (const wrong of ["horse/1", "person", `person/${person("ada")}/x`, "person/zzz", ""]) {
+        expect(() => tree.do(() => {}, { expected: { [wrong]: 0 } })).toThrow(
+          /^unknown-aggregate$/,
+        );
+      }
     }));
 
   it("never comes back for an identifier that was there before", () =>
@@ -473,6 +512,18 @@ describe("a branch", () => {
       expect(tree.rows()).toEqual(before);
     }));
 
+  it("that has no row takes nobody", () =>
+    inTree((tree) => {
+      start(tree);
+      tree.storage.transactionSync(() => {
+        const kinship = sqliteKinship(tree.storage.sql);
+        kinship.save([
+          { kind: "person-branch", id: person("ada"), before: null, after: branch("none") },
+        ]);
+        expect(() => kinship.flush(2)).toThrow("bad-write branch/");
+      });
+    }));
+
   it("that is new takes a member in the same scenario", () =>
     inTree((tree) => {
       start(tree);
@@ -613,6 +664,12 @@ describe("a row that is not what it should be", () => {
       }
       tree.storage.sql.exec(`UPDATE kinship_branch SET members = '{"people":["x"],"unions":[]}'`);
       expect(() => tree.read((c) => c.kinship.get(person("ada")))).toThrow("corrupt-row branch/");
+      // Nobody is in two branches.
+      tree.storage.sql.exec(`UPDATE kinship_branch SET members = '{"people":[],"unions":[]}'`);
+      tree.do((c) => addBranch(c, "red"));
+      const members = JSON.stringify({ people: [person("ada")], unions: [] });
+      tree.storage.sql.exec("UPDATE kinship_branch SET members = ?", members);
+      expect(() => tree.read((c) => c.kinship.get(person("ada")))).toThrow("corrupt-row branch/");
     }));
 
   it("is not written either", () =>
@@ -627,13 +684,42 @@ describe("a row that is not what it should be", () => {
             name: { ...form("n1"), given: 7 as unknown as string },
           }),
         ),
-      ).toThrow(`corrupt-row person/${person("ada")}`);
+      ).toThrow(`bad-write person/${person("ada")}`);
       expect(() =>
         tree.do((c) =>
           c.kinship.apply({ do: "put-name", person: person("ada"), name: form("a/b") }),
         ),
-      ).toThrow("corrupt-row");
+      ).toThrow("bad-write");
       expect(tree.rows()).toEqual(before);
+    }));
+});
+
+describe("a row with nothing in it", () => {
+  it("is not left behind", () =>
+    inTree((tree) => {
+      tree.do((c) => {
+        addPerson(c, "ada");
+        addPerson(c, "eve");
+        accepted(
+          c.life.add(
+            birth("ada", {
+              participants: [
+                { person: person("ada"), role: "principal" },
+                { person: person("eve"), role: "mother" },
+              ],
+            }),
+          ),
+        );
+      });
+      expect(tree.rows().life_subject).toHaveLength(2);
+      const aggregate = `life/${person("ada")}`;
+      tree.do((c) => accepted(c.life.remove(person("ada"), birth("ada").id)));
+      expect(tree.rows().life_subject).toEqual([]);
+      // Whoever saw it is told that it is gone.
+      expect(tree.run(() => ({ ok: true, value: 1 }), { expected: { [aggregate]: 1 } })).toEqual({
+        ok: false,
+        error: { code: "stale-version", aggregate, current: 0 },
+      });
     }));
 });
 

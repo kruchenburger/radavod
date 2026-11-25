@@ -19,9 +19,11 @@ export function journalOver(store: JournalStore): Journal {
   return {
     next: () => store.last() + 1,
     write(number, { actor, now, scenario }, changed) {
-      const patches = changed.flatMap(patchesOf);
+      const told = changed.map((one) => ({ one, patches: patchesOf(one) }));
+      const patches = told.flatMap((each) => each.patches);
       store.append({ number, at: now, by: actor, scenario, patches });
-      for (const subject of new Set(changed.flatMap(subjectsOf))) {
+      const subjects = told.flatMap((each) => subjectsOf(each.one, each.patches));
+      for (const subject of new Set(subjects)) {
         store.putNumbers(subject, [...store.numbersOf(subject), number]);
       }
     },

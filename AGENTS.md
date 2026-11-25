@@ -44,9 +44,9 @@ dependency-cruiser parses with swc, because TypeScript 7 has no compiler API.
 
 ## Storage
 
-A scenario runs in `unitOfWork.run` (`src/scenarios/unit-of-work.ts`): one transaction, one journal entry, each row written once at the end. The version of an aggregate is the number of the entry that changed it last, so it never comes back. Fields that follow from other aggregates (`children`, `unions`, `takesPart`) make no version and no patch; who is in a branch lies with the branch.
+A scenario runs in `unitOfWork.run` (`src/scenarios/unit-of-work.ts`): one transaction, one journal entry, everything written at the end. Scenarios do not nest. The version of an aggregate is the number of the entry that changed it last, so it never comes back. Fields that follow from other aggregates (`children`, `unions`, `takesPart`) make no version and no patch; who is in a branch lies with the branch. An entry is found by its aggregates and by every person its patches name, but for those who went from one branch to another, who are found under the branches.
 
-Each context has its tables and its adapter, which parses every row by a strict schema, `src/shared/rows.ts` reads and writes the rows, and `src/shared/values.ts` has the schemas of the kernel. A change of the tables is a new step in `src/worker/schema.ts`; a step that is out is never edited, and `test/storage/schema-1.ts` is frozen. `test/budgets.test.ts` counts rows over 5 000 invented people.
+Each context has its tables and its adapter, which parses every row by a strict schema, `src/shared/rows.ts` reads and writes the rows, and `src/shared/values.ts` has the schemas of the kernel. A change of the tables is a new step in `src/worker/schema.ts`; a step that is out is never edited, and the tables and the rows of `test/storage/schema-1.ts` are frozen. `test/budgets.test.ts` counts rows over 5 000 invented people.
 
 ## Texts
 

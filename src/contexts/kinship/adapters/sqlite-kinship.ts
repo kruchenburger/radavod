@@ -1,6 +1,7 @@
 import { z } from "zod";
 import type { BranchId, PersonId, UnionId } from "../../../kernel/id";
 import {
+  BadWrite,
   CorruptRow,
   jsonOf,
   type Kept,
@@ -249,11 +250,18 @@ class Membership {
       const after = this.branchOf(id);
       return before === after ? [] : [{ kind, id, before, after }];
     });
+    const entered = new Set(written.map(({ after }) => after));
     for (const branch of new Set(written.flatMap(({ before, after }) => [before, after]))) {
       if (branch === null) continue;
-      const members = JSON.stringify(membersSchema.parse(this.membersOf(branch as BranchId)));
-      // A branch that was removed has no row any more.
-      this.#sql.exec("UPDATE kinship_branch SET members = ? WHERE id = ?", members, branch);
+      const members = membersSchema.safeParse(this.membersOf(branch as BranchId));
+      if (!members.success) throw new BadWrite(`branch/${branch}`);
+      const { rowsWritten } = this.#sql.exec(
+        "UPDATE kinship_branch SET members = ? WHERE id = ?",
+        JSON.stringify(members.data),
+        branch,
+      );
+      // A branch that was left may have been removed, one that was entered has a row.
+      if (rowsWritten === 0 && entered.has(branch)) throw new BadWrite(`branch/${branch}`);
     }
     return written;
   }
@@ -269,6 +277,7 @@ class Membership {
       const members = membersSchema.safeParse(jsonOf(row.members));
       if (!id.success || !members.success) throw new CorruptRow(`branch/${row.id}`);
       for (const member of [...members.data.people, ...members.data.unions]) {
+        if (all.has(member)) throw new CorruptRow(`branch/${row.id}`);
         all.set(member, id.data);
       }
     }

@@ -15,6 +15,18 @@ export class CorruptRow extends Error {
   }
 }
 
+/** Something that could not be read back, and so is not written. It is the fault of the code. */
+export class BadWrite extends Error {
+  readonly code = "bad-write";
+  readonly key: string;
+
+  constructor(key: string) {
+    super(`bad-write ${key}`);
+    this.name = "BadWrite";
+    this.key = key;
+  }
+}
+
 /** A row as the database gives it. Its schema says what it is. */
 export type RawRow = { version: RawValue; data: RawValue };
 type RawValue = ArrayBuffer | string | number | null;
@@ -39,7 +51,10 @@ export interface Kept {
 
 type Aggregate<Id> = { id: Id; version: number };
 
-/** The aggregates of one table in one unit of work: each is read once and written once. */
+/**
+ * The aggregates of one table in one unit of work: each is read once and written once. They cannot be
+ * changed in place: a change is put.
+ */
 export class Rows<Id extends string, Value extends Aggregate<Id>> {
   readonly #kind: string;
   readonly #schema: z.ZodType<Omit<Value, "id" | "version">>;
@@ -65,7 +80,7 @@ export class Rows<Id extends string, Value extends Aggregate<Id>> {
   }
 
   put(id: Id, value: Value | null): void {
-    this.#row(id).now = value;
+    this.#row(id).now = frozen(value);
   }
 
   version(id: Id): number {
@@ -86,13 +101,12 @@ export class Rows<Id extends string, Value extends Aggregate<Id>> {
       if (stored === now || !differ(dataOf(stored), dataOf(now))) continue;
       const changed = writes(this.#kind, id, this.#authored(stored), this.#authored(now));
       written.push(...changed);
-      if (now === null) {
-        this.#table.remove(id);
+      if (isEmpty(dataOf(now))) {
+        if (stored !== null) this.#table.remove(id);
         continue;
       }
       const data = JSON.stringify(dataOf(now));
-      // What could not be read back is not written.
-      this.#parse(id, data);
+      if (this.#parse(data) === undefined) throw new BadWrite(`${this.#kind}/${id}`);
       this.#table.write(id, changed.length > 0 ? version : (stored?.version ?? 0), data);
     }
     return written;
@@ -111,14 +125,13 @@ export class Rows<Id extends string, Value extends Aggregate<Id>> {
 
   #value(id: Id, { version, data }: RawRow): Value {
     const counted = z.int().nonnegative().safeParse(version);
-    if (!counted.success) throw new CorruptRow(`${this.#kind}/${id}`);
-    return { ...this.#parse(id, data), id, version: counted.data } as Value;
+    const parsed = this.#parse(data);
+    if (!counted.success || parsed === undefined) throw new CorruptRow(`${this.#kind}/${id}`);
+    return frozen({ ...parsed, id, version: counted.data } as Value);
   }
 
-  #parse(id: Id, data: unknown): Omit<Value, "id" | "version"> {
-    const parsed = this.#schema.safeParse(jsonOf(data));
-    if (!parsed.success) throw new CorruptRow(`${this.#kind}/${id}`);
-    return parsed.data;
+  #parse(data: unknown): Omit<Value, "id" | "version"> | undefined {
+    return this.#schema.safeParse(jsonOf(data)).data;
   }
 
   #authored(value: Value | null): unknown {
@@ -127,9 +140,9 @@ export class Rows<Id extends string, Value extends Aggregate<Id>> {
     const fields = Object.entries(data).filter(
       ([key]) => !this.#mirrors.includes(key as keyof Value),
     );
-    // Lists with nothing in them were not written by anybody: a row may hold mirrors only.
-    const isEmpty = fields.every(([, field]) => Array.isArray(field) && field.length === 0);
-    return isEmpty ? null : Object.fromEntries(fields);
+    const authored = Object.fromEntries(fields);
+    // A row may hold mirrors only. Nobody wrote that.
+    return isEmpty(authored) ? null : authored;
   }
 }
 
@@ -137,6 +150,22 @@ function dataOf<Value extends Aggregate<unknown>>(value: Value | null): object |
   if (value === null) return null;
   const { id: _id, version: _version, ...data } = value;
   return data;
+}
+
+/** Whether there are only lists, with nothing in them. */
+function isEmpty(data: object | null): boolean {
+  return (
+    data === null ||
+    Object.values(data).every((field) => Array.isArray(field) && field.length === 0)
+  );
+}
+
+function frozen<T>(value: T): T {
+  if (typeof value === "object" && value !== null && !Object.isFrozen(value)) {
+    Object.freeze(value);
+    for (const part of Object.values(value)) frozen(part);
+  }
+  return value;
 }
 
 /** The value of a text of JSON, or undefined. The error would quote the text. */

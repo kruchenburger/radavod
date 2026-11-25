@@ -1,9 +1,9 @@
 import { describe, expect, it } from "vitest";
 import { generateFamily } from "../../examples/generate.ts";
-import { type Migration, migrate } from "../../src/contexts/history";
+import { journalOver, type Migration, migrate, sqliteJournal } from "../../src/contexts/history";
 import type { BranchId, PersonId, PlaceId, SourceId, UnionId } from "../../src/kernel/id";
 import { steps } from "../../src/worker/schema";
-import { fill, type Row, rowsOf, tables } from "./schema-1";
+import { entry, fill, type Row, rowsOf, tables } from "./schema-1";
 import { accepted, inTree, person, type Tree } from "./tree";
 
 /** The object has been through the steps already. */
@@ -71,6 +71,10 @@ describe("a database of schema 1", () => {
           for (const event of events) expect(found).toContainEqual(event);
         }
       });
+      const journal = journalOver(sqliteJournal(sql));
+      const first = family.people[0]?.id ?? "";
+      expect(journal.entriesOf(first)).toEqual([1]);
+      expect(journal.entry(1)?.patches).toEqual(entry(first).flat());
       // And it can be edited.
       const ada = family.people[0]?.id as PersonId;
       const changed = tree.do((c) =>

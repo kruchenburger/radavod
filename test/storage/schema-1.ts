@@ -3,8 +3,9 @@ import { snapshotOf } from "../../examples/snapshot.ts";
 import { anna, idOf } from "./tree";
 
 /**
- * A database as schema 1 had it, with the example family in it. It is written by hand and frozen: code
- * that comes later must open it. It uses no adapter and is not changed with them.
+ * A database as schema 1 had it, with the example family in it. Its tables and the shape of its rows
+ * are written by hand and frozen: code that comes later must open them. It uses no adapter and is not
+ * changed with them. Who is in the family may change with the example.
  */
 export const tables = [
   "CREATE TABLE history_schema (number INTEGER PRIMARY KEY)",
@@ -29,7 +30,10 @@ export const tables = [
   `CREATE TABLE life_subject (
     id TEXT PRIMARY KEY, version INTEGER NOT NULL, data TEXT NOT NULL
   ) WITHOUT ROWID`,
-  "CREATE TABLE history_entry (number INTEGER PRIMARY KEY, data TEXT NOT NULL)",
+  `CREATE TABLE history_entry (
+    number INTEGER NOT NULL, part INTEGER NOT NULL, data TEXT NOT NULL,
+    PRIMARY KEY (number, part)
+  ) WITHOUT ROWID`,
   "CREATE TABLE history_subject (id TEXT PRIMARY KEY, entries TEXT NOT NULL) WITHOUT ROWID",
   "CREATE TABLE history_trash (id TEXT PRIMARY KEY, data TEXT NOT NULL) WITHOUT ROWID",
 ];
@@ -210,8 +214,38 @@ export function fill(sql: SqlStorage, family: Family): void {
       JSON.stringify(members),
     );
   }
-  const entry = { at: 1_800_000_000_000, by: anna, scenario: "import", patches: [] };
-  sql.exec("INSERT INTO history_entry (number, data) VALUES (1, ?)", JSON.stringify(entry));
+  const subject = family.people[0]?.id ?? "";
+  for (const [part, patches] of entry(subject).entries()) {
+    const data = { at: 1_800_000_000_000, by: anna, scenario: "import", patches };
+    sql.exec(
+      "INSERT INTO history_entry (number, part, data) VALUES (1, ?, ?)",
+      part,
+      JSON.stringify(data),
+    );
+  }
+  sql.exec("INSERT INTO history_subject (id, entries) VALUES (?, ?)", subject, "[1]");
+}
+
+/** The patches of an entry, by its parts. */
+export function entry(subject: string): object[][] {
+  const aggregate = `person/${subject}`;
+  return [
+    [
+      { aggregate, path: "", before: null, after: { names: [{ id: "n1", given: "Верес" }] } },
+      { aggregate, path: "sex", before: "unknown", after: "male" },
+    ],
+    [
+      { aggregate, path: "names/n1/given", before: "Дуб", after: "Верес" },
+      { aggregate, path: "names/n2", before: { id: "n2" }, after: null },
+      { aggregate, path: "names/", before: ["n2", "n1"], after: ["n1"] },
+      {
+        aggregate: `person-branch/${subject}`,
+        path: "",
+        before: null,
+        after: idOf("branch", "b1"),
+      },
+    ],
+  ];
 }
 
 function dateOf(date: FuzzyDate | null): object | null {

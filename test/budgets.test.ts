@@ -154,9 +154,11 @@ describe("rows over 5 000 people", () => {
         accepted(c.life.remove(guests[0] as PersonId, wedding.id)),
       );
 
-      for (const [what, { written, limit }] of Object.entries(numbers)) {
+      for (const [what, { written, read, limit }] of Object.entries(numbers)) {
         expect(written, what).toBeGreaterThan(0);
         expect(written, what).toBeLessThanOrEqual(limit);
+        // Reading is cheap, but not the whole family: only a branch walks down its line.
+        expect(read, what).toBeLessThan(what.includes("300") ? 2000 : 150);
       }
     }),
   );

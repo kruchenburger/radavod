@@ -4,8 +4,17 @@ import { type Kinship, kinshipOver, sqliteKinship } from "../contexts/kinship";
 import { type Life, lifeOver, sqliteLife } from "../contexts/life";
 import { type Places, placesOver, sqlitePlaces } from "../contexts/places";
 import type { Result } from "../kernel/result";
+import type { Kept } from "../shared/rows";
 
 export type Contexts = { kinship: Kinship; places: Places; evidence: Evidence; life: Life };
+
+/** What can be asked without a change. */
+export type Reading = {
+  kinship: Pick<Kinship, "get" | "union" | "branch" | "relatives">;
+  places: Pick<Places, "get" | "nameOn" | "affiliationOn">;
+  evidence: Pick<Evidence, "source" | "citationsOf" | "countFor">;
+  life: Pick<Life, "event" | "eventsOf" | "main" | "countAt" | "warnings">;
+};
 
 export type Command = Act & {
   /**
@@ -27,44 +36,62 @@ export type StaleVersion = {
 export interface UnitOfWork {
   /**
    * Runs one scenario in one transaction with one journal entry. Commands see what earlier ones of
-   * the same scenario did; each row is written once, at the end. A refused scenario writes nothing,
-   * one that changes nothing writes no entry.
+   * the same scenario did, and everything is written at the end. A refused scenario writes nothing,
+   * one that changes nothing writes no entry. A scenario does not run inside another.
    */
-  run<T extends object, E extends { code: string }>(
+  run<T, E extends { code: string }>(
     command: Command,
     work: (contexts: Contexts) => Result<T, E>,
-  ): Result<T & { changed: Changed[] }, E | StaleVersion>;
-  /** Reads without a change. */
-  read<T>(work: (contexts: Contexts) => T): T;
+  ): Result<{ value: T; changed: Changed[] }, E | StaleVersion>;
+  read<T>(work: (contexts: Reading) => T): T;
 }
 
 export function unitOfWork(
   storage: Pick<DurableObjectStorage, "sql" | "transactionSync">,
 ): UnitOfWork {
+  let isOpen = false;
+  /** The contexts of a scenario do not see what another one has not written yet. */
+  const alone = <T>(work: () => T): T => {
+    if (isOpen) throw new Error("nested-scenario");
+    isOpen = true;
+    try {
+      return work();
+    } finally {
+      isOpen = false;
+    }
+  };
   return {
     run: (command, work) =>
-      storage.transactionSync(() => {
-        const { kept, contexts } = open(storage.sql);
-        for (const [aggregate, seen] of Object.entries(command.expected)) {
-          const [kind = "", id = ""] = aggregate.split("/");
-          const current = kept.map((one) => one.current(kind, id)).find((one) => one !== undefined);
-          if (current === undefined) throw new Error(`unknown-aggregate ${kind}`);
-          if (current !== seen) {
-            return { ok: false, error: { code: "stale-version", aggregate, current } };
+      alone(() =>
+        storage.transactionSync(() => {
+          const { kept, contexts } = open(storage.sql);
+          for (const [aggregate, seen] of Object.entries(command.expected)) {
+            const current = currentOf(kept, aggregate);
+            if (current !== seen) {
+              return { ok: false, error: { code: "stale-version", aggregate, current } };
+            }
           }
-        }
-        const result = work(contexts);
-        if (!result.ok) return result;
+          const result = work(contexts);
+          if (!result.ok) return result;
 
-        const journal = journalOver(sqliteJournal(storage.sql));
-        const version = journal.next();
-        const written = kept.flatMap((one) => one.flush(version));
-        if (written.length > 0) journal.write(version, command, written);
-        const changed = written.map((one) => ({ aggregate: aggregateOf(one), version }));
-        return { ok: true, value: { ...result.value, changed } };
-      }),
-    read: (work) => work(open(storage.sql).contexts),
+          const journal = journalOver(sqliteJournal(storage.sql));
+          const version = journal.next();
+          const written = kept.flatMap((one) => one.flush(version));
+          if (written.length > 0) journal.write(version, command, written);
+          const changed = written.map((one) => ({ aggregate: aggregateOf(one), version }));
+          return { ok: true, value: { value: result.value, changed } };
+        }),
+      ),
+    read: (work) => alone(() => work(open(storage.sql).contexts)),
   };
+}
+
+function currentOf(kept: readonly Kept[], aggregate: string): number | string | null {
+  const [, kind = "", id = ""] = /^([a-z-]+)\/([a-z]+_[1-9A-Za-z]{22})$/.exec(aggregate) ?? [];
+  const current = kept.map((one) => one.current(kind, id)).find((one) => one !== undefined);
+  // The key came from outside, so it is not repeated.
+  if (current === undefined) throw new Error("unknown-aggregate");
+  return current;
 }
 
 /** The contexts over one database, each with a memory of its own that lasts for one scenario. */

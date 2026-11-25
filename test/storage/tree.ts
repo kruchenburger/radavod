@@ -15,6 +15,7 @@ import type { NameForm } from "../../src/kernel/name-form";
 import {
   type Command,
   type Contexts,
+  type Reading,
   type UnitOfWork,
   unitOfWork,
 } from "../../src/scenarios/unit-of-work";
@@ -75,7 +76,7 @@ export class Tree {
   }
 
   /** Runs a scenario. Without `expected` the editor believes nothing. */
-  run<T extends object, E extends { code: string }>(
+  run<T, E extends { code: string }>(
     work: Parameters<typeof this.work.run<T, E>>[1],
     command: Partial<Command> = {},
   ) {
@@ -95,7 +96,7 @@ export class Tree {
     return result.value.changed;
   }
 
-  read<T>(work: (contexts: Contexts) => T): T {
+  read<T>(work: (contexts: Reading) => T): T {
     return this.work.read(work);
   }
 
@@ -122,7 +123,7 @@ export class Tree {
   }
 
   get entries(): number {
-    return this.storage.sql.exec("SELECT number FROM history_entry").toArray().length;
+    return this.storage.sql.exec("SELECT DISTINCT number FROM history_entry").toArray().length;
   }
 }
 

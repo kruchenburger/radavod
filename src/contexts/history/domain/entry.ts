@@ -30,12 +30,22 @@ export function patchesOf(changed: Changed): Patch[] {
 }
 
 /**
- * Under whose identifiers an entry is found: the aggregate itself, and for somebody who went from one
- * branch to another both branches, for there may be hundreds of such people.
+ * Under whose identifiers an entry is found: the aggregate itself, and every person the patches name,
+ * so that erasing somebody finds all that is said of them. Of those who went from one branch to
+ * another there may be hundreds: they are found under the branches.
  */
-export function subjectsOf({ kind, id, before, after }: Changed): string[] {
-  if (!kind.endsWith("-branch")) return [id];
-  return [before, after].filter((branch) => typeof branch === "string");
+export function subjectsOf(changed: Changed, patches: readonly Patch[]): string[] {
+  const { kind, id, before, after } = changed;
+  if (kind.endsWith("-branch")) {
+    return [before, after].filter((branch) => typeof branch === "string");
+  }
+  return [id, ...patches.flatMap((patch) => [...peopleIn(patch.before), ...peopleIn(patch.after)])];
+}
+
+function peopleIn(value: unknown): string[] {
+  if (typeof value === "string") return value.startsWith("person_") ? [value] : [];
+  if (typeof value !== "object" || value === null) return [];
+  return Object.values(value).flatMap(peopleIn);
 }
 
 type Difference = Omit<Patch, "aggregate">;
@@ -60,9 +70,11 @@ function thingsOf(list: string, before: Thing[], after: Thing[]): Difference[] {
       after: now,
     }));
   });
-  return differ(were, are)
-    ? [...differences, { path: `${list}/`, before: were, after: are }]
-    : differences;
+  const stayed = were.filter((id) => are.includes(id));
+  const atTheEnd = (ids: string[]) => [...stayed, ...ids.filter((id) => !stayed.includes(id))];
+  // What is added at the end, or put back there, finds its place by itself.
+  const isInOrder = !differ(were, atTheEnd(were)) && !differ(are, atTheEnd(are));
+  return isInOrder ? differences : [...differences, { path: `${list}/`, before: were, after: are }];
 }
 
 /** The fields that differ. Every aggregate has all its fields, and so has every thing in one. */

@@ -2,7 +2,7 @@ import fc from "fast-check";
 import { describe, expect, it } from "vitest";
 import { type Changed, journalOver, type Patch, sqliteJournal } from "../../src/contexts/history";
 import { patchesOf } from "../../src/contexts/history/domain/entry";
-import { anna, inTree } from "./tree";
+import { anna, branch, inTree, person } from "./tree";
 
 type Fields = Record<string, unknown>;
 type Thing = Fields & { id: string };
@@ -73,6 +73,12 @@ describe("patches", () => {
     expect(paths({ names }, { names: [{ id: "n1", given: "Вяз" }, names[1]] })).toEqual([
       "names/n1/given",
     ]);
+    const third = { id: "n3", given: "Вяз" };
+    // What is added at the end or removed from it needs no order.
+    expect(paths({ names }, { names: [...names, third] })).toEqual(["names/n3"]);
+    expect(paths({ names }, { names: [names[0]] })).toEqual(["names/n2"]);
+    expect(paths({ names }, { names: [names[0], third] })).toEqual(["names/n2", "names/n3"]);
+    expect(paths({ names }, { names: [third, ...names] })).toEqual(["names/n3", "names/"]);
     expect(paths({ names }, { names: [names[1]] })).toEqual(["names/n1", "names/"]);
     expect(paths({ names }, { names: names.toReversed() })).toEqual(["names/"]);
     expect(paths({ title: { ru: "", en: "" } }, { title: { ru: "x", en: "" } })).toEqual(["title"]);
@@ -124,11 +130,68 @@ describe("the journal", () => {
       const journal = journalOver(sqliteJournal(tree.storage.sql));
       const act = { actor: anna, now: 5, scenario: "edit-person" };
       journal.write(1, act, []);
-      expect(() => journal.write(1, act, [])).toThrow();
+      expect(() => journal.write(1, act, [])).toThrow(/UNIQUE|PRIMARY/);
       // And what could not be read back is not written.
-      expect(() => journal.write(2, { ...act, scenario: "" }, [])).toThrow();
-      expect(() => journal.write(2, { ...act, actor: "anna" as typeof anna }, [])).toThrow();
+      expect(() => journal.write(2, { ...act, scenario: "" }, [])).toThrow(/^bad-write entry\/2$/);
+      expect(() => journal.write(2, { ...act, actor: "anna" as typeof anna }, [])).toThrow(
+        /^bad-write entry\/2$/,
+      );
       expect(journal.next()).toBe(2);
+    }));
+
+  it("keeps an entry of any size", () =>
+    inTree((tree) => {
+      const journal = journalOver(sqliteJournal(tree.storage.sql));
+      // Larger than a row of the database may be.
+      const changed = Array.from({ length: 5000 }, (_, i) => ({
+        kind: "person",
+        id: `p${i}`,
+        before: null,
+        after: { note: "Ё".repeat(2000) },
+      }));
+      const act = { actor: anna, now: 5, scenario: "import" };
+      journal.write(1, act, changed);
+      expect(journal.next()).toBe(2);
+      const entry = journal.entry(1);
+      expect(entry).toMatchObject({ number: 1, at: 5, by: anna, scenario: "import" });
+      expect(entry?.patches).toEqual(changed.flatMap(patchesOf));
+      const parts = tree.storage.sql
+        .exec<{ size: number }>("SELECT length(CAST(data AS BLOB)) AS size FROM history_entry")
+        .toArray();
+      expect(parts.length).toBeGreaterThan(10);
+      expect(Math.max(...parts.map(({ size }) => size))).toBeLessThan(1_900_000);
+    }));
+
+  it("finds an entry by everybody it names", () =>
+    inTree((tree) => {
+      const journal = journalOver(sqliteJournal(tree.storage.sql));
+      const act = { actor: anna, now: 5, scenario: "s" };
+      const [ada, eve, kid] = [person("ada"), person("eve"), person("kid")];
+      journal.write(1, act, [
+        {
+          kind: "union",
+          id: "u",
+          before: { partners: [ada, "unknown"], kind: "civil" },
+          after: { partners: [ada, eve], kind: "civil" },
+        },
+      ]);
+      journal.write(2, act, [
+        {
+          kind: "person",
+          id: kid,
+          before: { parents: [{ id: "x", parent: eve }], sex: "male" },
+          after: { parents: [], sex: "male" },
+        },
+      ]);
+      // Hundreds may go from one branch to another at once: they are found under the branches.
+      journal.write(3, act, [
+        { kind: "person-branch", id: ada, before: null, after: branch("green") },
+      ]);
+      expect(journal.entriesOf(ada)).toEqual([1]);
+      expect(journal.entriesOf(eve)).toEqual([1, 2]);
+      expect(journal.entriesOf(kid)).toEqual([2]);
+      expect(journal.entriesOf("u")).toEqual([1]);
+      expect(journal.entriesOf(branch("green"))).toEqual([3]);
     }));
 
   it("names a corrupt row and does not quote it", () =>
