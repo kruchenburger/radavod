@@ -32,7 +32,7 @@ function drawn(
   const byKey = new Map(layout.cards.map((card) => [card.key, card]));
   const found = problems(layout, {
     snapshot,
-    people: expectedAround(snapshot, focus, more),
+    people: expectedAround(snapshot, focus, { ...more, open: layout.open }),
     children: "y",
     lines: ({ key }) => byKey.get(key)?.lines ?? [],
     measure,
@@ -101,6 +101,17 @@ describe("around a person", () => {
     expect(layout.focus).toBe("p:x");
   });
 
+  it("keeps the widths of the design", () => {
+    const layout = drawn(threeGenerations, "x", { siblings: true });
+    const widths = layout.columns.map(({ w }) => w);
+    expect(widths).toEqual([152, 152, 152, 236, 152, 152, 152]);
+    const gaps = layout.columns.slice(1).map(({ x }, i) => {
+      const before = layout.columns[i];
+      return x - (before?.x ?? 0) - (before?.w ?? 0);
+    });
+    expect(gaps).toEqual([34, 34, 34, 34, 34, 34]);
+  });
+
   it("puts children in the order of birth", () => {
     const layout = drawn(threeGenerations, "x");
     expect(isAscending([card(layout, "daughter").y, card(layout, "son").y])).toBe(true);
@@ -114,7 +125,7 @@ describe("around a person", () => {
 
   it("unfolds them by age around the person", () => {
     const layout = drawn(threeGenerations, "x", { siblings: true });
-    const cards = ["older", "x", "wife", "younger"].map((id) => card(layout, id));
+    const cards = ["older", "x", "younger", "wife"].map((id) => card(layout, id));
     expect(isAscending(cards.map(({ y }) => y))).toBe(true);
     expect(card(layout, "older").role).toBe("sibling");
   });
@@ -159,9 +170,16 @@ describe("a hard case around a person", () => {
   it("an unknown parent has a place", () => {
     const layout = drawn({ people: ["m", { id: "x", parents: ["m", null] }] }, "x");
     const place = layout.cards.find(({ person }) => person === null);
-    expect(place?.unknown).toEqual({ of: "parent", child: "x", parentage: "x-1" });
+    expect(place?.unknown).toEqual({ of: "parent", child: "x", parentages: ["x-1"] });
     expect(place?.generation).toBe(-1);
     expect(linksTo(layout, "x").map(({ parents }) => parents[0])).toContain(place?.key);
+  });
+
+  it("two unknown parents have one place", () => {
+    const layout = drawn({ people: [{ id: "x", parents: [null, null] }] }, "x");
+    expect(layout.cards.filter(({ person }) => person === null)).toMatchObject([
+      { unknown: { of: "parent", child: "x", parentages: ["x-0", "x-1"] } },
+    ]);
   });
 
   it("a partner nobody knows has a place", () => {
@@ -199,7 +217,7 @@ describe("a hard case around a person", () => {
     ]);
   });
 
-  it("an ancestor by two lines stands once, with a second line", () => {
+  it("an ancestor by two lines stands once, and a reference leads there along the margin", () => {
     const layout = drawn(
       {
         people: [
@@ -220,7 +238,27 @@ describe("a hard case around a person", () => {
       "x",
     );
     expect(linksTo(layout, "p").map(({ tree }) => tree)).toEqual([true, true]);
-    expect(linksTo(layout, "q").map(({ tree }) => tree)).toEqual([false, false]);
+    const reference = layout.cards.find(({ role }) => role === "reference");
+    expect(reference?.reference).toEqual({ as: "parents", people: ["a", "b"], page: null });
+    expect(linksTo(layout, "q")).toMatchObject([
+      { parents: ["p:a", "p:b"], parentsAt: reference?.key, tree: false },
+    ]);
+    const line = layout.links.find(({ type }) => type === "reference");
+    const left = Math.min(...(line?.points ?? []).map(([x]) => x));
+    expect(left).toBeLessThan(Math.min(...layout.cards.map(({ x }) => x)));
+  });
+
+  it("one repeated parent of two has a reference in the brace", () => {
+    const people = [
+      "a",
+      { id: "f", parents: ["a", "f2"] },
+      { id: "m", parents: ["a", "m2"] },
+      "f2",
+      "m2",
+      { id: "x", parents: ["f", "m"] },
+    ];
+    const layout = drawn({ people }, "x");
+    expect(linksTo(layout, "m").map(({ parents }) => parents)).toEqual([["p:a"], ["p:m2"]]);
   });
 
   it("an ancestor in two generations stands once", () => {
@@ -286,9 +324,35 @@ describe("a hard case around a person", () => {
       { id: `${wife}-2`, parents: ["x", wife], born: 1950 + i },
     ]);
     const unions = wives.map((wife): [string, string] => ["x", wife]);
-    const layout = drawn({ people: ["x", ...wives, ...children], unions }, "x");
+    const grandchildren = wives.flatMap((wife) => [
+      { id: `${wife}-g`, parents: [`${wife}-1`] },
+      { id: `${wife}-h`, parents: [`${wife}-g`] },
+    ]);
+    const spec = { people: ["x", ...wives, ...children, ...grandchildren], unions };
+    const layout = drawn(spec, "x");
     expect(isAscending(wives.map((wife) => card(layout, wife).y))).toBe(true);
-    drawn({ people: ["x", ...wives, ...children], unions }, "w3-1", { siblings: true });
+    expect(layout.open).toBe("p:w0");
+    expect(card(layout, "w0-g").generation).toBe(2);
+    expect(card(layout, "w1-1").folded).toBe(2);
+    const other = drawn(spec, "x", { open: "p:w5", siblings: true });
+    expect(card(other, "w5-h").generation).toBe(3);
+    expect(other.cards.some(({ person }) => person === "w0-g")).toBe(false);
+    drawn(spec, "w3-1", { siblings: true });
+  });
+
+  it("every union has a lane of its own", () => {
+    const people = [
+      "x",
+      ...["w1", "w2"].flatMap((wife) => [
+        wife,
+        { id: `${wife}-1`, parents: ["x", wife] },
+        { id: `${wife}-2`, parents: ["x", wife] },
+      ]),
+    ];
+    const layout = drawn({ people }, "x");
+    const lane = (child: string): number | undefined => linksTo(layout, child)[0]?.points[1]?.[0];
+    expect(Math.abs((lane("w1-1") ?? 0) - (lane("w2-1") ?? 0))).toBeGreaterThanOrEqual(6);
+    expect(lane("w1-1")).toBe(lane("w1-2"));
   });
 
   it("half-siblings, each from a parent of their own", () => {
@@ -341,7 +405,7 @@ describe("a hard case around a person", () => {
 it.each(Object.entries(cases))("the view around a person manages %s", (_, spec) => {
   for (const { id } of familyOf(spec).people) {
     drawn(spec, id);
-    drawn(spec, id, { siblings: true, lineOf: id });
+    drawn(spec, id, { siblings: true, lineOf: id, open: "?:partner u0" });
   }
 });
 

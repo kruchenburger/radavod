@@ -17,6 +17,10 @@ export function snapshotOf(family: ExampleFamily): TreeSnapshot {
       if (place !== null && !places.has(person)) places.set(person, place);
     }
   }
+  const began = new Map<string, number | null>();
+  for (const { kind, union, date } of family.events) {
+    if (kind === "wedding" && union !== null && date !== null) began.set(union, yearOf(date).sort);
+  }
   return {
     format: 1,
     version: 1,
@@ -36,6 +40,7 @@ export function snapshotOf(family: ExampleFamily): TreeSnapshot {
       id,
       kind,
       partners: [first, second],
+      began: began.get(id) ?? null,
       certainty,
     })),
     branches: family.branches.map(({ id, name, color }) => ({

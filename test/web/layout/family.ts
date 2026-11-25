@@ -3,14 +3,15 @@ import type { Measure, TextStyle, Wording } from "../../../web/tree/layout/types
 
 const letter: Partial<Record<TextStyle, number>> = {
   focusName: 17,
-  title: 13,
-  leafName: 9,
-  leafNameDirect: 9.5,
-  tagName: 13,
-  tagNameDirect: 14,
+  focusNameDouble: 14,
+  head: 13,
   nameDirect: 8.5,
   detail: 6.5,
-  leafDetail: 6,
+  closerName: 7,
+  closerNameDirect: 7.5,
+  nearName: 9,
+  nearNameDirect: 9.5,
+  nearDetail: 6.5,
 };
 
 /** Every letter is as wide as any other, so a test needs no fonts. */
@@ -26,6 +27,10 @@ export function wordingOf(snapshot: TreeSnapshot): Wording {
       branch: branches.get(person.branch ?? "") ?? "",
     }),
     unknown: ({ of }) => `unknown ${of}`,
+    reference: ({ as, page }) => ({
+      title: `see the ${as}`,
+      detail: branches.get(page ?? "") ?? "",
+    }),
   };
 }
 
@@ -56,6 +61,7 @@ export function familyOf({ people, unions = [], branches = [] }: FamilySpec): Tr
       id: `u${i}`,
       kind: "marriage",
       partners,
+      began: null,
       certainty: "confirmed",
     })),
     branches: branches.map((id, i) => ({ id, title: { ru: id, en: id }, color: i % 12 })),

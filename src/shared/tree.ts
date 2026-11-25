@@ -68,6 +68,8 @@ const unionSchema = z.object({
   kind: z.enum(["marriage", "civil", "unknown"]),
   /** Null for a partner nobody knows. */
   partners: z.tuple([id, id.nullable()]),
+  /** The day it began, counted like `sort` of a year. It orders the unions of a person. */
+  began: z.int().nullable(),
   certainty: certaintySchema,
 });
 

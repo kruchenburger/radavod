@@ -58,6 +58,11 @@ describe("the snapshot of the invented family", () => {
     }
   });
 
+  it("knows when a union began, if a wedding is dated", () => {
+    const dated = family.events.filter(({ kind, date }) => kind === "wedding" && date?.parsed);
+    expect(snapshot.unions.filter(({ began }) => began !== null)).toHaveLength(dated.length);
+  });
+
   it("names the place of birth, or of death", () => {
     expect(snapshot.people.filter(({ place }) => place !== null).length).toBeGreaterThan(250);
     const places = new Set(snapshot.places.map(({ id }) => id));

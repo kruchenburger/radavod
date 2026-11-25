@@ -38,6 +38,7 @@ export type Findings = {
   merged: string[];
   unordered: string[];
   textOutside: string[];
+  badReferences: string[];
 };
 
 /** How far a line may stop from a card it belongs to. */
@@ -60,6 +61,7 @@ export function check(drawing: Drawing, rules: Rules): Findings {
     merged: [],
     unordered: [],
     textOutside: [],
+    badReferences: [],
   };
   const byKey = new Map(cards.map((card) => [card.key, card]));
   checkNumbers(drawing, found);
@@ -70,6 +72,7 @@ export function check(drawing: Drawing, rules: Rules): Findings {
   checkMerged(links, found);
   checkOrder(byKey, links, rules, found);
   checkText(cards, rules, found);
+  checkReferences(byKey, links, found);
   return found;
 }
 
@@ -133,16 +136,14 @@ function checkPaths(cards: Card[], byKey: Map<string, Card>, links: Link[], foun
     const [first] = points;
     const last = points.at(-1);
     if (first === undefined || last === undefined) {
-      if (link.type === "parentage" || !standTogether(link.partners, byKey, links)) {
-        found.loose.push(nameOf(link));
-      }
+      const isNear =
+        link.type === "union" &&
+        standTogether([link.partners[0], link.at ?? link.partners[1]], byKey, links);
+      if (!isNear) found.loose.push(nameOf(link));
       continue;
     }
-    const [from, to] =
-      link.type === "parentage"
-        ? [link.parents, [link.child]]
-        : [[link.partners[0]], [link.partners[1]]];
-    if (link.type === "parentage") {
+    const [from, to] = endsOf(link);
+    if (link.type === "parentage" && link.parentsAt === undefined) {
       const [a, b] = link.parents;
       const isCouple = b === undefined || unions.has(pairOf(a ?? "", b));
       if (!isCouple && !standTogether([a ?? "", b ?? ""], byKey, links)) found.loose.push(nameOf(link));
@@ -159,6 +160,45 @@ function checkPaths(cards: Card[], byKey: Map<string, Card>, links: Link[], foun
         if (inside > 0.5) found.throughCards.push(`${nameOf(link)}: ${card.key}`);
       }
     }
+  }
+}
+
+/** The cards a line may begin at and end at. */
+function endsOf(link: Link): [from: string[], to: string[]] {
+  switch (link.type) {
+    case "union":
+      return [[link.partners[0]], [link.at ?? link.partners[1]]];
+    case "reference":
+      return [[link.reference], link.to];
+    case "parentage": {
+      const { parents, parentsAt, child, childAt } = link;
+      return [parentsAt === undefined ? parents : [...parents, parentsAt], [childAt ?? child]];
+    }
+  }
+}
+
+/** References name people who stand somewhere, and links use them for those people alone. */
+function checkReferences(byKey: Map<string, Card>, links: Link[], found: Findings): void {
+  const named = (key: string): string[] =>
+    (byKey.get(key)?.reference?.people ?? []).map(personKey);
+  for (const { key, reference } of byKey.values()) {
+    if (reference === undefined) continue;
+    const people = named(key);
+    if (people.length === 0 || people.some((person) => byKey.get(person)?.person == null)) {
+      found.badReferences.push(key);
+    }
+  }
+  for (const link of links) {
+    const isFor = (key: string | undefined, people: string[]): boolean =>
+      key === undefined ||
+      (named(key).length > 0 && named(key).every((person) => people.includes(person)));
+    const isRight =
+      link.type === "parentage"
+        ? isFor(link.parentsAt, link.parents) && isFor(link.childAt, [link.child])
+        : link.type === "union"
+          ? isFor(link.at, link.partners)
+          : isFor(link.reference, link.to);
+    if (!isRight) found.badReferences.push(nameOf(link));
   }
 }
 
@@ -196,10 +236,26 @@ function areOfOneStack(
   const [upper, lower] = a.y < b.y ? [a, b] : [b, a];
   const partners = new Set(
     links.flatMap((link) => {
-      const pair = link.type === "union" ? link.partners : link.parents;
+      if (link.type === "reference") return [];
+      const pair =
+        link.type === "union"
+          ? [...link.partners, ...(link.at === undefined ? [] : [link.at])]
+          : [...link.parents, ...(link.parentsAt === undefined ? [] : [link.parentsAt])];
       return pair.includes(a.key) || pair.includes(b.key) ? pair : [];
     }),
   );
+  // Unfolded siblings stand between a person and the partners.
+  const parents = new Set(
+    links.flatMap((link) =>
+      link.type === "parentage" && (link.child === a.key || link.child === b.key)
+        ? link.parents
+        : [],
+    ),
+  );
+  for (const link of links) {
+    if (link.type !== "parentage" || !link.parents.some((key) => parents.has(key))) continue;
+    partners.add(link.child);
+  }
   let bottom = upper.y + upper.h;
   const between = [...byKey.values()]
     .filter(({ x, w, y }) => x === a.x && w === a.w && y > upper.y && y <= lower.y)
@@ -219,6 +275,7 @@ function checkLinks(
 ): void {
   const drawn = new Map<string, string[]>();
   for (const link of links) {
+    if (link.type === "reference") continue;
     if (link.type === "union") drawn.set(pairOf(...link.partners), link.partners);
     else for (const parent of link.parents) drawn.set(`${parent} > ${link.child}`, [parent, link.child]);
   }
@@ -324,6 +381,7 @@ function checkText(cards: Card[], { lines, measure }: Rules, found: Findings): v
 }
 
 export function nameOf(link: Link): string {
+  if (link.type === "reference") return `${link.reference} >> ${link.to.join(" & ")}`;
   return link.type === "union"
     ? link.partners.join(" + ")
     : `${link.parents.join(" & ")} > ${link.child}`;

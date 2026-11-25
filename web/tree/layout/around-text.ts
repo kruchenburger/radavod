@@ -1,30 +1,43 @@
-import type { Entry } from "./around-model";
-import type { Kin } from "./kin";
-import { flow, type Run } from "./text";
+import type { TreeSnapshot } from "../../../src/shared/tree";
+import type { Entry, Model } from "./around-model";
+import { kinOf } from "./kin";
+import { step } from "./lanes";
+import { flow, nameLines, type Run } from "./text";
 import type { CardText, Line, Measure, Wording } from "./types";
 
-/** Sizes of the view around a person, in its own pixels. The screen may change any of them. */
+/** Sizes of the view around a person, those of docs/design.md. The screen may change any of them. */
 export type AroundMetrics = {
-  /** The width of a column, and of the middle one. */
+  /** The width of a column, and of the strip of the chosen person. */
   column: number;
-  middle: number;
-  /** The least width of a gutter between columns. */
-  gutter: number;
+  strip: number;
+  /** The least width of the gap between columns. It grows with the number of lines in it. */
+  gap: number;
+  /** Between lines in one gap. */
+  lane: number;
   /** Between the cards of a couple. */
   join: number;
   /** Around a card, between sets of parents, between families of one person. */
   rows: number;
   sets: number;
   families: number;
+  /** Around the text of the strip. */
   padX: number;
   padY: number;
+  /** A sibling stands this far in. */
+  siblings: number;
+  /** Room for the sign of a union before the name of a spouse. */
+  ring: number;
+  /** Room for the number of folded descendants. */
+  count: number;
   /** Heights of lines. */
   name: number;
   detail: number;
   focusName: number;
+  focusNameDouble: number;
   focusDetail: number;
-  /** Room for buttons: on the card of the person and beside an unknown place. */
+  /** Room for buttons: on the card of the person, under a partner and beside an unknown place. */
   actions: number;
+  children: number;
   aside: number;
   /** Where on the card of the person the lines come in. */
   anchor: number;
@@ -32,95 +45,169 @@ export type AroundMetrics = {
 
 export const aroundMetrics: AroundMetrics = {
   column: 152,
-  middle: 236,
-  gutter: 34,
+  strip: 236,
+  gap: 34,
+  lane: 6,
   join: 4,
   rows: 22,
   sets: 14,
   families: 8,
   padX: 22,
   padY: 4,
+  siblings: 20,
+  ring: 18,
+  count: 30,
   name: 21,
   detail: 18,
   focusName: 38,
+  focusNameDouble: 31,
   focusDetail: 21,
   actions: 44,
+  children: 26,
   aside: 32,
-  anchor: 40,
+  anchor: 36,
 };
 
-type TextOptions = { measure: Measure; wording: Wording; metrics: AroundMetrics };
+export type TextOptions<M> = { measure: Measure; wording: Wording; metrics: M };
+export type EntryText = { lines: Line[]; h: number };
 
-export function textOfEntry(
-  entry: Entry,
-  kin: Kin,
-  options: TextOptions,
-): { lines: Line[]; h: number } {
-  const { wording, metrics, measure } = options;
-  const { padX, padY, column, middle, aside } = metrics;
-  const isMiddle = entry.generation === 0;
-  const x = isMiddle ? padX : 0;
-  const width = isMiddle ? middle - 2 * padX : column - 4;
-  if (entry.unknown !== undefined) {
-    const runs: Run[] = [{ text: wording.unknown(entry.unknown), part: "unknown", style: "name" }];
-    const size = { measure, width: width - aside, lines: 2, lineHeight: metrics.name };
-    const lines = flow(runs, { ...size, x, y: padY });
-    return { lines, h: Math.max(bottomOf(lines), aside) + padY };
+/** Texts of all cards. Their heights leave room for every line that comes to the card. */
+export function textsOf(
+  snapshot: TreeSnapshot,
+  model: Model,
+  options: TextOptions<AroundMetrics>,
+): Map<string, EntryText> {
+  const kin = kinOf(snapshot);
+  const ports = portsOf(model);
+  const texts = new Map<string, EntryText>();
+  for (const entry of model.entries.values()) {
+    const person = entry.person === null ? undefined : kin.person(entry.person);
+    const text = person === undefined ? null : options.wording.person(person);
+    const { lines, h } = textOf(entry, text, options);
+    const room = entry.role === "partner" && model.open !== null ? options.metrics.children : 0;
+    const most = ports.get(entry.key) ?? 0;
+    texts.set(entry.key, { lines, h: Math.max(h + room, (most + 2) * step) });
   }
-  const person = entry.person === null ? undefined : kin.person(entry.person);
-  const text = person === undefined ? null : wording.person(person);
-  if (text === null) return { lines: [], h: metrics.name + 2 * padY };
-  return entry.role === "focus"
-    ? focusText(text, { ...options, x, width })
-    : personText(text, entry.direct, { ...options, x, width });
+  return texts;
 }
 
-function personText(
-  text: CardText,
-  isDirect: boolean,
-  { measure, metrics, x, width }: TextOptions & { x: number; width: number },
-): { lines: Line[]; h: number } {
-  const { padY } = metrics;
-  const name = flow(nameRuns(text, isDirect), {
-    measure,
-    width,
-    lines: 2,
-    lineHeight: metrics.name,
-    x,
-    y: padY,
+/** The most families whose lines take places on one side of a card. */
+function portsOf({ links, unions, references }: Model): Map<string, number> {
+  const sides = new Map<string, Set<string>>();
+  const add = (side: string, key: string, family: string): void => {
+    const name = `${side} ${key}`;
+    const families = sides.get(name);
+    if (families === undefined) sides.set(name, new Set([family]));
+    else families.add(family);
+  };
+  for (const { from, child, family } of links) {
+    for (const key of from) add("out", key, family);
+    add("in", child, family);
+  }
+  for (const { partners, isTogether, family } of unions) {
+    if (!isTogether) for (const key of partners) add("out", key, family);
+  }
+  for (const { reference, to, family } of references) {
+    for (const key of [reference, to[0] ?? ""]) add("in", key, family);
+  }
+  const most = new Map<string, number>();
+  for (const [name, { size }] of sides) {
+    const key = name.slice(name.indexOf(" ") + 1);
+    most.set(key, Math.max(most.get(key) ?? 0, size));
+  }
+  return most;
+}
+
+function textOf(
+  entry: Entry,
+  text: CardText | null,
+  options: TextOptions<AroundMetrics>,
+): EntryText {
+  const { metrics } = options;
+  const isInStrip = entry.generation === 0;
+  const indent = isInStrip ? metrics.padX + (entry.role === "sibling" ? metrics.siblings : 0) : 0;
+  const box = {
+    ...options,
+    x: indent,
+    width: (isInStrip ? metrics.strip - metrics.padX : metrics.column - 4) - indent,
+    top: isInStrip ? 2 * metrics.padY : metrics.padY,
+  };
+  if (entry.role === "focus" && text !== null) return focusText(text, box);
+  if (entry.unknown !== undefined || entry.reference !== undefined) return placeText(entry, box);
+  if (text === null) return { lines: [], h: metrics.name + 2 * metrics.padY };
+  if (entry.folded !== undefined) {
+    const [given, surname] = nameRuns(text, entry.direct);
+    const years: Run = { text: text.years, part: "years", style: "detail" };
+    const lines = flow([given, surname, years], {
+      ...size(box, metrics.name),
+      width: box.width - metrics.count,
+    });
+    return { lines, h: Math.max(bottomOf(lines), box.top + metrics.name) + metrics.padY };
+  }
+  const name = nameLines(...nameRuns(text, entry.direct), {
+    ...size(box, metrics.name),
+    indent: entry.isSpouse ? metrics.ring : 0,
   });
-  const below = Math.max(bottomOf(name), metrics.name + padY);
-  const detail = flow(detailRuns(text), {
-    measure,
-    width,
-    lines: 2,
-    lineHeight: metrics.detail,
-    x,
+  const below = Math.max(bottomOf(name), box.top + metrics.name);
+  const detail = flow(detailRuns(text), { ...size(box, metrics.detail), y: below });
+  return { lines: [...name, ...detail], h: Math.max(bottomOf(detail), below) + metrics.padY };
+}
+
+type TextBox = TextOptions<AroundMetrics> & { x: number; width: number; top: number };
+
+const size = ({ measure, width, x, top }: TextBox, lineHeight: number) => ({
+  measure,
+  width,
+  lineHeight,
+  x,
+  y: top,
+  lines: 2,
+});
+
+function placeText(entry: Entry, box: TextBox): EntryText {
+  const { metrics, wording, top, width } = box;
+  const { unknown, reference } = entry;
+  if (unknown !== undefined) {
+    const run: Run = { text: wording.unknown(unknown), part: "unknown", style: "reference" };
+    const lines = flow([run], {
+      ...size(box, metrics.name),
+      width: width - metrics.aside,
+      indent: entry.isSpouse ? metrics.ring : 0,
+    });
+    return { lines, h: Math.max(bottomOf(lines), top + metrics.aside) + metrics.padY };
+  }
+  if (reference === undefined) return { lines: [], h: metrics.name };
+  const { title, detail } = wording.reference(reference);
+  const head = flow([{ text: title, part: "title", style: "reference" }], size(box, metrics.name));
+  const below = Math.max(bottomOf(head), top + metrics.name);
+  const rest = flow([{ text: detail, part: "detail", style: "detail" }], {
+    ...size(box, metrics.detail),
     y: below,
   });
-  return { lines: [...name, ...detail], h: Math.max(bottomOf(detail), below) + padY };
+  return { lines: [...head, ...rest], h: Math.max(bottomOf(rest), below) + metrics.padY };
 }
 
-function focusText(
-  text: CardText,
-  { measure, metrics, x, width }: TextOptions & { x: number; width: number },
-): { lines: Line[]; h: number } {
+function focusText(text: CardText, box: TextBox): EntryText {
+  const { metrics } = box;
+  const isDouble = /\p{L}-\p{L}/u.test(text.surname);
+  const style = isDouble ? "focusNameDouble" : "focusName";
+  const nameHeight = isDouble ? metrics.focusNameDouble : metrics.focusName;
   const lines: Line[] = [];
-  let y = metrics.padY * 4;
+  let y = box.top + 2 * metrics.padY;
   const set = (run: Run, lineHeight: number): void => {
-    const own = flow([run], { measure, width, lines: 2, lineHeight, x, y });
+    const own = flow([run], { ...size(box, lineHeight), y });
     lines.push(...own);
     y = Math.max(y, bottomOf(own));
   };
-  set({ text: text.given, part: "given", style: "focusName" }, metrics.focusName);
-  set({ text: text.surname, part: "surname", style: "focusName" }, metrics.focusName);
-  y = Math.max(y, metrics.focusName + metrics.padY * 4) + metrics.padY;
+  set({ text: text.given, part: "given", style }, nameHeight);
+  set({ text: text.surname, part: "surname", style }, nameHeight);
+  y = Math.max(y, 2 * metrics.anchor) + metrics.padY;
   set({ text: text.years, part: "years", style: "focusDetail" }, metrics.focusDetail);
   set({ text: text.branch, part: "branch", style: "focusDetail" }, metrics.focusDetail);
-  return { lines, h: y + metrics.actions + metrics.padY * 2 };
+  return { lines, h: y + metrics.actions + 2 * metrics.padY };
 }
 
-export function nameRuns({ given, surname }: CardText, isDirect: boolean): Run[] {
+export function nameRuns({ given, surname }: CardText, isDirect: boolean): [Run, Run] {
   const style = isDirect ? "nameDirect" : "name";
   return [
     { text: given, part: "given", style },
@@ -135,5 +222,4 @@ export function detailRuns({ years, branch }: CardText): Run[] {
   ];
 }
 
-export const bottomOf = (lines: Line[]): number =>
-  Math.max(0, ...lines.map(({ y, h }) => y + h));
+export const bottomOf = (lines: Line[]): number => Math.max(0, ...lines.map(({ y, h }) => y + h));

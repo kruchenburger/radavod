@@ -210,6 +210,19 @@ const defects: Record<string, [keyof Findings, (d: ReturnType<typeof drawing>) =
     "textOutside",
     (d) => void d.lines.push({ ...at(d.lines, 0), x: 40, part: "surname" }),
   ],
+  "a reference to nobody": [
+    "badReferences",
+    (d) => {
+      at(d.cards, 4).reference = { as: "child", people: ["nobody"], page: null };
+    },
+  ],
+  "a reference to somebody else": [
+    "badReferences",
+    (d) => {
+      at(d.cards, 4).reference = { as: "child", people: ["first"], page: null };
+      (at(d.links, 3) as ParentageLink).childAt = "p:aunt";
+    },
+  ],
   "a card without a place": ["badNumbers", (d) => (at(d.cards, 5).x = Number.NaN)],
   "a card past the edge": ["outside", (d) => (d.width = 480)],
 };

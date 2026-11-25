@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { cut, flow } from "../../../web/tree/layout/text";
+import { cut, flow, nameLines } from "../../../web/tree/layout/text";
 import type { Measure } from "../../../web/tree/layout/types";
 
 const measure: Measure = (text) => [...text].length * 10;
@@ -60,7 +60,51 @@ describe("flow", () => {
     ]);
   });
 
+  it("goes on after a hyphen", () => {
+    expect(told(flow([run("Polynich-Zabolot")], options))).toEqual([
+      ["Polynich-", 0, 0],
+      ["Zabolot", 0, 20],
+    ]);
+    expect(told(flow([run("Ab-Cd")], options))).toEqual([["Ab-Cd", 0, 0]]);
+  });
+
   it("has no lines for no words", () => {
     expect(flow([run(""), run("  ")], options)).toEqual([]);
+  });
+});
+
+describe("a name", () => {
+  const name = (given: string, surname: string, indent = 0) =>
+    told(nameLines(run(given), run(surname, "surname"), { ...options, indent }));
+
+  it("is one line when it fits", () => {
+    expect(name("Anna", "Wolf")).toEqual([
+      ["Anna", 0, 0],
+      ["Wolf", 50, 0],
+    ]);
+  });
+
+  it("breaks between the given name and the surname", () => {
+    expect(name("Anna", "Zabolotska")).toEqual([
+      ["Anna", 0, 0],
+      ["Zabolotska", 0, 20],
+    ]);
+    expect(name("Anna B", "Wolf")).toEqual([
+      ["Anna B", 0, 0],
+      ["Wolf", 0, 20],
+    ]);
+  });
+
+  it("leaves room before its first line", () => {
+    expect(name("Anna", "Wolf", 20)).toEqual([
+      ["Anna", 20, 0],
+      ["Wolf", 0, 20],
+    ]);
+  });
+
+  it("may have no given name or no surname", () => {
+    expect(name("", "Wolf")).toEqual([["Wolf", 0, 0]]);
+    expect(name("Anna", "")).toEqual([["Anna", 0, 0]]);
+    expect(name("", "")).toEqual([]);
   });
 });

@@ -10,6 +10,8 @@ type FlowOptions = {
   lineHeight: number;
   x?: number;
   y?: number;
+  /** Room left before the first line. */
+  indent?: number;
 };
 
 const ellipsis = "…";
@@ -35,17 +37,17 @@ export function cut(text: string, style: TextStyle, width: number, measure: Meas
 
 /** Sets runs one after another, going on to the next line between words. */
 export function flow(runs: Run[], options: FlowOptions): Line[] {
-  const { measure, width, lines: most, lineHeight, x: left = 0, y: top = 0 } = options;
+  const { measure, width, lines: most, lineHeight, x: left = 0, y: top = 0, indent = 0 } = options;
   const set: Line[] = [];
   let line: Line | undefined;
   let row = 0;
-  let end = 0;
+  let end = indent;
   for (const { text, part, style } of runs) {
-    for (const word of wordsOf(text)) {
+    for (const { word, isApart } of wordsOf(text)) {
       const space = measure(" ", style);
       const joins = line !== undefined && line.part === part && line.style === style;
       if (line !== undefined && joins) {
-        const longer = `${line.text} ${word}`;
+        const longer = line.text + (isApart ? " " : "") + word;
         const w = measure(longer, style);
         if (line.x - left + w <= width) {
           end = line.x - left + w;
@@ -53,9 +55,9 @@ export function flow(runs: Run[], options: FlowOptions): Line[] {
           continue;
         }
       }
-      let start = line === undefined ? 0 : end + space;
+      let start = line === undefined ? indent : end + (isApart ? space : 0);
       let w = measure(word, style);
-      if (start + w > width && line !== undefined) {
+      if (start + w > width && (line !== undefined || start > 0)) {
         if (row + 1 >= most) return endWithEllipsis(set, { ...options, word, part, style, end });
         row += 1;
         start = 0;
@@ -97,7 +99,28 @@ function endWithEllipsis(
   return [...set.slice(0, -1), { ...last, text, w: measure(text, last.style) }];
 }
 
-/** Very long texts are never shown whole, so the rest is not worth looking at. */
-function wordsOf(text: string): string[] {
-  return text.slice(0, 2000).split(/\s+/u).filter((word) => word !== "");
+/** A name on one line, or the given name and the surname on lines of their own. */
+export function nameLines(given: Run, surname: Run, options: FlowOptions): Line[] {
+  const { width, lineHeight, y = 0 } = options;
+  const together = flow([given, surname], { ...options, lines: 1, width: Infinity });
+  const last = together.at(-1);
+  if (last === undefined || last.x - (options.x ?? 0) + last.w <= width) return together;
+  const first = flow([given], options);
+  const rows = new Set(first.map((line) => line.y)).size;
+  const rest = { ...options, y: y + rows * lineHeight };
+  return [...first, ...flow([surname], rows === 0 ? rest : { ...rest, indent: 0 })];
+}
+
+/**
+ * Words, and the parts of one with a hyphen. Very long texts are never shown whole, so the rest is
+ * not worth looking at.
+ */
+function wordsOf(text: string): { word: string; isApart: boolean }[] {
+  const words = text.slice(0, 2000).split(/\s+/u);
+  return words.flatMap((word) =>
+    word
+      .split(/(?<=\p{L}-)(?=\p{L})/u)
+      .filter((part) => part !== "")
+      .map((part, i) => ({ word: part, isApart: i === 0 })),
+  );
 }

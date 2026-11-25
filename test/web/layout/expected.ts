@@ -1,12 +1,12 @@
 import type { TreeSnapshot } from "../../../src/shared/tree";
 
-type Far = { up?: number; down?: number; siblings?: boolean };
+type Far = { up?: number; down?: number; siblings?: boolean; open?: string | null };
 
 /** Who must stand around a person, told apart from the layout: plain searches over the snapshot. */
 export function expectedAround(
   { people, unions }: TreeSnapshot,
   focus: string,
-  { up = 3, down = 3, siblings = false }: Far = {},
+  { up = 3, down = 3, siblings = false, open = null }: Far = {},
 ): Set<string> {
   const byId = new Map<string, TreeSnapshot["people"][number]>();
   for (const person of people) if (!byId.has(person.id)) byId.set(person.id, person);
@@ -28,7 +28,11 @@ export function expectedAround(
       add(children, parent, child);
     }
   }
-  const reach = (map: Map<string, string[]>, far: number): Set<string> => {
+  const reach = (
+    map: Map<string, string[]>,
+    far: number,
+    isFolded = (_: string): boolean => false,
+  ): Set<string> => {
     const found = new Set<string>();
     let front = [focus];
     const seen = new Set(front);
@@ -38,6 +42,7 @@ export function expectedAround(
         seen.add(id);
         found.add(id);
       }
+      front = front.filter((id) => !isFolded(id));
     }
     return found;
   };
@@ -50,25 +55,39 @@ export function expectedAround(
   // Two main parents of one kind are the parents of a child even when no union is known. One
   // parent told in several ways counts by the surest way: main first, then by kind.
   const rank = { blood: 0, adoption: 1, unknown: 2, guardianship: 3 };
-  const together = (id: string): string[] =>
-    (children.get(id) ?? []).flatMap((child) => {
-      const links = linksOf(child)
-        .map((link, i) => ({ ...link, i }))
-        .sort(
-          (a, b) =>
-            Number(b.main) - Number(a.main) || rank[a.kind] - rank[b.kind] || a.i - b.i,
-        );
-      const once = links.filter(
-        ({ parent }, i) => parent === null || links.findIndex((l) => l.parent === parent) === i,
+  const setOf = (child: string, id: string): (string | null)[] => {
+    const links = linksOf(child)
+      .map((link, i) => ({ ...link, i }))
+      .sort(
+        (a, b) => Number(b.main) - Number(a.main) || rank[a.kind] - rank[b.kind] || a.i - b.i,
       );
-      const own = once.find(({ parent }) => parent === id);
-      const same = once.filter(({ kind, main }) => kind === own?.kind && main === own.main);
-      const others = same.flatMap(({ parent }) =>
-        parent === null || parent === id ? [] : [parent],
-      );
-      return own?.main === true && same.length === 2 ? others : [];
-    });
-  const partners = (id: string): string[] => [...wed(id), ...together(id)];
+    const once = links.filter(
+      ({ parent }, i) => parent === null || links.findIndex((l) => l.parent === parent) === i,
+    );
+    const own = once.find(({ parent }) => parent === id);
+    const same = once.filter(({ kind, main }) => kind === own?.kind && main === own.main);
+    const others = same.flatMap(({ parent }) => (parent === id ? [] : [parent]));
+    if (own?.main === true && same.length === 2) return others;
+    return others.filter((other) => other !== null && wed(id).includes(other)).slice(0, 1);
+  };
+  const partners = (id: string): string[] => [
+    ...wed(id),
+    ...(children.get(id) ?? []).flatMap((child) =>
+      setOf(child, id).filter((other) => other !== null),
+    ),
+  ];
+
+  // Of three unions and more one is open, and the children of the others stand without their own.
+  const strangers = unions.filter(({ partners: [a, b] }) => a === focus && b === null);
+  const stripKeys = [...new Set(partners(focus))].map((id) => `p:${id}`);
+  const isManyUnions = stripKeys.length + strangers.length > 2;
+  const folded = new Set<string>();
+  for (const child of isManyUnions ? (children.get(focus) ?? []) : []) {
+    const [other] = setOf(child, focus);
+    const stranger = strangers[0] === undefined ? [] : [`?:partner ${strangers[0].id}`];
+    const keys = other === undefined ? [] : other === null ? stranger : [`p:${other}`];
+    if (keys.some((key) => key !== open)) folded.add(child);
+  }
 
   const all = new Set([focus, ...partners(focus), ...reach(parents, up)]);
   if (siblings && up > 0) {
@@ -76,9 +95,9 @@ export function expectedAround(
       for (const id of children.get(parent) ?? []) all.add(id);
     }
   }
-  for (const id of reach(children, down)) {
+  for (const id of reach(children, down, (child) => folded.has(child))) {
     all.add(id);
-    for (const partner of partners(id)) all.add(partner);
+    if (!folded.has(id)) for (const partner of partners(id)) all.add(partner);
   }
   return all;
 }

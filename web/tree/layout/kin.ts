@@ -25,7 +25,7 @@ export type UnionOf = { union: TreeUnion; other: string | null };
 
 /** The snapshot by questions. It judges nothing: what the snapshot says is drawn. */
 export type Kin = {
-  /** Everybody once, in the order of the snapshot. */
+  /** Everybody once, in the order of the snapshot. The snapshot must not change after. */
   ids: string[];
   person: (id: string) => TreePerson | undefined;
   /** The place in the snapshot. */
@@ -34,6 +34,7 @@ export type Kin = {
   sets: (child: string) => ParentSet[];
   /** In the order of birth. */
   children: (parent: string) => Child[];
+  /** In the order of time. */
   unions: (person: string) => UnionOf[];
   /** Every couple of two known people once. */
   couples: { union: TreeUnion; a: string; b: string }[];
@@ -109,6 +110,21 @@ function read({ people, unions }: TreeSnapshot): Kin {
     return first === second ? index(a) - index(b) : first - second;
   };
   for (const children of childrenOf.values()) children.sort((a, b) => byBirth(a.child, b.child));
+  // An undated union began before its first child was born.
+  const beganAt = (person: string, { union, other }: UnionOf): number =>
+    union.began ??
+    Math.min(
+      ...(childrenOf.get(person) ?? [])
+        .filter(({ set }) => other !== null && set.known.includes(other))
+        .map(({ child }) => bornAt(child)),
+      Infinity,
+    );
+  for (const [person, own] of unionsOf) {
+    if (own.length < 2) continue;
+    const times = new Map(own.map((one) => [one, beganAt(person, one)]));
+    const timeOf = (one: UnionOf): number => times.get(one) ?? Infinity;
+    own.sort((a, b) => (timeOf(a) === timeOf(b) ? 0 : timeOf(a) - timeOf(b)));
+  }
 
   const none: never[] = [];
   return {

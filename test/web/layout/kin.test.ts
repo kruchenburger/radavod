@@ -66,7 +66,32 @@ describe("the children of a person", () => {
 });
 
 describe("the partners of a person", () => {
-  it("come in the order of the unions, each once", () => {
+  it("come in the order of time: by the date of the union, else by the first child", () => {
+    const snapshot = familyOf({
+      people: [
+        "a",
+        "b",
+        "c",
+        "d",
+        { id: "x", born: 1900, parents: ["a", "c"] },
+        { id: "y", born: 1890, parents: ["a", "d"] },
+      ],
+      unions: [
+        ["a", "b"],
+        ["a", "c"],
+        ["d", "a"],
+      ],
+    });
+    const partners = (): (string | null)[] =>
+      kinOf({ ...snapshot })
+        .unions("a")
+        .map(({ other }) => other);
+    expect(partners()).toEqual(["d", "c", "b"]);
+    Object.assign(snapshot.unions[0] ?? {}, { began: 1880 * 365 });
+    expect(partners()).toEqual(["b", "d", "c"]);
+  });
+
+  it("come in the order of the snapshot without any date, each once", () => {
     const snapshot = familyOf({
       people: ["a", "b", "c"],
       unions: [
