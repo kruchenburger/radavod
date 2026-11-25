@@ -1,2 +1,3 @@
 guards/*/fixtures/
+examples/family.json
 pnpm-lock.yaml

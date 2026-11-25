@@ -43,6 +43,8 @@
     "lint": "oxlint",
     "typecheck": "tsc --noEmit && tsc --noEmit -p tsconfig.node.json && tsc --noEmit -p tsconfig.web.json",
     "guard:ddd": "node guards/ddd/cli.ts",
-    "guard:copy": "node guards/copy/cli.ts"
+    "guard:copy": "node guards/copy/cli.ts",
+    "guard:data": "node guards/data/cli.ts",
+    "examples": "node examples/write.ts"
   }
 }
