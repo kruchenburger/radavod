@@ -38,6 +38,11 @@ export const accessSteps: Migration[] = [
       sql.exec(`CREATE TABLE access_log (
         number INTEGER PRIMARY KEY AUTOINCREMENT, at INTEGER NOT NULL, data TEXT NOT NULL
       )`);
+      // Keys of tries are kept hashed with a salt of this family: an address never lies here.
+      sql.exec(
+        "CREATE TABLE access_salt (id INTEGER PRIMARY KEY CHECK (id = 1), salt TEXT NOT NULL)",
+      );
+      sql.exec("INSERT INTO access_salt (id, salt) VALUES (1, ?)", crypto.randomUUID());
       sql.exec(`CREATE TABLE access_attempt (
         number INTEGER PRIMARY KEY AUTOINCREMENT, limit_of TEXT NOT NULL, key TEXT NOT NULL,
         at INTEGER NOT NULL
@@ -183,7 +188,9 @@ export function sqliteAccess(sql: SqlStorage): AccessStore {
         (one) => one.kind === "recovery" && one.member === member && one.spentAt === null,
       ),
     isCodeUsed: (hash) =>
-      rows<Row>("SELECT used_at AS data FROM access_setup WHERE hash = ?", hash).length > 0,
+      sql.exec("SELECT 1 FROM access_setup WHERE hash = ?", hash).toArray().length > 0,
+    isErased: (person) =>
+      sql.exec("SELECT 1 FROM access_erased WHERE id = ?", person).toArray().length > 0,
     credential(id) {
       const [row] = rows<Row & { id: string }>(
         "SELECT id, data FROM access_credential WHERE id = ?",
@@ -201,7 +208,9 @@ export function sqliteAccess(sql: SqlStorage): AccessStore {
       return row === undefined ? null : sessionOf(row);
     },
     sessionsOf: (member) =>
-      rows<Row>("SELECT data FROM access_session WHERE member = ?", member).map(sessionOf),
+      rows<Row>("SELECT data FROM access_session WHERE member = ? ORDER BY hash", member).map(
+        sessionOf,
+      ),
     save(change: Change) {
       for (const write of change) {
         switch (write.kind) {
@@ -273,6 +282,7 @@ export function sqliteAccess(sql: SqlStorage): AccessStore {
         )
         .toArray()
         .map(({ at }) => at),
+    salt: () => sql.exec<{ salt: string }>("SELECT salt FROM access_salt").one().salt,
     tried(limit: Limit, key: string, at: number) {
       sql.exec("INSERT INTO access_attempt (limit_of, key, at) VALUES (?, ?, ?)", limit, key, at);
     },

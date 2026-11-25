@@ -1,7 +1,13 @@
 /** Members, roles, invitations, passkeys and sessions. */
 export { migrateAccess, sqliteAccess } from "./adapters/sqlite-access";
 export { sqliteLedger } from "./adapters/sqlite-ledger";
-export { type Access, type AccessError, accessOver } from "./application/access";
+export {
+  type Access,
+  type AccessError,
+  accessOver,
+  type Expected,
+  type StaleVersion,
+} from "./application/access";
 export type { ErasureLedger } from "./application/ledger";
 export type { AccessStore } from "./application/ports";
 export type { Credential, NewCredential } from "./domain/credential";

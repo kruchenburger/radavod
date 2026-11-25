@@ -31,7 +31,10 @@ export type Change = (
 /** A setup code that let a keeper in, by its hash. Each code does so once. */
 export type SetupCode = { hash: string; usedAt: number };
 
-/** What the access of a family holds. A family has few members: they are read all at once. */
+/**
+ * What the access of a family holds. A family has few members: they are read all at once. Lists come
+ * in the order of their identifiers.
+ */
 export interface AccessReader {
   member(id: MemberId): Member | null;
   members(): Member[];
@@ -41,6 +44,8 @@ export interface AccessReader {
   invitations(): Invitation[];
   /** The recovery links of a member that are not spent. */
   recoveriesOf(member: MemberId): Invitation[];
+  /** Whether a person was erased from the tree: nobody is tied to them again. */
+  isErased(person: PersonId): boolean;
   /** Whether a setup code, by its hash, ever let a keeper in. */
   isCodeUsed(hash: string): boolean;
   credential(id: string): Credential | null;

@@ -61,10 +61,11 @@ export function invite(
   reader: AccessReader,
   by: MemberId,
   input: { id: string; hash: string; role: Role; person: PersonId | null; now: number },
-): Result<Change, Forbidden | Duplicate> {
+): Result<Change, Forbidden | Duplicate | Missing> {
   const keeper = allowed(reader, by, "manage-members");
   if (!keeper.ok) return keeper;
   const { id, hash, role, person, now } = input;
+  if (person !== null && reader.isErased(person)) return missing(person);
   if (reader.invitation(id) !== null || reader.invitationByHash(hash) !== null) return duplicate;
   const invitation: Invitation = {
     id,

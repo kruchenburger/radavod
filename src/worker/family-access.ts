@@ -2,6 +2,8 @@ import { DurableObject } from "cloudflare:workers";
 import {
   type Access,
   type AccessError,
+  type Expected,
+  type StaleVersion,
   accessOver,
   type ErasureLedger,
   type Limit,
@@ -21,11 +23,6 @@ import type { Result } from "../kernel/result";
 import type { Env } from "./env";
 
 const day = 86_400_000;
-
-/** What a member saw: "member/<id>" and its version. A stale one is refused. */
-export type Expected = Record<string, number>;
-
-export type StaleVersion = { code: "stale-version"; aggregate: string; current: number };
 
 type Done<T = null> = Result<T, AccessError | StaleVersion>;
 
@@ -147,12 +144,16 @@ export class FamilyAccess extends DurableObject<Env> {
     return this.#change({}, (access) => access.signOut(hash));
   }
 
-  attempt(
-    limit: Limit,
+  /** A try of an address, known by a hash; it is hashed again with the salt of this family. */
+  async attempt(
+    limit: Exclude<Limit, "invite">,
     key: string,
     now: number,
   ): Promise<Result<null, RateLimited | StaleVersion>> {
-    return this.#run({}, (access) => access.attempt(limit, key, now));
+    const salted = new TextEncoder().encode(`${sqliteAccess(this.ctx.storage.sql).salt()}:${key}`);
+    const digest = new Uint8Array(await crypto.subtle.digest("SHA-256", salted));
+    const hashed = Array.from(digest, (byte) => byte.toString(16).padStart(2, "0")).join("");
+    return this.#run({}, (access) => access.attempt(limit, hashed, now));
   }
 
   log(by: MemberId): Result<LogEntry[], AccessError> {
@@ -182,14 +183,8 @@ export class FamilyAccess extends DurableObject<Env> {
   ): Promise<Result<T, E | StaleVersion>> {
     const done = this.ctx.storage.transactionSync((): Result<T, E | StaleVersion> => {
       const access = this.#access();
-      for (const [aggregate, seen] of Object.entries(expected)) {
-        const [kind, id = ""] = aggregate.split("/");
-        if (kind !== "member") throw new Error("unknown-aggregate");
-        const current = access.member(id as MemberId)?.version ?? 0;
-        if (current !== seen)
-          return { ok: false, error: { code: "stale-version", aggregate, current } };
-      }
-      return work(access);
+      const stale = access.stale(expected);
+      return stale === null ? work(access) : { ok: false, error: stale };
     });
     if (done.ok) await this.#wake();
     return done;

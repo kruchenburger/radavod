@@ -1,4 +1,4 @@
-import type { MemberId, PersonId } from "../../../kernel/id";
+import { isId, type MemberId, type PersonId } from "../../../kernel/id";
 import type { Duplicate, Missing } from "../../../kernel/refusal";
 import type { Result } from "../../../kernel/result";
 import {
@@ -43,6 +43,11 @@ import {
 } from "../domain/limits";
 import { countryOf, type LogEntry } from "../domain/log";
 import type { AccessStore } from "./ports";
+
+/** What a member saw: "member/<id>" and its version, 0 for one not there. */
+export type Expected = Record<string, number>;
+
+export type StaleVersion = { code: "stale-version"; aggregate: string; current: number };
 
 export type AccessError =
   | RateLimited
@@ -101,12 +106,17 @@ export interface Access {
   /** Who a session is, its end moved on; null for one that is over. */
   session(hash: string, now: number): Signed | null;
   signOut(hash: string): Result<Change, AccessError>;
-  /** Counts a try of a key; one too many is refused with when to try again. */
-  attempt(limit: Limit, key: string, now: number): Result<null, RateLimited>;
+  /**
+   * Counts a try of a key, an address by its hash; one too many is refused with when to try again.
+   * Invitations and recovery links count themselves.
+   */
+  attempt(limit: Exclude<Limit, "invite">, key: string, now: number): Result<null, RateLimited>;
   /** The sign-in log, for a keeper. */
   log(by: MemberId): Result<LogEntry[], AccessError>;
   /** People erased from the tree are tied to no member and no invitation. */
   forget(people: readonly PersonId[]): void;
+  /** The first version a member saw that is not the one kept, or null. */
+  stale(expected: Expected): StaleVersion | null;
   /** Takes away what is over. */
   clean(now: number): void;
   /** Whether anything is kept that will be over some day. */
@@ -137,8 +147,12 @@ export function accessOver(store: AccessStore): Access {
       return done;
     },
     recover(by, input) {
+      const tries = store.triesOf("invite", by, windowStart("invite", input.now));
+      const room = allowance("invite", tries, input.now);
+      if (!room.ok) return room;
       const done = saved(recover(store, by, input));
       if (done.ok) {
+        store.tried("invite", by, input.now);
         const { member, now: at } = input;
         store.log({ at, kind: "recovery", member, credential: null, by, country: null });
       }
@@ -191,6 +205,18 @@ export function accessOver(store: AccessStore): Access {
     forget(people) {
       const change = withoutPeople(store, people);
       if (change.length > 0) store.save(change);
+    },
+    stale(expected) {
+      for (const [aggregate, seen] of Object.entries(expected)) {
+        const [kind, id, more] = aggregate.split("/");
+        // The key came from the code, not from a member.
+        if (kind !== "member" || more !== undefined || !isId("member", id)) {
+          throw new Error("unknown-aggregate");
+        }
+        const current = store.member(id)?.version ?? 0;
+        if (current !== seen) return { code: "stale-version", aggregate, current };
+      }
+      return null;
     },
     clean: (now) => store.clean(now, now - longestWindow),
     isWaiting: () => store.isWaiting(),

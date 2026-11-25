@@ -8,6 +8,8 @@ export interface AccessStore extends AccessReader {
   /** When a key tried something since a time. */
   triesOf(limit: Limit, key: string, since: number): number[];
   tried(limit: Limit, key: string, at: number): void;
+  /** What keys of tries are hashed with, kept by this family only. */
+  salt(): string;
   log(entry: LogEntry): void;
   /** The sign-in log, the newest first. */
   logged(): LogEntry[];

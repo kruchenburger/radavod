@@ -52,6 +52,7 @@ async function twoKeepers(stub: ReturnType<typeof objectOf>, now: number) {
 }
 
 describe("the access of a family in its object", () => {
+  // The object runs one call at a time: the second sees the first and is refused.
   it("keeps one keeper when two keepers revoke each other at the same moment", async () => {
     const stub = objectOf();
     const now = Date.now();
@@ -161,6 +162,31 @@ describe("the access of a family in its object", () => {
     });
   });
 
+  it("ties nobody to a person erased from the tree, and keeps no address among the tries", async () => {
+    const stub = objectOf();
+    const now = Date.now();
+    await twoKeepers(stub, now);
+    await stub.remember([person("ada")]);
+    const input = { id: "a", hash: "a", role: "reader" as const, person: person("ada"), now };
+    expect(await stub.invite(member("ann"), input)).toEqual({
+      ok: false,
+      error: { code: "missing", id: person("ada") },
+    });
+    expect((await stub.attempt("sign-in", "203.0.113.7", now)).ok).toBe(true);
+    await runInDurableObject(stub, (_, { storage }) => {
+      expect(JSON.stringify(rowsOf(storage.sql))).not.toContain("203.0.113.7");
+    });
+  });
+
+  it("takes only versions of members, by their keys", async () => {
+    const stub = objectOf();
+    const now = Date.now();
+    await twoKeepers(stub, now);
+    await expect(
+      stub.revoke(member("ann"), member("bob"), now, { [`member/${member("bob")}/x`]: 1 }),
+    ).rejects.toThrow("unknown-aggregate");
+  });
+
   it("cleans what is over by an alarm, and wakes no more once nothing is left", async () => {
     const stub = objectOf();
     const now = Date.now();
@@ -217,7 +243,13 @@ describe("the access of a family in its object", () => {
       expect((await stub.invite(member("ann"), input)).ok).toBe(true);
     }
     const more = { id: "x", hash: "x", role: "reader" as const, person: null, now };
-    expect((await stub.invite(member("ann"), more)).ok).toBe(false);
+    expect(await stub.invite(member("ann"), more)).toEqual({
+      ok: false,
+      error: { code: "rate-limited", retryAfter: 86_400 },
+    });
+    // Recovery links count with them.
+    const recovery = { id: "r", hash: "r", member: member("bob"), now };
+    expect((await stub.recover(member("ann"), recovery)).ok).toBe(false);
     expect((await stub.invite(member("bob"), more)).ok).toBe(true);
   });
 });
@@ -246,6 +278,7 @@ describe("the tables of access", () => {
           "access_invitation",
           "access_log",
           "access_member",
+          "access_salt",
           "access_schema",
           "access_session",
           "access_setup",
