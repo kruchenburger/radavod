@@ -1,8 +1,11 @@
-import { expect, it } from "vitest";
+import { expect, it, vi } from "vitest";
 import { around } from "../../../web/tree/layout/around";
 import { branchMap } from "../../../web/tree/layout/branch-map";
 import { bigSnapshot, busiest } from "./big";
 import { measure, wordingOf } from "./family";
+
+// Making the family takes longer than laying it out.
+vi.setConfig({ testTimeout: 60_000 });
 
 // Generous bounds: a shared machine in CI is slow. `pnpm bench` tells the real times.
 

@@ -27,11 +27,17 @@ describe("the snapshot of the invented family", () => {
   });
 
   it("has every parentage with its kind, its flag and its certainty", () => {
+    const known = family.parentages.map((link) => ({
+      ...link,
+      union: snapshot.people
+        .find(({ id }) => id === link.child)
+        ?.parents.find(({ id }) => id === link.id)?.union,
+    }));
     const told = snapshot.people.flatMap(({ id, parents }) =>
-      parents.map(({ union: _, ...parentage }) => ({ child: id, ...parentage })),
+      parents.map((parentage) => ({ child: id, ...parentage })),
     );
     const order = (a: { id: string }, b: { id: string }): number => (a.id < b.id ? -1 : 1);
-    expect(told.sort(order)).toEqual([...family.parentages].sort(order));
+    expect(told.sort(order)).toEqual(known.sort(order));
   });
 
   it("ties a child to the union of both parents, and to none when one is unknown", () => {
