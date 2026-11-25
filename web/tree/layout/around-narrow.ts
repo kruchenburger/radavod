@@ -98,8 +98,11 @@ export function aroundNarrow(
   }
   const margin = new Track();
   for (const { family, source, target } of wires) {
-    margin.touch(family, row(source, -20));
-    margin.touch(family, row(target, 20));
+    // A row may hold ends of several lines, each at a place of its own.
+    for (const key of [source, target]) {
+      margin.touch(family, row(key, -20));
+      margin.touch(family, row(key, 20));
+    }
   }
   const marginLanes = margin.lay();
   const marginWidth = marginLanes === 0 ? 0 : (marginLanes + 1) * metrics.lane;

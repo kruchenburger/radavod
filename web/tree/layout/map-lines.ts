@@ -39,21 +39,18 @@ export function planLines(model: MapModel, placed: Placed, metrics: MapMetrics):
   // Verticals that come into a gap from above, by place.
   const fromAbove = new Map<string, string>();
   const place = (page: number, gap: number, x: number): string => `${page} ${gap} ${x}`;
-  /** A place for a vertical from below that no other family holds above. */
-  const clear = (page: number, gap: number, x: number, family: string): number => {
-    const shifts = [0, step / 2, -step / 2];
-    const isFree = (shift: number): boolean => {
-      const holder = fromAbove.get(place(page, gap, x + shift));
-      return holder === undefined || holder === family;
-    };
-    return x + (shifts.find(isFree) ?? 0);
+  /** A place for a vertical from below: half a step aside when another family holds it above. */
+  const clear = (page: number, gap: number, x: number, family: string, aside: 1 | -1): number => {
+    const holder = fromAbove.get(place(page, gap, x));
+    return holder === undefined || holder === family ? x : x + (aside * step) / 2;
   };
 
   const entries = new Map<MapNode, number>();
   const familyOf = new Map<MapNode, string>();
   for (const { from, to, family } of model.links) {
     familyOf.set(to.node, family);
-    fromAbove.set(place(to.node.page, placed.rowOf(to.node), exitX(from, placed, metrics)), family);
+    const exit = exitX(from.node, family, { placed, metrics });
+    fromAbove.set(place(to.node.page, placed.rowOf(to.node), exit), family);
   }
 
   // Crossings by the node their line leaves, so that a column knows its vertical goes on below.
@@ -103,7 +100,7 @@ export function planLines(model: MapModel, placed: Placed, metrics: MapMetrics):
     row = placed.rowOf(node);
     const x = placed.x(node) + (node.isList ? -tick : axis);
     const family = familyOf.get(node);
-    entries.set(node, family === undefined ? x : clear(node.page, row, x, family));
+    entries.set(node, family === undefined ? x : clear(node.page, row, x, family, 1));
     waiting.push(node);
   }
   settle();
@@ -112,7 +109,9 @@ export function planLines(model: MapModel, placed: Placed, metrics: MapMetrics):
     const start = spots.get(crossing.reference) as { node: MapNode; row: number };
     const end = spots.get(crossing.to) as { node: MapNode; row: number };
     const { gapFrom, gapTo } = routes.get(crossing) as { gapFrom: number; gapTo: number };
-    const x = clear(end.node.page, gapTo, slot(end.node, crossing.family), crossing.family);
+    const { family } = crossing;
+    // The other way than columns, which hang next to it.
+    const x = clear(end.node.page, gapTo, slot(end.node, family), family, -1);
     return {
       crossing,
       isShort,
@@ -123,7 +122,7 @@ export function planLines(model: MapModel, placed: Placed, metrics: MapMetrics):
 
   for (const { from, to, family } of model.links) {
     const track = trackAt(to.node.page, placed.rowOf(to.node));
-    track.touch(family, exitX(from, placed, metrics));
+    track.touch(family, exitX(from.node, family, { placed, metrics }));
     track.touch(family, entries.get(to.node) ?? 0);
   }
   for (const { crossing, from, to, isShort } of wires) {
@@ -150,11 +149,23 @@ export function planLines(model: MapModel, placed: Placed, metrics: MapMetrics):
 
 type Spot = { node: MapNode; row: number };
 
-/** Where a family leaves its couple: under the last row, on the right of any other. */
-function exitX({ node, row }: Spot, placed: Placed, { w, axis, step }: MapMetrics): number {
-  const index = node.exits.indexOf(row);
-  if (index < 0) return placed.x(node) + axis;
-  return placed.x(node) + w + step * (node.exits.length - index);
+/** Where a family leaves its couple: below, or on the right when others stand under it. */
+function exitX(
+  node: MapNode,
+  family: string,
+  { placed, metrics }: { placed: Placed; metrics: MapMetrics },
+): number {
+  const index = node.exits.findIndex((exit) => exit.family === family);
+  if (index < 0) return placed.x(node) + metrics.axis;
+  return placed.x(node) + metrics.w + metrics.step * (node.exits.length - index);
+}
+
+/** Families that leave the same row on the right leave it one under another. */
+function exitShift(node: MapNode, family: string): number | null {
+  const exit = node.exits.find((found) => found.family === family);
+  if (exit === undefined) return null;
+  const same = node.exits.filter(({ row }) => row === exit.row);
+  return (same.indexOf(exit) - (same.length - 1) / 2) * 0.4;
 }
 
 export type MapGrid = {
@@ -261,14 +272,15 @@ export function drawMapLines(
 
   const links: Link[] = model.links.map(({ from, to, ...link }): Link => {
     const { x, y } = corner(from.node);
-    const exit = onMap(from.node, exitX(from, placed, metrics));
-    const isBelow = !from.node.exits.includes(from.row);
-    const points: Point[] = isBelow
-      ? [[exit, y + from.node.rows.length * line]]
-      : [
-          [x + w, rowY(from)],
-          [exit, rowY(from)],
-        ];
+    const exit = onMap(from.node, exitX(from.node, link.family, { placed, metrics }));
+    const shift = exitShift(from.node, link.family);
+    const points: Point[] =
+      shift === null
+        ? [[exit, y + from.node.rows.length * line]]
+        : [
+            [x + w, rowY(from) + shift * line],
+            [exit, rowY(from) + shift * line],
+          ];
     const entry = onMap(to.node, plan.entry(to.node));
     const child = corner(to.node);
     if (entry !== exit) {
@@ -279,6 +291,15 @@ export function drawMapLines(
     else points.push([entry, child.y]);
     return { ...link, points };
   });
+  const arrived = new Map<string, number>();
+  /** Lines that come to one person come one under another, as a share of the row. */
+  const arrival = ({ crossing, to }: Wire): number => {
+    const count = arrived.get(crossing.to) ?? 0;
+    arrived.set(crossing.to, count + 1);
+    // In a column the line of the parents holds the middle of the row.
+    const places = to.node.isList ? [0.34, -0.34, 0.17, -0.17] : [0, 0.34, -0.34, 0.17, -0.17];
+    return places[count % places.length] ?? 0;
+  };
   for (const { wire, first, last, street } of routes) {
     const { crossing, from, to, isShort } = wire;
     const { family, reference, certainty } = crossing;
@@ -299,7 +320,8 @@ export function drawMapLines(
       }
       points.push([b, endY]);
     }
-    points.push([endX, endY], [endX, rowY(to)], [corner(to.node).x, rowY(to)]);
+    const inRow = rowY(to) + line * arrival(wire);
+    points.push([endX, endY], [endX, inRow], [corner(to.node).x, inRow]);
     links.push({
       type: "reference",
       reference,

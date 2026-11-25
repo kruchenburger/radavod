@@ -271,8 +271,10 @@ function areOfOneStack(
   }
   // Under a partner stand references to other partners of that partner.
   for (const link of links) {
-    if (link.type !== "union" || link.at === undefined) continue;
-    if (partners.has(link.partners[0])) partners.add(link.at);
+    if (link.type === "reference") continue;
+    const at = link.type === "union" ? link.at : link.parentsAt;
+    const [own = ""] = link.type === "union" ? link.partners : link.parents;
+    if (at !== undefined && partners.has(own)) partners.add(at);
   }
   let bottom = upper.y + upper.h;
   const between = [...byKey.values()]
@@ -355,7 +357,10 @@ function checkOrder(
 ): void {
   const other = children === "x" ? "y" : "x";
   const rank = new Map<string, number>();
+  // Of two people with one id the first counts.
+  const once = new Map([...snapshot.people].reverse().map((person) => [person.id, person]));
   snapshot.people
+    .filter((person) => once.get(person.id) === person)
     .map(({ id, birth }, i) => ({ id, i, sort: birth?.sort ?? Infinity }))
     .sort((a, b) => (a.sort === b.sort ? a.i - b.i : a.sort - b.sort))
     .forEach(({ id }, i) => rank.set(id, rank.get(id) ?? i));

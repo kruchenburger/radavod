@@ -57,7 +57,7 @@ export function flow(runs: Run[], options: FlowOptions): Line[] {
       }
       let start = line === undefined ? indent : end + (isApart ? space : 0);
       let w = measure(word, style);
-      if (start + w > width && (line !== undefined || start > 0)) {
+      if (start + w > width && line !== undefined) {
         if (row + 1 >= most) return endWithEllipsis(set, { ...options, word, part, style, end });
         row += 1;
         start = 0;

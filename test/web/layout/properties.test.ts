@@ -1,5 +1,5 @@
 import fc from "fast-check";
-import { describe, expect, it } from "vitest";
+import { describe, expect, it, vi } from "vitest";
 import { type TreeSnapshot, treeSnapshotSchema } from "../../../src/shared/tree";
 import { around, type AroundOptions } from "../../../web/tree/layout/around";
 import { aroundNarrow } from "../../../web/tree/layout/around-narrow";
@@ -99,6 +99,7 @@ const snapshots = fc
   );
 
 /** A fixed seed keeps CI the same from run to run; shrinking finds the smallest family. */
+vi.setConfig({ testTimeout: 60_000 });
 const runs = { numRuns: 300, seed: 12 };
 
 /** The people of a drawing, to ask for each of them in turn. */

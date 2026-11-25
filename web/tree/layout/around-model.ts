@@ -344,18 +344,19 @@ class Builder {
       if (this.#has(id)) continue;
       const isOlder = this.#kin.byBirth(id, this.#focus) < 0;
       siblings[isOlder ? "older" : "younger"].push(this.#enter(id, "sibling", 0));
-      this.#linkToParents(id, true);
+      this.#linkToParents(id, (parent) => this.#entries.get(parent)?.generation === -1);
     }
     return { siblings, siblingIds };
   }
 
   /** Lines from every parent who is drawn and has none yet. */
-  #linkToParents(child: string, tree: boolean): void {
+  #linkToParents(child: string, decides: (parent: string) => boolean): void {
     for (const set of this.#kin.sets(child)) {
       const missing = set.known
         .map(personKey)
         .filter((key) => this.#entries.has(key) && !this.#linked.has(`${key} ${personKey(child)}`));
       const family = familyOf(missing);
+      const tree = missing.some(decides);
       const couple = missing.length > 1 ? this.#couples.get(family) : undefined;
       if (couple?.hasArms === false) {
         this.#link(set, { parents: missing, from: couple.from, tree });
@@ -363,14 +364,14 @@ class Builder {
       }
       for (const key of missing) {
         const own = couple === undefined ? familyOf([key]) : family;
-        this.#link(set, { parents: [key], from: [key], family: own, tree });
+        this.#link(set, { parents: [key], from: [key], family: own, tree: decides(key) });
       }
     }
   }
 
   #addSecondLines(): void {
     for (const { person } of this.#entries.values()) {
-      if (person !== null) this.#linkToParents(person, false);
+      if (person !== null) this.#linkToParents(person, () => false);
     }
   }
 

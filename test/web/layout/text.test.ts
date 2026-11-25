@@ -102,6 +102,13 @@ describe("a name", () => {
     ]);
   });
 
+  it("cuts a given name that has no room after the sign", () => {
+    expect(name("Maximiliana", "Wolf", 20)).toEqual([
+      ["Maximil…", 20, 0],
+      ["Wolf", 0, 20],
+    ]);
+  });
+
   it("may have no given name or no surname", () => {
     expect(name("", "Wolf")).toEqual([["Wolf", 0, 0]]);
     expect(name("Anna", "")).toEqual([["Anna", 0, 0]]);

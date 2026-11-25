@@ -22,8 +22,11 @@ export type MapNode = {
   rows: MapRow[];
   children: MapNode[];
   parent: MapNode | null;
-  /** Rows whose family leaves on the right, because others stand below. The last one leaves below. */
-  exits: number[];
+  /**
+   * Families whose lines leave on the right, from top to bottom: one family leaves below, and the
+   * others have somebody under them.
+   */
+  exits: { family: string; row: number }[];
 };
 
 export type MapRow = {
@@ -185,10 +188,16 @@ class MapBuilder {
 
   #noteAbsentPartners(): void {
     for (const { a, b } of this.#kin.couples) {
-      if (this.#unit(a) === this.#unit(b)) continue;
+      if (this.#standTogether(a, b)) continue;
       this.#noteAbsent(a, b);
       this.#noteAbsent(b, a);
     }
+  }
+
+  /** Two partners of one person stand in one unit and are still no couple in it. */
+  #standTogether(a: string, b: string): boolean {
+    const unit = this.#unit(a);
+    return unit === this.#unit(b) && (unit.head === a || unit.head === b);
   }
 
   #noteAbsent(person: string, partner: string): void {
@@ -246,8 +255,11 @@ class MapBuilder {
   }
 
   #familyOf(host: Unit, { known }: ParentSet): UnitFamily {
-    const own = known.filter((id) => this.#unit(id) === host);
-    const absent = known.find((id) => this.#unit(id) !== host) ?? null;
+    const inside = known.filter((id) => this.#unit(id) === host);
+    const [first, second] = inside as [string, string | undefined];
+    const isCouple = second === undefined || this.#standTogether(first, second);
+    const own = isCouple ? inside : [first];
+    const absent = known.find((id) => !own.includes(id)) ?? null;
     if (absent !== null) this.#noteAbsent(own[0] as string, absent);
     const parents = absent === null ? own : [...own, absent];
     let family = host.families.find(
@@ -401,12 +413,13 @@ class MapBuilder {
       );
       return { family, keys, reference, row: Math.max(...places) };
     });
-    families.sort((a, b) => a.row - b.row);
-    const last = node.rows.length - 1;
-    node.exits = [...new Set(families.map(({ row }) => row))].filter((row) => row !== last);
+    // The couple of the last row leaves below, after everybody who leaves on the right.
+    families.sort((a, b) => a.row - b.row || a.keys.length - b.keys.length);
+    const exits = families.map(({ row, keys }) => ({ row, family: nameOf(keys) }));
+    node.exits = exits.at(-1)?.row === node.rows.length - 1 ? exits.slice(0, -1) : exits;
 
     for (const { family, keys, reference, row } of families) {
-      const name = `s:${JSON.stringify([...keys].sort())}`;
+      const name = nameOf(keys);
       let list: MapNode | null = null;
       for (const { child, set, isHere } of family.children) {
         const childUnit = this.#unit(child);
@@ -497,7 +510,7 @@ class MapBuilder {
         family: `u:${id}`,
         direct: false,
       };
-      const isTogether = this.#unit(a) === this.#unit(b);
+      const isTogether = this.#standTogether(a, b);
       for (const [one, other] of isTogether
         ? [[a, b] as const]
         : [[a, b] as const, [b, a] as const]) {
@@ -511,6 +524,8 @@ class MapBuilder {
     }
   }
 }
+
+const nameOf = (parents: string[]): string => `s:${JSON.stringify([...parents].sort())}`;
 
 const partnerName = (person: string, partner: string): string =>
   `partner ${JSON.stringify([person, partner])}`;
