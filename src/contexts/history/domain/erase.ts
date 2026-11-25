@@ -1,4 +1,4 @@
-import { ERASED as erased, type PersonId } from "../../../kernel/id";
+import { ERASED as erased, ERASED_IN_WORDS, type PersonId } from "../../../kernel/id";
 import type { NameForm } from "../../../kernel/name-form";
 import type { Patch } from "./entry";
 
@@ -31,25 +31,31 @@ function allWays(forms: readonly Parts[]): string[] {
   return [...new Set(whole)].sort((a, b) => b.length - a.length);
 }
 
-/** Whether a text has a whole name in it, as words. */
-export function speaksOf(text: string, names: readonly string[]): boolean {
-  return names.some((name) => text.includes(name) && asWords(name).test(text));
-}
+/** Whole names to look for in texts, as words. */
+export type Words = { has(text: string): boolean; clean(text: string): string };
 
-const patterns = new Map<string, RegExp>();
-
-function asWords(text: string): RegExp {
-  const known = patterns.get(text);
-  if (known !== undefined) {
-    known.lastIndex = 0;
-    return known;
-  }
-  const pattern = new RegExp(
-    `(?<![\\p{L}\\p{N}])${text.replace(/[\\^$.*+?()[\]{}|/]/gu, "\\$&")}(?![\\p{L}\\p{N}])`,
-    "gu",
-  );
-  patterns.set(text, pattern);
-  return pattern;
+/** Patterns of the names, made once for one erasure and forgotten with it. */
+export function wordsOf(names: readonly string[]): Words {
+  const patterns = names.map((name) => ({
+    name,
+    pattern: new RegExp(
+      `(?<![\\p{L}\\p{N}])${name.replace(/[\\^$.*+?()[\]{}|/]/gu, "\\$&")}(?![\\p{L}\\p{N}])`,
+      "gu",
+    ),
+  }));
+  return {
+    has: (text) =>
+      patterns.some(({ name, pattern }) => {
+        pattern.lastIndex = 0;
+        return text.includes(name) && pattern.test(text);
+      }),
+    clean: (text) =>
+      patterns.reduce(
+        (clean, { name, pattern }) =>
+          clean.includes(name) ? clean.replace(pattern, ERASED_IN_WORDS) : clean,
+        text,
+      ),
+  };
 }
 
 /**
@@ -78,36 +84,27 @@ function formsIn(value: unknown): NameForm[] {
 }
 
 /** The patches of an entry without a person: none about them, none that names them. */
-export function withoutPerson(
-  patches: readonly Patch[],
-  id: PersonId,
-  names: readonly string[],
-): Patch[] {
+export function withoutPerson(patches: readonly Patch[], id: PersonId, words: Words): Patch[] {
   return patches
     .filter(({ aggregate }) => !isOf(aggregate, id))
     .map(({ aggregate, path, before, after }) => ({
       aggregate,
       path,
-      before: scrubbed(before, id, names),
-      after: scrubbed(after, id, names),
+      before: scrubbed(before, id, words),
+      after: scrubbed(after, id, words),
     }));
 }
 
 /** A value with a mark in the place of a person and of the whole names. */
-export function scrubbed(value: unknown, id: PersonId, names: readonly string[]): unknown {
-  return inTexts(value, (text) => unnamed(text.replaceAll(id, erased), names));
+export function scrubbed(value: unknown, id: PersonId, words: Words): unknown {
+  return inTexts(value, (text) =>
+    words.clean(text === id ? erased : text.replaceAll(id, ERASED_IN_WORDS)),
+  );
 }
 
 /** A value with a mark in the place of the whole names. */
-export function withoutNames(value: unknown, names: readonly string[]): unknown {
-  return inTexts(value, (text) => unnamed(text, names));
-}
-
-function unnamed(text: string, names: readonly string[]): string {
-  return names.reduce(
-    (clean, name) => (clean.includes(name) ? clean.replace(asWords(name), erased) : clean),
-    text,
-  );
+export function withoutNames(value: unknown, words: Words): unknown {
+  return inTexts(value, (text) => words.clean(text));
 }
 
 function inTexts(value: unknown, change: (text: string) => string): unknown {

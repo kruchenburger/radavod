@@ -387,6 +387,23 @@ describe("an undo", () => {
       expect(tree.run((c) => undo(c, 2))).toEqual(refused("in-use"));
     }));
 
+  it("minds no word a family writes", () =>
+    inTree((tree) => {
+      family(tree);
+      tree.do((c) => accepted(c.kinship.apply(edit("ada", { sex: "female" }))));
+      tree.do((c) =>
+        accepted(
+          c.kinship.apply({
+            do: "put-name",
+            person: person("ada"),
+            name: form("n1", { given: "The entry was erased by fire" }),
+          }),
+        ),
+      );
+      accepted(tree.run((c) => undo(c, 3)));
+      accepted(tree.run((c) => undo(c, 2)));
+    }));
+
   it("of a part of somebody who is gone is refused", () =>
     inTree((tree) => {
       family(tree);

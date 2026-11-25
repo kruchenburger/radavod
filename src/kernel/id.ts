@@ -9,8 +9,9 @@ export function isId<K extends string>(kind: K, value: unknown): value is Id<K> 
   return base58.test(value.slice(kind.length + 1));
 }
 
-/** Stands in the journal where somebody erased was. */
+/** Stands in the journal where somebody erased was, and in texts where their name was. */
 export const ERASED = "erased";
+export const ERASED_IN_WORDS = "[erased]";
 
 export type PersonId = Id<"person">;
 export type UnionId = Id<"union">;

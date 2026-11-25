@@ -2,8 +2,9 @@ import type { Citation } from "../contexts/evidence";
 import {
   purge,
   scrubbed,
-  speaksOf,
+  type Words,
   withoutNames,
+  wordsOf,
   type Trashed,
   wholeNames,
 } from "../contexts/history";
@@ -12,7 +13,7 @@ import type { LifeEvent } from "../contexts/life";
 import type { EventId, MemberId, PersonId } from "../kernel/id";
 import type { NameForm } from "../kernel/name-form";
 import type { Result } from "../kernel/result";
-import { withoutErased } from "../shared/reverse";
+import { type State, withoutErased } from "../shared/reverse";
 import { trash, type TrashError } from "./trash";
 import type { Contexts, Reading, StaleVersion, UnitOfWork } from "./unit-of-work";
 
@@ -68,7 +69,9 @@ export function eraseHere(
     { ...act, scenario: "erase", expected: {} },
     (c): Result<Erased, EraseError> => {
       forms = formsOf(c, id);
-      others = namesOfOthers(c, id);
+      const state = c.history.state();
+      others = namesOfOthers(state, id);
+      const words = wordsOf(wholeNames(forms, others));
       if (c.kinship.get(id) !== null) {
         const gone = trash(c, id, act);
         if (!gone.ok) return gone;
@@ -77,9 +80,8 @@ export function eraseHere(
       if (trashed !== null) {
         c.history.trash.put(id, null);
         // What goes over to others does not name the one who goes, in words either.
-        const names = wholeNames(forms, others);
         for (const event of trashed.events as LifeEvent[]) {
-          handOver(c, trashed, event, newId, (value) => inWords(value, names));
+          handOver(c, trashed, event, newId, (value) => withoutNames(value, words) as typeof value);
         }
       }
       for (const other of c.history.trash.everybody()) {
@@ -90,7 +92,8 @@ export function eraseHere(
       if (!left.ok) return left;
       const cited = c.evidence.putBack([{ kind: "cited", id, value: null }]);
       if (!cited.ok) return cited;
-      return { ok: true, value: { mentions: mentionsIn(c, id, wholeNames(forms, others)) } };
+      // What changed since the state was read is the person who goes and what they took.
+      return { ok: true, value: { mentions: mentionsIn(c.history.state(), id, words) } };
     },
     {
       tell: (written) =>
@@ -98,8 +101,8 @@ export function eraseHere(
           .filter((one) => one.id !== id)
           .map((one) => ({
             ...one,
-            before: scrubbed(one.before, id, wholeNames(forms, others)),
-            after: scrubbed(one.after, id, wholeNames(forms, others)),
+            before: scrubbed(one.before, id, wordsOf(wholeNames(forms, others))),
+            after: scrubbed(one.after, id, wordsOf(wholeNames(forms, others))),
           })),
       last: (sql) => purge(sql, id, forms, others),
     },
@@ -109,13 +112,14 @@ export function eraseHere(
 
 /** What others still say of a person by the whole name, for whoever erases to decide about. */
 export function mentionsOf(c: Reading, id: PersonId): string[] {
-  return mentionsIn(c, id, wholeNames(formsOf(c, id), namesOfOthers(c, id)));
+  const state = c.history.state();
+  return mentionsIn(state, id, wordsOf(wholeNames(formsOf(c, id), namesOfOthers(state, id))));
 }
 
-function mentionsIn(c: Reading, id: PersonId, names: readonly string[]): string[] {
-  return Object.entries(c.history.state())
+function mentionsIn(state: State, id: PersonId, words: Words): string[] {
+  return Object.entries(state)
     .filter(([aggregate]) => !aggregate.endsWith(`/${id}`))
-    .filter(([, value]) => textsIn(value).some((text) => speaksOf(text, names)))
+    .filter(([, value]) => textsIn(value).some((text) => words.has(text)))
     .map(([aggregate]) => aggregate);
 }
 
@@ -125,8 +129,8 @@ function formsOf(c: Reading, id: PersonId): NameForm[] {
 }
 
 /** The names of everybody else, in the tree and in the trash. */
-function namesOfOthers(c: Reading, id: PersonId): NameForm[] {
-  return Object.entries(c.history.state()).flatMap(([aggregate, value]) => {
+function namesOfOthers(state: State, id: PersonId): NameForm[] {
+  return Object.entries(state).flatMap(([aggregate, value]) => {
     if (aggregate.endsWith(`/${id}`)) return [];
     if (aggregate.startsWith("person/")) return (value as PersonWritten).names;
     if (aggregate.startsWith("trash/")) return ((value as Trashed).person as PersonWritten).names;
@@ -192,12 +196,8 @@ function handOver(
   for (const citation of citations) c.evidence.cite(citation);
 }
 
-function inWords<T>(value: T, names: readonly string[]): T {
-  return withoutNames(value, names) as T;
-}
-
 /** Somebody in the trash without any link to an erased person. */
 function untied(trashed: Trashed, id: PersonId): Trashed {
-  const marked = scrubbed(trashed, id, []) as Trashed;
+  const marked = scrubbed(trashed, id, wordsOf([])) as Trashed;
   return withoutErased(`trash/${trashed.id}`, marked) as Trashed;
 }

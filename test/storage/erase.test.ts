@@ -188,7 +188,7 @@ describe("an erased person", () => {
       expect(tree.rows().history_checkpoint).toEqual([]);
       // Her entries are there, with nobody in them.
       expect(tree.read((c) => c.history.entry(2))).toMatchObject({ scenario: "test", patches: [] });
-      expect(all.entries({ before: 4, limit: 1 })[0]?.title).toBe("Как нашли erased");
+      expect(all.entries({ before: 4, limit: 1 })[0]?.title).toBe("Как нашли [erased]");
     }));
 
   it("is in no row from the trash either, nor in the trash of others", () =>
@@ -369,7 +369,7 @@ describe("an erased person", () => {
       const text = tree.read((c) => JSON.stringify(c.history.entry(last - 2)));
       expect(text).toContain(note);
       const after = tree.read((c) => JSON.stringify(c.history.entry(last)));
-      expect(after).toContain("«erased», сказала она. erased.");
+      expect(after).toContain("«[erased]», сказала она. [erased].");
     }));
 
   it("is known by every name they ever had whole, edited part by part", () =>
@@ -430,9 +430,9 @@ describe("an erased person", () => {
       expect(mentions).toEqual([]);
       expect(found(tree.rows(), said)).toEqual([]);
       tree.read((c) => {
-        expect(c.life.eventsOf(person("eve")).map(({ note }) => note)).toContain("erased, 1901");
+        expect(c.life.eventsOf(person("eve")).map(({ note }) => note)).toContain("[erased], 1901");
         expect(c.evidence.citationsOf(person("eve")).map(({ quote }) => quote)).toContain(
-          "«erased»",
+          "«[erased]»",
         );
       });
     }));
