@@ -1,6 +1,6 @@
 import type { FamilyEvent, PlaceName, SourceKind, Text } from "./family.ts";
 
-/** Every invented word of the example family. Given names are common, surnames and places are made up. */
+/** Every invented word of the example family. Given names are common; surnames and places are made up. */
 
 /** The community a family belonged to. It decides in which languages its names were written. */
 export type Tradition = "orthodox" | "catholic" | "lithuanian" | "jewish";
@@ -9,7 +9,7 @@ type Pair = [male: string, female: string];
 
 export type Given = {
   ru: string;
-  be: string;
+  be?: string;
   pl?: string;
   lt?: string;
   la?: string;
@@ -17,12 +17,12 @@ export type Given = {
   en: string;
 };
 
-export type MaleGiven = Given & { patronymic: { ru: Pair; be: Pair } };
+export type MaleGiven = Given & { patronymic: { ru: Pair; be?: Pair } };
 
 export type Surname = {
   tradition: Tradition;
   ru: Pair;
-  be: Pair;
+  be?: Pair;
   pl?: Pair;
   lt?: { male: string; maiden: string; married: string };
   yi?: string;
@@ -173,71 +173,63 @@ const christianWomen: Given[] = [
 const jewishMen: MaleGiven[] = [
   {
     ru: "Лейба",
-    be: "Лейба",
     yi: "לייב",
     en: "Leib",
-    patronymic: { ru: ["Лейбович", "Лейбовна"], be: ["Лейбавіч", "Лейбаўна"] },
+    patronymic: { ru: ["Лейбович", "Лейбовна"] },
   },
   {
     ru: "Мовша",
-    be: "Моўша",
     yi: "משה",
     en: "Moyshe",
-    patronymic: { ru: ["Мовшевич", "Мовшевна"], be: ["Моўшавіч", "Моўшаўна"] },
+    patronymic: { ru: ["Мовшевич", "Мовшевна"] },
   },
   {
     ru: "Хаим",
-    be: "Хаім",
     yi: "חיים",
     en: "Chaim",
-    patronymic: { ru: ["Хаимович", "Хаимовна"], be: ["Хаімавіч", "Хаімаўна"] },
+    patronymic: { ru: ["Хаимович", "Хаимовна"] },
   },
   {
     ru: "Арон",
-    be: "Арон",
     yi: "אהרן",
     en: "Aron",
-    patronymic: { ru: ["Аронович", "Ароновна"], be: ["Аронавіч", "Аронаўна"] },
+    patronymic: { ru: ["Аронович", "Ароновна"] },
   },
   {
     ru: "Зелик",
-    be: "Зелік",
     yi: "זעליג",
     en: "Zelig",
-    patronymic: { ru: ["Зеликович", "Зеликовна"], be: ["Зелікавіч", "Зелікаўна"] },
+    patronymic: { ru: ["Зеликович", "Зеликовна"] },
   },
   {
     ru: "Берка",
-    be: "Берка",
     yi: "בער",
     en: "Ber",
-    patronymic: { ru: ["Беркович", "Берковна"], be: ["Беркавіч", "Беркаўна"] },
+    patronymic: { ru: ["Беркович", "Берковна"] },
   },
   {
     ru: "Гирш",
-    be: "Гірш",
     yi: "הירש",
     en: "Hirsh",
-    patronymic: { ru: ["Гиршевич", "Гиршевна"], be: ["Гіршавіч", "Гіршаўна"] },
+    patronymic: { ru: ["Гиршевич", "Гиршевна"] },
   },
   {
     ru: "Янкель",
-    be: "Янкель",
     yi: "יאַנקל",
     en: "Yankl",
-    patronymic: { ru: ["Янкелевич", "Янкелевна"], be: ["Янкелевіч", "Янкелеўна"] },
+    patronymic: { ru: ["Янкелевич", "Янкелевна"] },
   },
 ];
 
 const jewishWomen: Given[] = [
-  { ru: "Фейга", be: "Фейга", yi: "פֿייגע", en: "Feige" },
-  { ru: "Рива", be: "Рыва", yi: "ריווע", en: "Rive" },
-  { ru: "Хася", be: "Хася", yi: "כאַסיע", en: "Khasye" },
-  { ru: "Двойра", be: "Двойра", yi: "דבֿורה", en: "Dvoyre" },
-  { ru: "Гинда", be: "Гінда", yi: "הינדע", en: "Hinde" },
-  { ru: "Малка", be: "Малка", yi: "מלכּה", en: "Malke" },
-  { ru: "Хая", be: "Хая", yi: "חיה", en: "Chaye" },
-  { ru: "Соня", be: "Соня", yi: "סאָניע", en: "Sonye" },
+  { ru: "Фейга", yi: "פֿייגע", en: "Feige" },
+  { ru: "Рива", yi: "ריווע", en: "Rive" },
+  { ru: "Хася", yi: "כאַסיע", en: "Khasye" },
+  { ru: "Двойра", yi: "דבֿורה", en: "Dvoyre" },
+  { ru: "Гинда", yi: "הינדע", en: "Hinde" },
+  { ru: "Малка", yi: "מלכּה", en: "Malke" },
+  { ru: "Хая", yi: "חיה", en: "Chaye" },
+  { ru: "Соня", yi: "סאָניע", en: "Sonye" },
 ];
 
 export function givenNames(tradition: Tradition): { male: MaleGiven[]; female: Given[] } {
@@ -246,68 +238,67 @@ export function givenNames(tradition: Tradition): { male: MaleGiven[]; female: G
     : { male: christianMen, female: christianWomen };
 }
 
-/** A surname that is the same for men and women. */
+/** A surname that is the same for men and women. Polish books wrote the Catholic ones. */
 const surname = (
   tradition: Tradition,
   ru: string,
   be: string,
-  pl: string,
   en: string,
+  pl?: string,
 ): Surname => ({
   tradition,
   ru: [ru, ru],
   be: [be, be],
-  pl: [pl, pl],
   en: [en, en],
+  ...(pl === undefined ? {} : { pl: [pl, pl] }),
 });
 
 /** The ten branches, in the order of the founders. */
 export const branches: { name: Text; surname: Surname }[] = [
   {
-    name: { ru: "Ольховичи", en: "The Olkhovich family" },
-    surname: surname("orthodox", "Ольхович", "Альховіч", "Olchowicz", "Olkhovich"),
+    name: { ru: "Ольхуничи", en: "The Olkhunich family" },
+    surname: surname("orthodox", "Ольхунич", "Альхуніч", "Olkhunich"),
   },
   {
-    name: { ru: "Вересени", en: "The Veresen family" },
-    surname: surname("catholic", "Вересень", "Верасень", "Wieresień", "Veresen"),
+    name: { ru: "Вересуничи", en: "The Veresunich family" },
+    surname: surname("catholic", "Вересунич", "Верасуніч", "Veresunich", "Wieresunicz"),
   },
   {
-    name: { ru: "Журавики", en: "The Zhuravik family" },
-    surname: surname("orthodox", "Журавик", "Журавік", "Żurawik", "Zhuravik"),
+    name: { ru: "Журавени", en: "The Zhuraven family" },
+    surname: surname("orthodox", "Журавень", "Журавень", "Zhuraven"),
   },
   {
-    name: { ru: "Калинники", en: "The Kalinnik family" },
-    surname: surname("orthodox", "Калинник", "Каліннік", "Kalinnik", "Kalinnik"),
+    name: { ru: "Калинени", en: "The Kalinen family" },
+    surname: surname("orthodox", "Калинень", "Калінень", "Kalinen"),
   },
   {
     name: { ru: "Лозовени", en: "The Lozoven family" },
-    surname: surname("catholic", "Лозовень", "Лазавень", "Łozowień", "Lozoven"),
+    surname: surname("catholic", "Лозовень", "Лазавень", "Lozoven", "Łozowień"),
   },
   {
     name: { ru: "Мятлики", en: "The Myatlik family" },
-    surname: surname("orthodox", "Мятлик", "Мятлік", "Miatlik", "Myatlik"),
+    surname: surname("orthodox", "Мятлик", "Мятлік", "Myatlik"),
   },
   {
     name: { ru: "Лаздутисы", en: "The Lazdutis family" },
     surname: {
-      ...surname("lithuanian", "Лаздутис", "Лаздуціс", "Łazdutis", "Lazdutis"),
+      ...surname("lithuanian", "Лаздутис", "Лаздуціс", "Lazdutis", "Łazdutis"),
       lt: { male: "Lazdutis", maiden: "Lazdutytė", married: "Lazdutienė" },
     },
   },
   {
     name: { ru: "Сосенники", en: "The Sosennik family" },
-    surname: surname("orthodox", "Сосенник", "Сасеннік", "Sosiennik", "Sosennik"),
+    surname: surname("orthodox", "Сосенник", "Сасеннік", "Sosennik"),
   },
   {
     name: { ru: "Осочники", en: "The Osochnik family" },
-    surname: surname("catholic", "Осочник", "Асочнік", "Osocznik", "Osochnik"),
+    surname: surname("catholic", "Осочник", "Асочнік", "Osochnik", "Osocznik"),
   },
   {
     name: { ru: "Вайсройзы", en: "The Vaysroyz family" },
     surname: {
       tradition: "jewish",
       ru: ["Вайсройз", "Вайсройз"],
-      be: ["Вайсройз", "Вайсройз"],
       yi: "ווײַסרויז",
       en: ["Vaysroyz", "Vaysroyz"],
     },
@@ -316,23 +307,22 @@ export const branches: { name: Text; surname: Surname }[] = [
 
 /** Families that married into the branches. */
 export const otherSurnames: Surname[] = [
-  surname("orthodox", "Пеструн", "Пяструн", "Piestrun", "Pestrun"),
-  surname("orthodox", "Крынич", "Крыніч", "Krynicz", "Krynich"),
-  surname("orthodox", "Чаборень", "Чабарэнь", "Czaboreń", "Chaboren"),
-  surname("orthodox", "Туманик", "Туманік", "Tumanik", "Tumanik"),
-  surname("orthodox", "Бережник", "Беражнік", "Bereżnik", "Berezhnik"),
-  surname("orthodox", "Рябинник", "Рабіннік", "Rabinnik", "Ryabinnik"),
+  surname("orthodox", "Пеструн", "Пяструн", "Pestrun"),
+  surname("orthodox", "Крынунь", "Крынунь", "Krynun"),
+  surname("orthodox", "Чаборень", "Чабарэнь", "Chaboren"),
+  surname("orthodox", "Туманень", "Туманень", "Tumanen"),
+  surname("orthodox", "Бережник", "Беражнік", "Berezhnik"),
+  surname("orthodox", "Рябинник", "Рабіннік", "Ryabinnik"),
   {
     tradition: "orthodox",
     ru: ["Быльников", "Быльникова"],
     be: ["Быльнікаў", "Быльнікава"],
-    pl: ["Bylnikow", "Bylnikowa"],
     en: ["Bylnikov", "Bylnikova"],
   },
-  surname("catholic", "Лугвень", "Лугвень", "Łuhwień", "Lugven"),
-  surname("catholic", "Полынич", "Палыніч", "Połynicz", "Polynich"),
-  surname("catholic", "Снежень", "Снежань", "Śnieżeń", "Snezhen"),
-  surname("catholic", "Яворик", "Яворык", "Jaworik", "Yavorik"),
+  surname("catholic", "Лугавень", "Лугавень", "Lugaven", "Łuhawień"),
+  surname("catholic", "Полынич", "Палыніч", "Polynich", "Połynicz"),
+  surname("catholic", "Снежень", "Снежань", "Snezhen", "Śnieżeń"),
+  surname("catholic", "Яворень", "Яварэнь", "Yavoren", "Jaworień"),
   {
     tradition: "catholic",
     ru: ["Мховский", "Мховская"],
@@ -341,25 +331,45 @@ export const otherSurnames: Surname[] = [
     en: ["Mkhovsky", "Mkhovskaya"],
   },
   {
-    ...surname("lithuanian", "Клевутис", "Клявуціс", "Klewutis", "Klevutis"),
+    ...surname("lithuanian", "Клевутис", "Клявуціс", "Klevutis", "Klewutis"),
     lt: { male: "Klevutis", maiden: "Klevutytė", married: "Klevutienė" },
   },
   {
     tradition: "jewish",
     ru: ["Шнееблат", "Шнееблат"],
-    be: ["Шнэеблат", "Шнэеблат"],
     yi: "שנייבלאַט",
     en: ["Shneyblat", "Shneyblat"],
   },
 ];
 
-export const nicknames = ["Бортник", "Дударь", "Молчун", "Рыжий", "Сапожок", "Верба"];
+export const nicknames = {
+  male: ["Бортник", "Дударь", "Молчун", "Рыжий", "Сапожок"],
+  female: ["Верба", "Певунья", "Тихоня", "Пчёлка"],
+};
+
+const beforeReform = new Map([
+  ["Фёдор", "Ѳедоръ"],
+  ["Матвей", "Матвѣй"],
+  ["Снежень", "Снѣжень"],
+]);
+
+/** The spelling of a name before the reform of 1918. */
+export function oldSpelling(name: string): string {
+  return (
+    beforeReform.get(name) ??
+    name
+      .replaceAll(/и(?=[аеёийоуыэюя])/g, "і")
+      .replaceAll(/И(?=[аеёийоуыэюя])/g, "І")
+      .replace(/(?<=[бвгджзклмнпрстфхцчшщ])$/, "ъ")
+  );
+}
 
 const empire = (governorate: string, en: string): Text => ({
   ru: `Российская империя, ${governorate} губерния`,
   en: `Russian Empire, ${en} Governorate`,
 });
 const poland: Text = { ru: "Польская Республика", en: "Republic of Poland" };
+const rsfsr: Text = { ru: "РСФСР", en: "Russian SFSR" };
 const bssr: Text = { ru: "БССР", en: "Byelorussian SSR" };
 const belarus: Text = { ru: "Республика Беларусь", en: "Republic of Belarus" };
 
@@ -367,7 +377,13 @@ type Affiliation = { name: Text; from: number; to: number | null };
 
 const east = (governorate: string, en: string): Affiliation[] => [
   { name: empire(governorate, en), from: 1793, to: 1917 },
-  { name: bssr, from: 1919, to: 1991 },
+  // Vitebsk and most of Mogilev joined the Byelorussian SSR later than Minsk.
+  ...(en === "Minsk"
+    ? [{ name: bssr, from: 1919, to: 1991 }]
+    : [
+        { name: rsfsr, from: 1917, to: 1924 },
+        { name: bssr, from: 1924, to: 1991 },
+      ]),
   { name: belarus, from: 1991, to: null },
 ];
 const west = (governorate: string, en: string): Affiliation[] => [
@@ -483,6 +499,8 @@ export const port = 11;
 export const sources: {
   kind: SourceKind;
   title: string;
+  /** What its parts are called. */
+  unit: string;
   from: number;
   to: number;
   /** The only event it tells about. */
@@ -496,6 +514,7 @@ export const sources: {
     to: 1917,
     of: ["orthodox"],
     title: "Метрическая книга Заольховичской церкви",
+    unit: "запись",
   },
   {
     kind: "register",
@@ -503,6 +522,7 @@ export const sources: {
     to: 1939,
     of: ["catholic", "lithuanian"],
     title: "Księga metrykalna parafii Osocze Kościelne",
+    unit: "akt",
   },
   {
     kind: "register",
@@ -510,6 +530,7 @@ export const sources: {
     to: 1840,
     of: ["catholic", "lithuanian"],
     title: "Liber metricalis ecclesiae Tumanoviensis",
+    unit: "folium",
   },
   {
     kind: "register",
@@ -517,33 +538,67 @@ export const sources: {
     to: 1915,
     of: ["jewish"],
     title: "Метрическая книга Крынычинского раввината",
+    unit: "запись",
   },
   {
     kind: "census",
     from: 1800,
     to: 1858,
     title: "Ревизская сказка деревни Панская Калинница",
+    unit: "двор",
   },
   {
     kind: "census",
     from: 1870,
     to: 1912,
     title: "Посемейный список Тумановской волости",
+    unit: "двор",
   },
-  { kind: "register", title: "Книга записей актов, Тумановск", from: 1919, to: 1995 },
-  { kind: "document", title: "Похозяйственная книга, Мятликов Брод", from: 1935, to: 1980 },
+  {
+    kind: "register",
+    title: "Книга записей актов, Тумановск",
+    unit: "запись",
+    from: 1919,
+    to: 1995,
+  },
+  {
+    kind: "document",
+    title: "Похозяйственная книга, Мятликов Брод",
+    unit: "страница",
+    from: 1935,
+    to: 1980,
+  },
   {
     kind: "document",
     from: 1885,
     to: 1938,
     about: "emigration",
     title: "Passenger list of the steamship Alder Queen",
+    unit: "line",
   },
-  { kind: "photo", title: "Подпись на обороте свадебной фотографии", from: 1890, to: 1975 },
-  { kind: "document", title: "Надгробия на кладбище в Сосенной Выселке", from: 1860, to: 2015 },
-  { kind: "story", title: "Рассказ тёти, записан на кухне", from: 1880, to: 2020 },
-  { kind: "story", title: "Тетрадь дедушки с родословной", from: 1800, to: 1960 },
-  { kind: "document", title: "Семейные паспорта и свидетельства", from: 1925, to: 2025 },
+  {
+    kind: "photo",
+    title: "Подпись на обороте свадебной фотографии",
+    unit: "снимок",
+    from: 1890,
+    to: 1975,
+  },
+  {
+    kind: "document",
+    title: "Надгробия на кладбище в Сосенной Выселке",
+    unit: "ряд",
+    from: 1860,
+    to: 2015,
+  },
+  { kind: "story", title: "Рассказ тёти, записан на кухне", unit: "минута", from: 1880, to: 2020 },
+  { kind: "story", title: "Тетрадь дедушки с родословной", unit: "лист", from: 1800, to: 1960 },
+  {
+    kind: "document",
+    title: "Семейные паспорта и свидетельства",
+    unit: "документ",
+    from: 1925,
+    to: 2025,
+  },
 ];
 
 /** Dates as sources put them that name no year. */

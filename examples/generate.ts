@@ -9,12 +9,12 @@ import type {
   Parentage,
   Person,
   Script,
-  SourceKind,
   Union,
 } from "./family.ts";
 import {
   branches,
   nicknames,
+  oldSpelling,
   places,
   port,
   sources,
@@ -35,21 +35,31 @@ export function generateFamily(seed: number, size: number): ExampleFamily {
   return new Chronicle(random, growTree(random, size)).write();
 }
 
-type Life = { death: number | null; deathIsKnown: boolean; living: Person["living"] };
+type Life = {
+  death: number | null;
+  deathIsKnown: boolean;
+  living: Person["living"];
+  /** The year of emigration. */
+  left: number | null;
+};
 
 function lifeOf(random: Random, person: Draft): Life {
   const { int, chance } = random;
-  const diesYoung = !person.settled && chance(0.12);
+  const left =
+    !person.settled && person.birth >= 1870 && person.birth <= 1908 && chance(0.4)
+      ? person.birth + int(18, 27)
+      : null;
+  const diesYoung = !person.settled && left === null && chance(0.12);
   const span = diesYoung ? int(0, 12) : int(48, 92);
   const death = person.death ?? Math.max(person.birth + span, person.aliveIn + int(0, 3));
   if (death >= thisYear) {
-    return { death: null, deathIsKnown: false, living: chance(0.93) ? "yes" : "unknown" };
+    return { death: null, deathIsKnown: false, living: chance(0.93) ? "yes" : "unknown", left };
   }
-  // Nothing says the person is dead, though nobody lives that long.
+  // Dead by now, but no record of it reached the family.
   if (person.death === null && chance(0.12)) {
-    return { death, deathIsKnown: false, living: "unknown" };
+    return { death, deathIsKnown: false, living: "unknown", left };
   }
-  return { death, deathIsKnown: person.death !== null || chance(0.9), living: "no" };
+  return { death, deathIsKnown: person.death !== null || chance(0.9), living: "no", left };
 }
 
 /** What a fact is about: decides which sources may name it. */
@@ -72,7 +82,8 @@ type Details = Pick<FamilyEvent, "date" | "place" | "participants"> & {
   main?: boolean;
 };
 
-const languageOf = { orthodox: "be", catholic: "pl", lithuanian: "lt", jewish: "yi" } as const;
+const church = (tradition: Tradition): string =>
+  tradition === "lithuanian" ? "catholic" : tradition;
 
 const scriptOf = (language: Language): Script =>
   language === "yi" ? "Hebr" : language === "ru" || language === "be" ? "Cyrl" : "Latn";
@@ -164,7 +175,7 @@ class Chronicle {
     const write = (
       kind: NameForm["kind"],
       language: Language,
-      parts: { given?: string | undefined; patronymic?: string; surname?: string | undefined },
+      parts: { [part in "given" | "patronymic" | "surname"]?: string | undefined },
     ): void => {
       this.#nameCount += 1;
       const id = `n${this.#nameCount}`;
@@ -177,18 +188,22 @@ class Chronicle {
     const isWoman = person.sex === "female";
     const form = isWoman ? 1 : 0;
     const ru = fatherGiven === null ? {} : { patronymic: fatherGiven.patronymic.ru[form] };
-    const be = fatherGiven === null ? {} : { patronymic: fatherGiven.patronymic.be[form] };
-    const own = languageOf[surname.tradition];
+    const be = fatherGiven?.patronymic.be?.[form];
     write("birth", "ru", { given: given.ru, ...ru, surname: surname.ru[form] });
-    if (own === "be") write("birth", "be", { given: given.be, ...be, surname: surname.be[form] });
-    if (own === "pl") write("birth", "pl", { given: given.pl, surname: surname.pl?.[form] });
-    if (own === "yi") write("birth", "yi", { given: given.yi, surname: surname.yi });
-    if (own === "lt") {
-      const spelling = isWoman ? surname.lt?.maiden : surname.lt?.male;
-      write("birth", "lt", { given: given.lt, surname: spelling });
+    if (surname.be !== undefined) {
+      write("birth", "be", { given: given.be, patronymic: be, surname: surname.be[form] });
     }
-    if ((own === "pl" || own === "lt") && birth < 1900) {
-      write("church", "la", { given: given.la, surname: surname.pl?.[form] });
+    if (surname.yi !== undefined) {
+      write("birth", "yi", { given: given.yi, surname: surname.yi });
+    }
+    if (surname.lt !== undefined) {
+      const spelling = isWoman ? surname.lt.maiden : surname.lt.male;
+      write("birth", "lt", { given: given.lt, surname: spelling });
+    } else if (surname.pl !== undefined) {
+      write("birth", "pl", { given: given.pl, surname: surname.pl[form] });
+    }
+    if (surname.pl !== undefined && birth < 1900) {
+      write("church", "la", { given: given.la, surname: surname.pl[form] });
     }
     for (const { partners, kind } of this.#tree.unions) {
       const [husband, wife] = partners;
@@ -202,18 +217,13 @@ class Chronicle {
     if (!isWoman && birth < 1910 && chance(0.12)) {
       write("variant", "ru", { given: oldSpelling(given.ru), surname: oldSpelling(surname.ru[0]) });
     }
-    if (this.#leaves(person))
+    if (this.#life(person).left !== null) {
       write("variant", "en", { given: given.en, surname: surname.en[form] });
-    if (chance(0.06)) write("nickname", "ru", { given: pick(nicknames) });
+    }
+    if (chance(0.06)) {
+      write("nickname", "ru", { given: pick(isWoman ? nicknames.female : nicknames.male) });
+    }
     return forms;
-  }
-
-  /** Some of the unmarried went overseas. */
-  #leaves(person: Draft): boolean {
-    const { death } = this.#life(person);
-    const isGrown = death === null || death > person.birth + 30;
-    const years = person.birth >= 1870 && person.birth <= 1908;
-    return years && isGrown && !person.settled && Number(this.#id(person).slice(1)) % 2 === 0;
   }
 
   #writeEvents(): FamilyEvent[] {
@@ -225,9 +235,9 @@ class Chronicle {
   }
 
   #writeLife(person: Draft): void {
-    const { chance, int, pick } = this.#random;
+    const { chance, pick } = this.#random;
     const { birth } = person;
-    const { death, deathIsKnown } = this.#life(person);
+    const { death, deathIsKnown, left } = this.#life(person);
     const subject = subjectOf(person);
     const home = this.#home(person);
     const self: Participants = [{ person: this.#id(person), role: "principal" }];
@@ -237,12 +247,14 @@ class Chronicle {
 
     if (subject.tradition !== "jewish" && birth < 1918 && chance(0.35)) {
       const { friend } = this.#tree;
-      const guests = this.#guests(person, birth);
-      const knows = birth > friend.birth + 18 && birth < friend.birth + 60;
-      if (knows && chance(0.4)) guests.unshift(this.#id(friend));
-      const godparents = guests
-        .slice(0, 2)
-        .map((id) => ({ person: id, role: "godparent" as const }));
+      const parents = this.#tree.links.filter((l) => l.child === person).map((l) => l.parent);
+      const able = this.#guests(subject.tradition, birth, [person, ...parents]);
+      const [men, women] = ["male", "female"].map((sex) => able.filter((p) => p.sex === sex));
+      const godfather = men?.includes(friend) && chance(0.3) ? [friend] : this.#one(men);
+      const godparents = [...godfather, ...this.#one(women)].map((godparent) => ({
+        person: this.#id(godparent),
+        role: "godparent" as const,
+      }));
       const date = soonAfter(this.#random, born);
       this.#event("baptism", subject, {
         date,
@@ -250,16 +262,17 @@ class Chronicle {
         participants: [...self, ...godparents],
       });
     }
-    if (this.#leaves(person)) {
-      const year = birth + int(18, 27);
-      const date = dateIn(this.#random, year);
+    if (left !== null) {
+      const date = dateIn(this.#random, left, "gregorian");
       const place = placeId(port);
-      this.#event("emigration", { ...subject, year }, { date, place, participants: self });
+      this.#event("emigration", { ...subject, year: left }, { date, place, participants: self });
     }
     if (death !== null && deathIsKnown) {
       const dying = { ...subject, year: death };
-      const died = death === birth ? yearDate(death) : dateIn(this.#random, death);
-      const place = chance(0.7) ? home : pick([placeId(town), null]);
+      const calendar = left === null ? [] : (["gregorian"] as const);
+      const died = death === birth ? yearDate(death) : dateIn(this.#random, death, ...calendar);
+      const last = left === null ? home : placeId(port);
+      const place = chance(0.7) ? last : left === null ? pick([placeId(town), null]) : null;
       this.#event("death", dying, { date: died, place, participants: self });
       if (chance(0.25)) {
         const date = soonAfter(this.#random, died);
@@ -281,10 +294,12 @@ class Chronicle {
     if (chance(0.8)) {
       const date = dateIn(this.#random, union.year);
       const place = this.#home(wife);
-      const guests = chance(0.2) ? this.#guests(wife, union.year, union) : [];
+      const able = this.#guests(subject.tradition, union.year, union.partners);
+      const [first] = chance(0.3) ? this.#one(able) : [];
+      const guests = first === undefined ? [] : [first, ...this.#one(able, first)];
       const all = [
         ...participants,
-        ...guests.map((p) => ({ person: p, role: "witness" as const })),
+        ...guests.map((p) => ({ person: this.#id(p), role: "witness" as const })),
       ];
       const year = { ...subject, year: union.year };
       this.#event("wedding", year, { date, place, participants: all, union: id });
@@ -297,17 +312,21 @@ class Chronicle {
     }
   }
 
-  /** Two grown-ups alive that year, other than those the day is about. */
-  #guests(person: Draft, year: number, union?: DraftUnion): string[] {
-    const able = this.#tree.people.filter((guest) => {
-      const { death } = this.#life(guest);
+  /** Grown-ups of the same church who were alive and at home that year, hosts left out. */
+  #guests(tradition: Tradition, year: number, hosts: readonly (Draft | null)[]): Draft[] {
+    return this.#tree.people.filter((guest) => {
+      const { death, left } = this.#life(guest);
       const isAdult = guest.birth + 18 <= year && guest.birth + 60 > year && guest.given !== null;
-      const isHost = guest === person || guest === this.#tree.friend;
-      const isAlive = death === null || death > year;
-      return isAdult && isAlive && !isHost && !union?.partners.includes(guest);
+      const isHere = (death === null || death > year) && (left === null || left > year);
+      const isOurs = church(guest.surname.tradition) === church(tradition);
+      return isAdult && isHere && isOurs && !hosts.includes(guest);
     });
-    if (able.length === 0) return [];
-    return [...new Set([this.#random.pick(able), this.#random.pick(able)])].map((p) => this.#id(p));
+  }
+
+  /** One of the people, if there is anybody besides the one left out. */
+  #one(people: Draft[] = [], besides?: Draft): Draft[] {
+    const left = people.filter((person) => person !== besides);
+    return left.length === 0 ? [] : [this.#random.pick(left)];
   }
 
   /** The place of the branch; the last two generations live in the town. */
@@ -395,7 +414,7 @@ class Chronicle {
         id: `c${this.#citationCount}`,
         source: `s${sources.indexOf(source) + 1}`,
         fact,
-        detail: detailIn(source.kind, int(1, 90)),
+        detail: `${source.unit} ${int(1, 90)}`,
       });
     }
     return certainty;
@@ -404,24 +423,4 @@ class Chronicle {
 
 function placeId(index: number): string {
   return `l${index + 1}`;
-}
-
-/** Until 1918 a word ending in a consonant took a hard sign. */
-function oldSpelling(word: string): string {
-  return /[бвгджзклмнпрстфхцчшщ]$/.test(word) ? `${word}ъ` : word;
-}
-
-function detailIn(kind: SourceKind, number: number): string {
-  switch (kind) {
-    case "register":
-      return `запись ${number}`;
-    case "census":
-      return `двор ${number}`;
-    case "document":
-      return `страница ${number}`;
-    case "photo":
-      return `снимок ${number}`;
-    case "story":
-      return `минута ${number}`;
-  }
 }

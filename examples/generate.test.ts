@@ -281,7 +281,102 @@ describe("the soundness check", () => {
   const exactBirth = (f: Family) =>
     f.events.find((e) => e.kind === "birth" && e.date?.parsed?.qualifier === "exact")!;
 
+  const exactDeaths = (f: Family) =>
+    f.events.flatMap((e) => (e.kind === "death" && e.main && e.date?.parsed?.from) || []);
+  const shiftBirths = (f: Family, sex: string, years: number) => {
+    const ids = f.people.filter((p) => p.sex === sex).map(({ id }) => id);
+    for (const { kind, date, participants } of f.events) {
+      if (kind === "birth" && ids.includes(participants[0]!.person) && date?.parsed) {
+        date.parsed.from.year += years;
+      }
+    }
+  };
+  const inviteEmigrant = (f: Family) => {
+    const exact = (kind: string) =>
+      f.events.find((e) => e.kind === kind && e.date?.parsed?.qualifier === "exact")!;
+    const [left, wedding] = [exact("emigration"), exact("wedding")];
+    wedding.participants.push({ person: left.participants[0]!.person, role: "witness" });
+    wedding.date!.parsed!.from.year = left.date!.parsed!.from.year + 1;
+  };
+  const guestsAt = (f: Family, kind: string) =>
+    f.events.filter((e) => e.kind === kind && e.participants.length > 2);
+
   it.each<[string, (broken: Family) => void, RegExp]>([
+    [
+      "a union with oneself",
+      (f) => (f.unions[0]!.partners[1] = f.unions[0]!.partners[0]),
+      /oneself/,
+    ],
+    [
+      "a guest twice",
+      (f) =>
+        guestsAt(f, "baptism")[0]!.participants.push(
+          f.events[0]!.participants[0]!,
+          f.events[0]!.participants[0]!,
+        ),
+      /somebody twice/,
+    ],
+    [
+      "an empty name",
+      (f) => Object.assign(f.people[0]!.names[0]!, { given: null, surname: null }),
+      /empty name/,
+    ],
+    [
+      "a name shown in another language",
+      (f) => (f.people[0]!.names[0]!.language = "be"),
+      /not shown in ru/,
+    ],
+    ["a parent too young", (f) => shiftBirths(f, "male", 15), /is \d+ when/],
+    ["a mother too old", (f) => shiftBirths(f, "female", -25), /is \d+ when/],
+    ["a life too long", (f) => exactDeaths(f).forEach((d) => (d.year += 200)), /lived from/],
+    [
+      "a death before a child",
+      (f) =>
+        f.events.forEach(
+          (e) => e.kind === "death" && e.date?.parsed && (e.date.parsed.from.year -= 40),
+        ),
+      /is dead when/,
+    ],
+    [
+      "a guest not born yet",
+      (f) =>
+        f.events.forEach(
+          (e) => e.kind === "wedding" && e.date?.parsed && (e.date.parsed.from.year -= 60),
+        ),
+      /is not born before/,
+    ],
+    [
+      "a guest dead by then",
+      (f) =>
+        f.events.forEach(
+          (e) => e.kind === "wedding" && e.date?.parsed && (e.date.parsed.from.year += 90),
+        ),
+      /is dead before/,
+    ],
+    ["a guest overseas", inviteEmigrant, /is overseas before/],
+    [
+      "a parent as godparent",
+      (f) => {
+        const e = guestsAt(f, "baptism").find(
+          (x) => kinOf(f).parents(x.participants[0]!.person).length > 0,
+        )!;
+        e.participants[1]!.person = kinOf(f).parents(e.participants[0]!.person)[0]!;
+      },
+      /own godparent/,
+    ],
+    ["two godfathers", (f) => f.people.forEach((p) => (p.sex = "male")), /of one sex/],
+    [
+      "twelve months between two births",
+      (f) => {
+        const kin = kinOf(f);
+        for (const p of f.people)
+          for (const c of kin.children(p.id))
+            for (const e of f.events)
+              if (e.kind === "birth" && e.participants[0]!.person === c && e.date?.parsed)
+                e.date.parsed.from.year = 1900;
+      },
+      /too close/,
+    ],
     ["a cycle", (f) => (f.parentages[0]!.parent = f.parentages[0]!.child), /cycle/],
     ["a child that is not there", (f) => (f.parentages[0]!.child = "p0"), /refers to p0/],
     ["a place that is not there", (f) => (f.events[0]!.place = "pl0"), /refers to pl0/],

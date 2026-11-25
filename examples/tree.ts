@@ -153,8 +153,10 @@ export function growTree(random: Random, size: number): Tree {
     });
   }
 
-  const nextBirth = (union: DraftUnion): number =>
-    (union.children.at(-1)?.birth ?? union.year) + int(1, 3);
+  const nextBirth = ({ year, children }: DraftUnion): number => {
+    const last = children.at(-1);
+    return last === undefined ? year + int(1, 3) : last.birth + int(2, 3);
+  };
 
   const canBear = (union: DraftUnion): boolean => {
     const latest = (union.children.at(-1)?.birth ?? union.year) + 3;
@@ -195,8 +197,8 @@ export function growTree(random: Random, size: number): Tree {
     const siblings = int(1, 2);
     const place = int(0, siblings);
     const births: number[] = [birthIn(generation) + int(-2, 2)];
-    for (let i = place; i > 0; i -= 1) births.unshift((births[0] as number) - int(1, 3));
-    for (let i = place; i < siblings; i += 1) births.push((births.at(-1) as number) + int(1, 3));
+    for (let i = place; i > 0; i -= 1) births.unshift((births[0] as number) - int(2, 3));
+    for (let i = place; i < siblings; i += 1) births.push((births.at(-1) as number) + int(2, 3));
     const year = (births[0] as number) - 1;
 
     const [line] = lines;
@@ -337,6 +339,7 @@ export function growTree(random: Random, size: number): Tree {
     // Two versions of a father: the second one is a neighbor of his generation.
     const disputed = bear(marry(find({ generation: 3, branch: 4, sex: "male" })));
     const neighbor = find({ generation: 3, branch: 5, sex: "male" });
+    neighbor.settled = true;
     const [main] = links.filter(({ child }) => child === disputed);
     if (main !== undefined) main.certainty = "contradiction";
     Object.assign(link(disputed, neighbor), { main: false, certainty: "contradiction" });
@@ -344,8 +347,7 @@ export function growTree(random: Random, size: number): Tree {
     // Eight siblings, none with a family of their own.
     const row = marry(find({ generation: 3, branch: 8, sex: "male" }));
     for (let i = 0; i < 8; i += 1) {
-      const birth = (row.children.at(-1)?.birth ?? row.year) + int(1, 2);
-      bear(row, { birth, settled: true });
+      bear(row, { birth: row.year + 1 + 2 * i, settled: true });
     }
     row.closed = true;
 
@@ -367,6 +369,7 @@ export function growTree(random: Random, size: number): Tree {
     });
     const guardian = find({ generation: 3, branch: 2, sex: "male" });
     link(ward, guardian, "guardianship");
+    guardian.settled = true;
     guardian.aliveIn = Math.max(guardian.aliveIn, ward.birth);
     const listed = add({
       generation: 3,

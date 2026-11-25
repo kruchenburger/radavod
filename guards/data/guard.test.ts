@@ -9,6 +9,9 @@ import { bad, contents, type Files, good } from "./fixtures.ts";
 import { check, type Report, type Violation } from "./guard.ts";
 import { rules } from "./rules.ts";
 
+// Inside a git hook these point at the real repository.
+for (const key of Object.keys(process.env)) if (key.startsWith("GIT_")) delete process.env[key];
+
 const repository = fileURLToPath(new URL("../..", import.meta.url));
 const gedcomInA = [{ rule: "gedcom-content", file: "a.txt" }];
 

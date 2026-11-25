@@ -12,10 +12,11 @@ export type Examples = Record<string, string[]>;
 /**
  * Looks for a family's data in every file git tracks or has staged.
  *
- * It does not see: untracked files, earlier commits, branches not checked out, text in images and
- * PDF, encrypted or encoded data (base64, a compressed database), brotli, archives without a
- * signature at the start (except zip), and a family written in a format of its own: a table, a
- * list in prose, CSV, JSON or XML without the backup marker.
+ * It does not see: untracked files, earlier commits, other branches, text in images and PDF,
+ * encrypted or encoded data (base64, a compressed or encrypted database), archives of a kind not in
+ * `rules.ts` (brotli has no signature at all), parts of a GEDCOM file with no header, person, family
+ * or name line, GEDCOM in an encoding that is not ASCII-based, a backup marker without quotes, and a
+ * family in a format of its own: a SQL dump, a table, prose, CSV, JSON or XML without the marker.
  */
 export function check(folder: string, examples: Examples = listed): Report {
   for (const [file, allowed] of Object.entries(examples)) {

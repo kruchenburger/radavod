@@ -48,6 +48,19 @@ function brokenReferences(family: ExampleFamily): string[] {
     toSource(id, source);
     toFact(id, fact);
   }
+  const parentsOf = new Map<string, (string | null)[]>();
+  for (const { child, parent } of parentages) {
+    parentsOf.set(child, [...(parentsOf.get(child) ?? []), parent]);
+  }
+  const sexOf = new Map(people.map(({ id, sex }) => [id, sex]));
+  for (const { id, participants } of events) {
+    const godparents = participants.flatMap((p) => (p.role === "godparent" ? p.person : []));
+    const parents = parentsOf.get(participants[0]?.person ?? "") ?? [];
+    if (godparents.some((person) => parents.includes(person))) found.push(`${id}: own godparent`);
+    if (new Set(godparents.map((person) => sexOf.get(person))).size !== godparents.length) {
+      found.push(`${id} has two godparents of one sex`);
+    }
+  }
   return found;
 }
 
@@ -116,14 +129,33 @@ function brokenLives(family: ExampleFamily): string[] {
     if (death !== undefined && (death < birth || death > birth + 105)) {
       found.push(`${id} lived from ${birth} to ${death}`);
     }
-    for (const child of kin.children(id)) {
+    const children = kin.children(id).filter((child) => kin.parents(child).includes(id));
+    const ages = children.flatMap((child) => births.get(child) ?? []).sort((a, b) => a - b);
+    if (sex === "female" && ages.some((year, i) => i > 0 && year - (ages[i - 1] ?? 0) < 2)) {
+      found.push(`${id} has children too close together`);
+    }
+    for (const child of children) {
       const born = births.get(child);
-      if (born === undefined || !kin.parents(child).includes(id)) continue;
+      if (born === undefined) continue;
       const age = born - birth;
       if (age < 17 || age > (sex === "female" ? 47 : 75)) {
         found.push(`${id} is ${age} when ${child} is born`);
       }
       if (death !== undefined && born > death) found.push(`${id} is dead when ${child} is born`);
+    }
+  }
+  const left = new Map(
+    family.events.flatMap(({ kind, participants, date }) => {
+      const [person, from] = [participants[0]?.person, date?.parsed?.from.year];
+      const exact = kind === "emigration" && date?.parsed?.qualifier === "exact";
+      return exact && person !== undefined && from !== undefined ? [[person, from] as const] : [];
+    }),
+  );
+  for (const { date, participants, id } of family.events) {
+    const guests = participants.filter(({ role }) => role !== "principal");
+    const at = date?.parsed?.qualifier === "exact" ? date.parsed.from.year : 0;
+    for (const { person } of guests) {
+      if (at > (left.get(person) ?? at)) found.push(`${person} is overseas before ${id}`);
     }
   }
   for (const { date, participants, main, id } of family.events) {

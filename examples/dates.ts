@@ -1,6 +1,9 @@
 import type { FuzzyDate, PartialDate } from "./family.ts";
 import type { Random } from "./random.ts";
 
+type Parsed = NonNullable<FuzzyDate["parsed"]>;
+type Calendar = Parsed["calendar"];
+
 const ofMonth = [
   "января",
   "февраля",
@@ -30,10 +33,8 @@ const months = [
   "декабрь",
 ];
 
-/** The empire counted by the Julian calendar until 1918. */
-const calendarOf = (year: number): "julian" | "gregorian" => (year < 1918 ? "julian" : "gregorian");
-
-type Parsed = NonNullable<FuzzyDate["parsed"]>;
+/** The empire counted by the Julian calendar until 1918; overseas the Gregorian one was in use. */
+const calendarOf = (year: number): Calendar => (year < 1918 ? "julian" : "gregorian");
 
 function dated(
   text: string,
@@ -52,7 +53,17 @@ const dayDate = (year: number, month: number, day: number): FuzzyDate =>
   dated(`${day} ${ofMonth[month - 1]} ${year} г.`, "exact", { year, month, day });
 
 /** A date the way some source would give the year. */
-export function dateIn(random: Random, year: number): FuzzyDate {
+export function dateIn(
+  random: Random,
+  year: number,
+  calendar: Calendar = calendarOf(year),
+): FuzzyDate {
+  const date = writtenDate(random, year, calendar);
+  if (date.parsed !== null) date.parsed.calendar = calendar;
+  return date;
+}
+
+function writtenDate(random: Random, year: number, calendar: Calendar): FuzzyDate {
   const { int, chance } = random;
   const kind = random.weighted([
     ["day", 56],
@@ -65,7 +76,7 @@ export function dateIn(random: Random, year: number): FuzzyDate {
   ]);
   switch (kind) {
     case "day":
-      if (year < 1918 && chance(0.06)) {
+      if (calendar === "julian" && chance(0.06)) {
         return dated(`на Покров ${year} г.`, "exact", { year, month: 10, day: 1 });
       }
       return dayDate(year, int(1, 12), int(1, 28));
@@ -99,5 +110,8 @@ export function soonAfter(random: Random, date: FuzzyDate | null): FuzzyDate | n
   const { year, month, day } = date?.parsed?.from ?? {};
   if (year === undefined || month === undefined || day === undefined) return null;
   const later = day + random.int(1, 4);
-  return later > 28 ? null : dayDate(year, month, later);
+  if (later > 28) return null;
+  const next = dayDate(year, month, later);
+  if (next.parsed !== null && date?.parsed) next.parsed.calendar = date.parsed.calendar;
+  return next;
 }

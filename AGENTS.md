@@ -37,9 +37,9 @@ dependency-cruiser parses with swc, because TypeScript 7 has no compiler API.
 
 ## Data guard
 
-`pnpm guard:data` reads every tracked or staged file and fails on GEDCOM (by name or content), the backup marker in double quotes, SQLite and archives, whatever the file is called. It fails when it scans nothing or cannot read a file, so submodules and Git LFS do not work here. A file in `examples/` must be listed in `guards/data/examples.json`, with the rules it may break.
+`pnpm guard:data` reads every tracked or staged file and fails on GEDCOM (by name or content), the backup marker in quotes, SQLite and archives, whatever the file is called. It fails when it scans nothing or cannot read a file, so submodules and Git LFS do not work here. A file in `examples/` must be listed in `guards/data/examples.json`, with the rules it may break.
 
-The guard has no other exception. Its broken examples are built by `guards/data/fixtures.ts` in temporary repositories and are never files here. Code that needs the backup marker spells it in backticks. What the guard cannot see is listed above `check` in `guards/data/guard.ts`.
+The guard has no other exception. Its broken examples are built by `guards/data/fixtures.ts` in temporary repositories and are never files here. Code that needs the backup marker spells it in backticks; code, tests and docs that need GEDCOM build it from separate levels and tags, as the fixtures do, or keep it in a listed example. What the guard cannot see is listed above `check` in `guards/data/guard.ts`.
 
 ## Settings
 

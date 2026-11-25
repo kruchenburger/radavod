@@ -24,7 +24,7 @@ const header: Line[] = [
 ];
 const person: Line[] = [
   [0, "@I1@", "INDI"],
-  [1, "NAME", "Адам /Ольхович/"],
+  [1, "NAME", "Адам /Ольхунич/"],
 ];
 const union: Line[] = [
   [0, "@F1@", "FAM"],
@@ -32,6 +32,7 @@ const union: Line[] = [
 ];
 const gedcom = [...header, ...person];
 const tree = lines(gedcom);
+const array = JSON.stringify(header.map((row) => row.join(" ")));
 const bom = "﻿";
 
 const marker = ["radavod", "backup"].join("-");
@@ -66,6 +67,21 @@ export const bad: [name: string, rule: string, files: Files][] = [
   ["GEDCOM in a source string", "gedcom-content", { "a.ts": utf8(lines(gedcom, "\\n")) }],
   ["GEDCOM in a JSON string", "gedcom-content", { "a.json": utf8(lines(gedcom, "\\r\\n")) }],
   ["GEDCOM after code on its line", "gedcom-content", { "a.ts": utf8("const a = `" + tree) }],
+  ["GEDCOM in JSON twice", "gedcom-content", { "a.json": utf8(lines(gedcom, "\\\\n")) }],
+  ["GEDCOM with escaped line ends", "gedcom-content", { a: utf8(lines(header, "\\u000a")) }],
+  ["GEDCOM as an array of lines", "gedcom-content", { "a.json": utf8(array) }],
+  [
+    "GEDCOM as cells",
+    "gedcom-content",
+    { "a.csv": utf8(header.map((row) => row.join(" ")).join(",")) },
+  ],
+  ["GEDCOM as HTML", "gedcom-content", { "a.html": utf8(lines(header, "<br>")) }],
+  [
+    "a GEDCOM identifier with a space",
+    "gedcom-content",
+    { a: utf8(lines([[0, "@I 1@", "INDI"]])) },
+  ],
+  ["a GEDCOM name alone", "gedcom-content", { a: utf8(lines(person.slice(1))) }],
   ["a GEDCOM header alone", "gedcom-content", { "a.txt": utf8(lines(header)) }],
   ["a GEDCOM person without a header", "gedcom-content", { "a.txt": utf8(lines(person)) }],
   ["a GEDCOM family without a header", "gedcom-content", { "a.txt": utf8(lines(union)) }],
@@ -78,6 +94,12 @@ export const bad: [name: string, rule: string, files: Files][] = [
   ["a backup in UTF-16 BE", "backup-marker", { "data.json": utf16be(bom + backup) }],
   ["a backup inside text", "backup-marker", { "notes.txt": utf8(`Copy: ${backup}`) }],
   ["a backup in a string", "backup-marker", { "log.json": utf8(JSON.stringify(backup)) }],
+  ["a backup in single quotes", "backup-marker", { a: utf8(`format: '${marker}'`) }],
+  [
+    "a backup with an escaped hyphen",
+    "backup-marker",
+    { a: utf8(backup.replace("radavod-", "radavod\\u002d")) },
+  ],
   ["a backup inside examples", "backup-marker", { "examples/family.json": utf8(backup) }],
 
   ["a SQLite database", "sqlite-content", { "family.dat": sqlite }],
@@ -94,6 +116,10 @@ export const bad: [name: string, rule: string, files: Files][] = [
   ["a zip after text", "archive-content", { a: Buffer.concat([utf8("text"), emptyZip]) }],
   ["the same with a comment", "archive-content", { a: Buffer.concat([utf8("a"), zipWithComment]) }],
   ["a gzip", "archive-content", { tree: padded(hex("1f8b08")) }],
+  ["a compress file", "archive-content", { tree: padded(hex("1f9d")) }],
+  ["an lz4", "archive-content", { tree: padded(hex("04224d18")) }],
+  ["an lzip", "archive-content", { tree: padded(hex("4c5a4950")) }],
+  ["a cab", "archive-content", { tree: padded(hex("4d534346")) }],
   ["a bzip2", "archive-content", { tree: padded(hex("425a68")) }],
   ["an xz", "archive-content", { tree: padded(hex("fd377a585a00")) }],
   ["a zstd", "archive-content", { tree: padded(hex("28b52ffd")) }],
@@ -114,6 +140,8 @@ export const good: [name: string, files: Files][] = [
   ["prose about GEDCOM", { "a.md": utf8("A file starts with `0 HEAD` and has `1 GEDC`.\n") }],
   ["a header line alone", { "a.txt": utf8(lines([[0, "HEAD"]])) }],
   ["other numbers before the tags", { "a.txt": utf8("10 " + "HEAD\n11 " + "GEDC\n") }],
+  ["a path that looks like a name line", { "a.txt": utf8("1 NAME or two: src/a.ts\n") }],
+  ["a file named after the marker", { "a.ts": utf8(`const name = "${marker}.json";\n`) }],
   ["prose about the marker", { "a.md": utf8(`The marker is ${marker}.\n`) }],
   ["prose about SQLite", { "a.md": utf8("It starts with SQLite format 3 and a zero byte.\n") }],
   ["a path with spaces and other letters", { "докі/мой файл.md": utf8("text\n") }],
