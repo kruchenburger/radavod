@@ -1,4 +1,7 @@
-import "@fontsource-variable/roboto-slab";
+import "@fontsource-variable/alegreya";
+import "@fontsource-variable/alegreya/wght-italic.css";
+import "@fontsource/alegreya-sans/400.css";
+import "@fontsource/alegreya-sans/500.css";
 import "@mantine/core/styles.css";
 import { StrictMode } from "react";
 import { createRoot } from "react-dom/client";

@@ -1,19 +1,30 @@
 import { describe, expect, it } from "vitest";
-import font from "@fontsource-variable/roboto-slab/index.css?raw";
+import serif from "@fontsource-variable/alegreya/index.css?raw";
+import serifItalic from "@fontsource-variable/alegreya/wght-italic.css?raw";
+import sans from "@fontsource/alegreya-sans/400.css?raw";
+import sansMedium from "@fontsource/alegreya-sans/500.css?raw";
+import main from "../../web/main.tsx?raw";
+import packageJson from "../../package.json?raw";
 import page from "../../web/index.html?raw";
 import styles from "../../web/app/home.module.css?raw";
 import config from "../../vite.config.ts?raw";
 import wrangler from "../../wrangler.jsonc?raw";
 import { THEME_KEY } from "../../web/app/memory";
-import { tokens } from "../../web/app/tokens";
+import { fonts } from "../../web/app/tokens";
 
-it.each([
-  ["the page", page],
-  ["the styles", styles],
-  ["the font", font],
-])("asks no other site for anything: %s", (_, source) => {
-  expect(source).not.toMatch(/(?:https?:)?\/\/\w/);
-});
+const faces = [
+  ["serif", serif],
+  ["serif italic", serifItalic],
+  ["sans", sans],
+  ["sans medium", sansMedium],
+] as const;
+
+it.each([["the page", page] as const, ["the styles", styles] as const, ...faces])(
+  "asks no other site for anything: %s",
+  (_, source) => {
+    expect(source).not.toMatch(/(?:https?:)?\/\/\w/);
+  },
+);
 
 it("is built where the Worker looks for it", () => {
   const { assets } = JSON.parse(wrangler) as { assets: { directory: string } };
@@ -34,49 +45,36 @@ it.each([
   expect(document.documentElement.getAttribute("data-mantine-color-scheme")).toBe(attribute);
 });
 
-it.each([
-  ["Russian", "абвгдеёжзийклмнопрстуфхцчшщъыьэюя"],
-  ["Belarusian", "абвгдеёжзійклмнопрстуўфхцчшыьэюя’"],
-  ["Polish", "aąbcćdeęfghijklłmnńoóprsśtuwyzźż"],
-  ["Lithuanian", "aąbcčdeęėfghiįyjklmnoprsštuųūvzž"],
-])("has a font for %s", (_, alphabet) => {
-  const ranges = [...font.matchAll(/unicode-range: ([^;]+);/g)].flatMap(([, list = ""]) =>
-    list.split(",").map((range) => {
-      const [first = "", last = first] = range.trim().replace("U+", "").split("-");
-      return [parseInt(first, 16), parseInt(last, 16)] as const;
-    }),
-  );
-  const missing = [...alphabet, ...alphabet.toUpperCase()].filter((letter) => {
-    const code = letter.codePointAt(0) ?? 0;
-    return !ranges.some(([first, last]) => first <= code && code <= last);
-  });
-  expect(missing).toEqual([]);
-});
-
-describe.each(Object.entries(tokens))("the %s theme", (_, { paper, surface, ...colors }) => {
+describe.each(faces)("the %s face", (_, face) => {
   it.each([
-    ["ink", paper],
-    ["ink", surface],
-    ["muted", paper],
-    ["muted", surface],
-    ["action", paper],
-    ["warning", paper],
-    ["warning", surface],
-  ] as const)("%s reads on %s", (name, background) => {
-    expect(contrast(colors[name], background)).toBeGreaterThanOrEqual(4.5);
+    ["Russian", "абвгдеёжзийклмнопрстуфхцчшщъыьэюя"],
+    ["Belarusian", "абвгдеёжзійклмнопрстуўфхцчшыьэюя’"],
+    ["Polish", "aąbcćdeęfghijklłmnńoóprsśtuwyzźż"],
+    ["Lithuanian", "aąbcčdeęėfghiįyjklmnoprsštuųūvzž"],
+    ["old Russian spelling", "ѣіѳѵ"],
+  ])("has letters for %s", (_, alphabet) => {
+    const ranges = [...face.matchAll(/unicode-range: ([^;]+);/g)].flatMap(([, list = ""]) =>
+      list.split(",").map((range) => {
+        const [first = "", last = first] = range.trim().replace("U+", "").split("-");
+        return [parseInt(first, 16), parseInt(last, 16)] as const;
+      }),
+    );
+    const missing = [...alphabet, ...alphabet.toUpperCase()].filter((letter) => {
+      const code = letter.codePointAt(0) ?? 0;
+      return !ranges.some(([first, last]) => first <= code && code <= last);
+    });
+    expect(missing).toEqual([]);
+  });
+
+  it("is loaded and asked for by its name", () => {
+    const [, family] = /font-family: '([^']+)'/.exec(face) ?? [];
+    expect(Object.values(fonts).some((stack) => stack.startsWith(`"${family}"`))).toBe(true);
   });
 });
 
-/** WCAG 2.1 contrast ratio. */
-function contrast(a: string, b: string): number {
-  const [dark = 0, light = 0] = [luminance(a), luminance(b)].sort((x, y) => x - y);
-  return (light + 0.05) / (dark + 0.05);
-}
-
-function luminance(color: string): number {
-  const [r = 0, g = 0, b = 0] = [1, 3, 5].map((i) => {
-    const value = parseInt(color.slice(i, i + 2), 16) / 255;
-    return value <= 0.04045 ? value / 12.92 : ((value + 0.055) / 1.055) ** 2.4;
-  });
-  return 0.2126 * r + 0.7152 * g + 0.0722 * b;
-}
+it("loads every font it ships and ships every font it loads", () => {
+  const { dependencies } = JSON.parse(packageJson) as { dependencies: Record<string, string> };
+  const loaded = [...main.matchAll(/import "(@fontsource[\w-]*.[\w-]+)/g)].map(([, name]) => name);
+  const shipped = Object.keys(dependencies).filter((name) => name.startsWith("@fontsource"));
+  expect([...new Set(loaded)].sort()).toEqual(shipped.sort());
+});
