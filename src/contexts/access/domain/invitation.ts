@@ -44,6 +44,7 @@ export type RedeemError = Spent | Expired | Missing | Duplicate | CredentialErro
  * The first keeper, with a passkey. A family with a keeper is closed, but for a new setup code, which
  * brings in one more keeper: so a family that lost every device gets back in.
  */
+// The caller checks that the code is the setup code of the installation now; here each code counts once.
 export function setUp(
   reader: AccessReader,
   input: { member: NewMember; credential: NewCredential; now: number; code: string },

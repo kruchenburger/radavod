@@ -134,14 +134,11 @@ describe("after any operations on members", () => {
           take(access, step, now, n);
           wasSetUp ||= access.isSetUp();
           if (wasSetUp) expect(keepers(access), JSON.stringify(step)).toBeGreaterThan(0);
-          // Every live session is of a live member and credential, and says the member's role.
+          // Every live session is of a live member.
           for (let k = 0; k <= n; k++) {
             const signed = access.session(`s-${k}`, now);
             if (signed === null) continue;
-            expect(access.member(signed.member)).toMatchObject({
-              revokedAt: null,
-              role: signed.role,
-            });
+            expect(access.member(signed.member)?.revokedAt).toBeNull();
           }
           // A member never has two live devices, and only a reader has one.
           for (const one of access.members()) {

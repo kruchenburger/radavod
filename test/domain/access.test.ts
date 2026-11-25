@@ -235,6 +235,15 @@ describe("a link of a keeper who was lowered or revoked since", () => {
     const redeem = { hash: "h", now: start, member: { id: member("dan"), name: "Dan" } };
     expect(access.redeem({ ...redeem, credential: passkey("d") })).toEqual(refused("missing"));
     expect(access.member(member("dan"))).toBeNull();
+    // Revoked: a recovery link of theirs gives nothing either.
+    expect(access.changeRole(member("ann"), member("bob"), "keeper", start).ok).toBe(true);
+    joined(access, "eve", "editor");
+    const recovery = { id: "r", hash: "r", member: member("eve"), now: start };
+    expect(access.recover(member("bob"), recovery).ok).toBe(true);
+    expect(access.revoke(member("ann"), member("bob"), start).ok).toBe(true);
+    expect(access.redeem({ hash: "r", now: start, credential: passkey("e2") })).toEqual(
+      refused("missing"),
+    );
   });
 });
 
