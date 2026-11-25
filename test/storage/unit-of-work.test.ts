@@ -716,7 +716,7 @@ describe("a row that is not what it should be", () => {
           .toArray();
         const right = row?.data ?? "";
         // An unknown field is not let through either.
-        tree.storage.sql.exec(`UPDATE ${table} SET data = ?`, right.replace("{", '{"extra":1,'));
+        tree.storage.sql.exec(`UPDATE ${table} SET data = ?`, `{"extra":1,${right.slice(1)}`);
         expect(read, table).toThrow(`corrupt-row ${kind}/`);
         tree.storage.sql.exec(`UPDATE ${table} SET data = ?, version = -1`, right);
         expect(read, table).toThrow(`corrupt-row ${kind}/`);
