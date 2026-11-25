@@ -472,8 +472,9 @@ describe("an erased person", () => {
       );
       tree.do((c) =>
         accepted(
-          c.life.edit(person("guest"), {
-            ...told("baptism", "baptism", ["guest", "principal"]),
+          // An event that names nobody else, so only the name leads to its entry.
+          c.life.add({
+            ...told("letter", "other", ["guest", "principal"]),
             note: `${odd.given} ${odd.surname}`,
           }),
         ),
