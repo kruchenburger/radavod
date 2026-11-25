@@ -44,8 +44,8 @@ export function editBranch(
 }
 
 /**
- * The person gets the branch whatever they had. A descendant who has one keeps it unless told to
- * overwrite, and those below get theirs all the same.
+ * The person gets the branch whatever they had. A descendant who has another one keeps it unless told
+ * to overwrite, and those below belong with them.
  */
 export function assignBranch(
   g: FamilyGraph,
@@ -67,8 +67,9 @@ export function assignBranch(
         ({ parent, kind, main }) => parent === id && main && kind !== "guardianship",
       );
       if (one === null || !isDescendant) continue;
+      if (!overwrite && one.branch !== null && one.branch !== branch) continue;
       found.set(child, one);
-      if (overwrite || one.branch === null) draft.putPerson({ ...one, branch });
+      draft.putPerson({ ...one, branch });
     }
   }
   return { ok: true, value: draft.change() };

@@ -500,20 +500,38 @@ describe("a branch", () => {
     });
   });
 
-  it("skips descendants who have one, but not those below them", () => {
+  it("stops at descendants who keep another one: those below belong with them", () => {
     const family = line();
     assign(family, "son", "red", false);
     assign(family, "top", "green", true);
-    expect(branches(family)).toMatchObject({ top: "green", son: "red", grandson: "green" });
+    expect(branches(family)).toMatchObject({
+      top: "green",
+      son: "red",
+      daughter: "green",
+      grandson: null,
+    });
     assign(family, "top", "green", true, true);
-    expect(branches(family)).toMatchObject({ son: "green" });
+    expect(branches(family)).toMatchObject({ son: "green", grandson: "green" });
+  });
+
+  it("goes on below descendants who have the same one, and by another line", () => {
+    const family = line();
+    assign(family, "son", "green", false);
+    assign(family, "top", "green", true);
+    expect(branches(family)).toMatchObject({ son: "green", grandson: "green" });
+
+    const other = line();
+    other.withParent("grandson", "daughter", { kind: "unknown" });
+    assign(other, "son", "red", false);
+    assign(other, "top", "green", true);
+    expect(branches(other)).toMatchObject({ son: "red", grandson: "green" });
   });
 
   it("is taken from descendants only when told to overwrite", () => {
     const family = line();
     assign(family, "top", "green", true);
     assign(family, "top", null, true);
-    expect(branches(family)).toMatchObject({ top: null, son: "green" });
+    expect(branches(family)).toMatchObject({ top: null, son: "green", grandson: "green" });
     assign(family, "top", null, true, true);
     expect(branches(family)).toMatchObject({ son: null, grandson: null });
   });
