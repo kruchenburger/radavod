@@ -4,7 +4,7 @@ import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { fileURLToPath } from "node:url";
 import { describe, expect, it } from "vitest";
-import { treeSnapshotSchema } from "../src/shared/tree.ts";
+import { treeSampleSchema, treeSnapshotSchema } from "../src/shared/tree.ts";
 import type { FuzzyDate } from "./family.ts";
 import { generateFamily } from "./generate.ts";
 import { dayNumber, snapshotOf, yearOf } from "./snapshot.ts";
@@ -28,10 +28,23 @@ describe("the snapshot of the invented family", () => {
 
   it("has every parentage with its kind, its flag and its certainty", () => {
     const told = snapshot.people.flatMap(({ id, parents }) =>
-      parents.map((parentage) => ({ child: id, ...parentage })),
+      parents.map(({ union: _, ...parentage }) => ({ child: id, ...parentage })),
     );
     const order = (a: { id: string }, b: { id: string }): number => (a.id < b.id ? -1 : 1);
     expect(told.sort(order)).toEqual([...family.parentages].sort(order));
+  });
+
+  it("ties a child to the union of both parents, and to none when one is unknown", () => {
+    for (const { id, parents } of snapshot.people) {
+      for (const { parent, kind, main, union } of parents) {
+        const same = parents.filter((one) => one.kind === kind && one.main === main);
+        const told = snapshot.unions.find((one) => one.id === union);
+        const ids = same.flatMap((one) => (one.parent === null ? [] : [one.parent]));
+        if (union === null) expect(ids.length, id).toBeLessThan(2);
+        else expect([...(told?.partners ?? [])].sort(), id).toEqual([...ids].sort());
+        if (parent === null) expect(union).toBeNull();
+      }
+    }
   });
 
   it("counts branch colors from 0", () => {
@@ -59,7 +72,9 @@ describe("the snapshot of the invented family", () => {
   });
 
   it("knows when a union began, if a wedding is dated", () => {
-    const dated = family.events.filter(({ kind, date }) => kind === "wedding" && date?.parsed);
+    const dated = family.events.filter(
+      ({ kind, date }) => kind === "wedding" && date !== null && yearOf(date).sort !== null,
+    );
     expect(snapshot.unions.filter(({ began }) => began !== null)).toHaveLength(dated.length);
   });
 
@@ -109,6 +124,15 @@ describe("a year", () => {
     });
   });
 
+  it("has no earliest day when it is only known to be before", () => {
+    const before = date({ qualifier: "before", from: { year: 1903 } });
+    expect(yearOf(before)).toEqual({ text: "1903", qualifier: "before", sort: null });
+    expect(yearOf(date({ qualifier: "after", from: { year: 1903 } })).sort).not.toBeNull();
+    expect(
+      yearOf(date({ qualifier: "between", from: { year: 1900 }, to: { year: 1903 } })).sort,
+    ).toBe(dayNumber({ year: 1900 }, "gregorian"));
+  });
+
   it("sorts by the earliest possible day in one calendar", () => {
     expect(dayNumber({ year: 2000, month: 1, day: 1 }, "gregorian")).toBe(2451545);
     expect(dayNumber({ year: 1900, month: 2, day: 28 }, "julian")).toBe(
@@ -128,7 +152,10 @@ it("is written where the app fetches it from", () => {
       folder,
     ]);
     const written: unknown = JSON.parse(readFileSync(join(folder, "sample/tree.json"), "utf8"));
-    expect(treeSnapshotSchema.parse(written)).toEqual(snapshot);
+    const sample = treeSampleSchema.parse(written);
+    expect(sample.snapshot).toEqual(snapshot);
+    const last = family.unions.find(({ id }) => id === family.lastCouple);
+    expect(last?.partners).toContain(sample.start);
   } finally {
     rmSync(folder, { recursive: true, force: true });
   }

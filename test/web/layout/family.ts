@@ -62,6 +62,7 @@ export function familyOf({ people, unions = [], branches = [] }: FamilySpec): Tr
       kind: "marriage",
       partners,
       began: null,
+      branch: null,
       certainty: "confirmed",
     })),
     branches: branches.map((id, i) => ({ id, title: { ru: id, en: id }, color: i % 12 })),
@@ -89,6 +90,7 @@ export function personOf(spec: PersonSpec): TreePerson {
     parents: parents.map((parent, i) => ({
       id: `${id}-${i}`,
       parent: null,
+      union: null,
       kind: "blood",
       main: true,
       certainty: "confirmed",

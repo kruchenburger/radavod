@@ -6,6 +6,7 @@ import {
   type Line,
   type Link,
   type Measure,
+  type ParentageLink,
   type Point,
   personKey,
 } from "../../../web/tree/layout/types";
@@ -22,6 +23,10 @@ export type Rules = {
   measure?: Measure;
   /** Which row a card stands in, when a row holds columns of cards. */
   row?: (card: Card) => string;
+  /** The people of the direct line. */
+  line?: ReadonlySet<string>;
+  /** How far apart lines must run outside of these boxes. */
+  spacing?: { least: number; outside: Box[] };
   /** A list with indents: deeper rows may stand between partners. */
   isList?: boolean;
 };
@@ -43,6 +48,8 @@ export type Findings = {
   unordered: string[];
   textOutside: string[];
   badReferences: string[];
+  mistold: string[];
+  crowded: string[];
 };
 
 /** How far a line may stop from a card it belongs to. */
@@ -66,6 +73,8 @@ export function check(drawing: Drawing, rules: Rules): Findings {
     unordered: [],
     textOutside: [],
     badReferences: [],
+    mistold: [],
+    crowded: [],
   };
   const byKey = new Map(cards.map((card) => [card.key, card]));
   checkNumbers(drawing, found);
@@ -77,6 +86,8 @@ export function check(drawing: Drawing, rules: Rules): Findings {
   checkOrder(byKey, links, rules, found);
   checkText(cards, rules, found);
   checkReferences(byKey, links, found);
+  checkTold(byKey, links, rules, found);
+  checkCrowded(links, rules, found);
   return found;
 }
 
@@ -327,6 +338,139 @@ function checkLinks(
     const isOfUnknown = cards.some((card) => card?.person === null);
     if (cards.includes(undefined) || (!isOfUnknown && !told.has(edge))) found.falseLinks.push(edge);
   }
+}
+
+const kinds = ["blood", "adoption", "unknown", "guardianship"];
+const leastSure = ["contradiction", "unresolved", "hypothesis", "one-source", "confirmed"];
+
+/** Lines say of kinship what the snapshot says: kind, main, certainty, the direct line. */
+function checkTold(
+  byKey: Map<string, Card>,
+  links: Link[],
+  { snapshot, line }: Rules,
+  found: Findings,
+): void {
+  const people = new Map([...snapshot.people].reverse().map((person) => [person.id, person]));
+  const wrong = (link: Link, what: string): void => {
+    found.mistold.push(`${nameOf(link)}: ${what}`);
+  };
+  /** One parent told in several ways counts by the surest way. */
+  const parentageOf = ({ child: childKey, kind, main }: ParentageLink, parentKey: string) => {
+    const child = people.get(byKey.get(childKey)?.person ?? "");
+    const parent = byKey.get(parentKey);
+    const unknown = parent?.unknown;
+    if (unknown !== undefined) {
+      if (unknown.of === "partner") {
+        return child?.parents.find(
+          (one) => one.parent === null && one.kind === kind && one.main === main,
+        );
+      }
+      const own = child?.parents.filter(
+        (one) =>
+          one.parent === null &&
+          one.kind === kind &&
+          one.main === main &&
+          unknown.parentages.includes(one.id),
+      );
+      return own?.sort((a, b) => sureness(a.certainty) - sureness(b.certainty))[0];
+    }
+    return child?.parents
+      .filter((one) => one.parent !== null && one.parent === parent?.person)
+      .sort(
+        (a, b) => Number(b.main) - Number(a.main) || kinds.indexOf(a.kind) - kinds.indexOf(b.kind),
+      )[0];
+  };
+  const sureness = (certainty: string): number => leastSure.indexOf(certainty);
+
+  for (const link of links) {
+    if (link.type === "union") {
+      const told = snapshot.unions.filter(
+        ({ id, partners: [a, b] }) =>
+          id === link.union &&
+          (link.partners.includes(personKey(a)) ||
+            (b !== null && link.partners.includes(personKey(b)))),
+      );
+      const isTold = told.some(
+        ({ kind, certainty }) => kind === link.kind && certainty === link.certainty,
+      );
+      if (!isTold) wrong(link, "union");
+    }
+    if (link.type !== "parentage") continue;
+    const ties = new Map(link.ties.map(({ parent, certainty }) => [parent, certainty]));
+    const sure = Math.min(...link.ties.map(({ certainty }) => sureness(certainty)));
+    if (sureness(link.certainty) !== sure) wrong(link, "certainty of the line");
+    if (link.ties.some(({ parent }) => !link.parents.includes(parent))) wrong(link, "ties");
+    for (const parent of link.parents) {
+      const told = parentageOf(link, parent);
+      // An unknown partner may stand for a parent nobody wrote down.
+      if (told === undefined && byKey.get(parent)?.unknown?.of === "partner") continue;
+      if (told === undefined || told.kind !== link.kind || told.main !== link.main) {
+        wrong(link, `kind of ${parent}`);
+      }
+      if (told !== undefined && told.certainty !== ties.get(parent)) {
+        wrong(link, `certainty of ${parent}`);
+      }
+    }
+    if (line === undefined) continue;
+    const child = byKey.get(link.child)?.person ?? "";
+    const isDirect = link.main && link.kind === "blood" && line.has(child);
+    if (isDirect !== link.direct) wrong(link, "direct");
+  }
+  for (const { key, person, direct } of byKey.values()) {
+    if (line !== undefined && direct !== (person !== null && line.has(person))) {
+      found.mistold.push(`${key}: direct`);
+    }
+  }
+}
+
+/** Lines of different families side by side, where the design keeps them apart. */
+function checkCrowded(links: Link[], { spacing }: Rules, found: Findings): void {
+  if (spacing === undefined) return;
+  const { least, outside } = spacing;
+  type Piece = Box & { family: string; name: string; isFlat: boolean };
+  const grid = new Grid<Piece>();
+  for (const link of links) {
+    for (const [a, b] of pieces(link.points)) {
+      const whole = boxOf(a, b);
+      const isFlat = whole.h < 0.01;
+      for (const box of cutOut(whole, isFlat, outside)) {
+        const piece: Piece = { ...box, isFlat, family: link.family, name: nameOf(link) };
+        for (const other of grid.near(piece, least)) {
+          if (other.family === piece.family || other.isFlat !== isFlat) continue;
+          const [along, apart] = isFlat
+            ? [-gap(piece.x, piece.w, other.x, other.w), Math.abs(piece.y - other.y)]
+            : [-gap(piece.y, piece.h, other.y, other.h), Math.abs(piece.x - other.x)];
+          if (along > 0.5 && apart < least - 0.01) {
+            found.crowded.push(`${piece.name} and ${other.name}: ${apart}`);
+          }
+        }
+        grid.add(piece, piece);
+      }
+    }
+  }
+}
+
+/** The parts of a straight piece that lie outside of all boxes. */
+function cutOut(piece: Box, isFlat: boolean, boxes: Box[]): Box[] {
+  let parts = [piece];
+  for (const box of boxes) {
+    const isBeside = isFlat
+      ? piece.y <= box.y || piece.y >= box.y + box.h
+      : piece.x <= box.x || piece.x >= box.x + box.w;
+    if (isBeside) continue;
+    parts = parts.flatMap((part) => {
+      const [from, to] = isFlat ? [part.x, part.x + part.w] : [part.y, part.y + part.h];
+      const [start, end] = isFlat ? [box.x, box.x + box.w] : [box.y, box.y + box.h];
+      const rest: [number, number][] = [
+        [from, Math.min(to, start)],
+        [Math.max(from, end), to],
+      ];
+      return rest
+        .filter(([a, b]) => b > a)
+        .map(([a, b]) => (isFlat ? { ...part, x: a, w: b - a } : { ...part, y: a, h: b - a }));
+    });
+  }
+  return parts;
 }
 
 function checkMerged(links: Link[], found: Findings): void {

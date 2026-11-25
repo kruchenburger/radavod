@@ -11,7 +11,7 @@ import {
 } from "../../../web/tree/layout/around";
 import type { ParentageLink } from "../../../web/tree/layout/types";
 import { cases } from "./cases";
-import { expectedAround } from "./expected";
+import { expectedAround, lineAround } from "./expected";
 import { type FamilySpec, familyOf, measure, wordingOf } from "./family";
 import { problems } from "./geometry";
 
@@ -34,6 +34,7 @@ function drawn(
     snapshot,
     people: expectedAround(snapshot, focus, { ...more, open: layout.open }),
     children: "y",
+    line: lineAround(snapshot, focus, more.lineOf),
     lines: ({ key }) => byKey.get(key)?.lines ?? [],
     measure,
   });
@@ -119,7 +120,7 @@ describe("around a person", () => {
 
   it("folds siblings and tells who they are", () => {
     const layout = drawn(threeGenerations, "x");
-    expect(layout.siblings).toEqual(["older", "younger"]);
+    expect(layout.siblings.map(({ person }) => person)).toEqual(["older", "younger"]);
     expect(layout.cards.some(({ person }) => person === "older")).toBe(false);
   });
 
@@ -186,6 +187,58 @@ describe("a hard case around a person", () => {
     const layout = drawn({ people: ["x"], unions: [["x", null]] }, "x");
     const place = layout.cards.find(({ person }) => person === null);
     expect(place?.unknown).toEqual({ of: "partner", partner: "x", union: "u0" });
+  });
+
+  it("two partners nobody knows have their own children", () => {
+    const people = [
+      "x",
+      { id: "a", parents: [{ parent: "x", union: "u0" }, null] },
+      { id: "b", parents: [{ parent: "x", union: "u1" }] },
+      { id: "c", parents: [{ parent: "x" }, { parent: null, union: "u1" }] },
+      { id: "plain", parents: ["x", null] },
+      { id: "odd", parents: [{ parent: "x", union: "nowhere" }, null] },
+      { id: "others", parents: [{ parent: "x", union: "u2" }] },
+    ];
+    const unions: [string, string | null][] = [
+      ["x", null],
+      ["x", null],
+      ["plain", null],
+    ];
+    const layout = drawn({ people, unions }, "x", { open: "?:partner u0" });
+    const partnerOf = (child: string): string | undefined => linksTo(layout, child)[0]?.parents[1];
+    expect(["a", "b", "c", "plain", "odd", "others"].map(partnerOf)).toEqual([
+      "?:partner u0",
+      "?:partner u1",
+      "?:partner u1",
+      "?:partner u0",
+      "?:partner u0",
+      undefined,
+    ]);
+  });
+
+  it("parents told by one union stand together, whoever else is a partner", () => {
+    const people = [
+      "m",
+      "f1",
+      "f2",
+      {
+        id: "x",
+        parents: [
+          { parent: "m", union: "u1", main: false },
+          { parent: "f1", main: false },
+          { parent: "f2", union: "u1", main: false },
+        ],
+      },
+    ];
+    const unions: [string, string][] = [
+      ["m", "f1"],
+      ["m", "f2"],
+    ];
+    const layout = drawn({ people, unions }, "x");
+    const families = linksTo(layout, "x").map(({ parents, family }) => [parents[0], family]);
+    const of = Object.fromEntries(families) as Record<string, string>;
+    expect(of["p:m"]).toBe(of["p:f2"]);
+    expect(of["p:m"]).not.toBe(of["p:f1"]);
   });
 
   it("adoptive, guardian and second parents stand next to the blood ones", () => {
@@ -370,6 +423,63 @@ describe("a hard case around a person", () => {
       ["f", "other"],
     ];
     drawn({ people, unions }, "x", { siblings: true });
+  });
+
+  it("children of a guardian are marked, those of a rejected version are no siblings", () => {
+    const people = [
+      "guardian",
+      "rejected",
+      {
+        id: "x",
+        parents: [
+          { parent: "guardian", kind: "guardianship" as const },
+          { parent: "rejected", main: false },
+        ],
+      },
+      { id: "theirs", parents: ["guardian"] },
+      { id: "stranger", parents: ["rejected"] },
+    ];
+    const layout = drawn({ people }, "x", { siblings: true });
+    expect(layout.siblings).toEqual([
+      {
+        person: "theirs",
+        shared: [{ parent: "guardian", own: "guardianship", theirs: "blood" }],
+      },
+    ]);
+    expect(layout.cards.some(({ person }) => person === "stranger")).toBe(false);
+  });
+
+  it("the certainty of one parent is not that of the other", () => {
+    const people = [
+      "m",
+      "f",
+      {
+        id: "x",
+        parents: [
+          { parent: "m", certainty: "confirmed" as const },
+          { parent: null, certainty: "unresolved" as const },
+        ],
+      },
+      {
+        id: "y",
+        parents: [
+          { parent: "m", certainty: "confirmed" as const },
+          { parent: "f", certainty: "contradiction" as const },
+        ],
+      },
+    ];
+    const alone = drawn({ people }, "x");
+    expect(linksTo(alone, "x").map(({ ties }) => ties[0]?.certainty)).toEqual([
+      "confirmed",
+      "unresolved",
+    ]);
+    const couple = drawn({ people, unions: [["m", "f"]] }, "m");
+    const [line] = linksTo(couple, "y");
+    expect(line?.ties).toEqual([
+      { parent: "p:m", certainty: "confirmed" },
+      { parent: "p:f", certainty: "contradiction" },
+    ]);
+    expect(line?.certainty).toBe("contradiction");
   });
 
   it("people who are their own ancestors", () => {

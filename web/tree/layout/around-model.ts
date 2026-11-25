@@ -1,5 +1,5 @@
 import type { TreeSnapshot } from "../../../src/shared/tree";
-import { isOfLine, type Kin, kinOf, type ParentSet } from "./kin";
+import { isOfLine, type Kin, kinOf, leastSure, type ParentSet, type Sibling } from "./kin";
 import {
   type ParentageLink,
   personKey,
@@ -17,7 +17,7 @@ export type Model = {
   open: string | null;
   siblings: { older: Entry[]; younger: Entry[] };
   /** Everybody who shares a parent with the person, drawn or not. */
-  siblingIds: string[];
+  kinSiblings: Sibling[];
   up: UpNode[];
   families: Family[];
   /** Kin who hang on somebody standing on the other side, for example on a wife who is a grandchild. */
@@ -114,7 +114,7 @@ class Builder {
     }
     const open = partners.length < 3 ? null : this.#chooseOpen(partners);
     const { up, strayUp } = this.#climb();
-    const { siblings, siblingIds } = this.#enterSiblings();
+    const { siblings, kinSiblings } = this.#enterSiblings();
     const top: DownNode = { cards: [focus, ...partners], families: [] };
     const strayDown = this.#descend(top, open);
     this.#addSecondLines();
@@ -123,7 +123,7 @@ class Builder {
       partners,
       open,
       siblings,
-      siblingIds,
+      kinSiblings,
       up,
       families: top.families,
       strayUp,
@@ -208,24 +208,42 @@ class Builder {
   #partnerOf(set: ParentSet, cards: Entry[], person = this.#focus): string | undefined {
     const other = set.known.find((id) => id !== person);
     if (other !== undefined) return cards.find((card) => card.person === other)?.key;
-    if (set.unknown.length === 0) return undefined;
-    return cards.find(({ unknown }) => unknown?.of === "partner")?.key;
+    const strangers = cards.filter(({ unknown }) => unknown?.of === "partner");
+    const named = strangers.find(({ unknown }) =>
+      set.members.some(({ union }) => unknown?.of === "partner" && union === unknown.union),
+    );
+    return (named ?? (set.unknown.length === 0 ? undefined : strangers[0]))?.key;
   }
 
   #link(set: ParentSet, link: Pick<ModelLink, "parents" | "from" | "tree"> & Partial<ModelLink>) {
-    const { kind, main, certainty } = set;
+    const { kind, main } = set;
     const child = personKey(set.child);
+    const ties = link.parents.flatMap((parent) => this.#tieOf(set, parent));
     this.#links.push({
       type: "parentage",
       child,
       kind,
       main,
-      certainty,
+      ties,
+      certainty: leastSure(ties.map(({ certainty }) => certainty)),
       family: familyOf(link.parents),
       direct: isOfLine(set) && this.#line.has(set.child),
       ...link,
     });
     for (const parent of link.parents) this.#linked.add(`${parent} ${child}`);
+  }
+
+  /** What is known of one parent by itself. */
+  #tieOf({ members }: ParentSet, parent: string): ParentageLink["ties"] {
+    const entry = this.#entries.get(parent);
+    const unknown = entry?.unknown;
+    const own = members.filter((member) =>
+      unknown?.of === "parent"
+        ? unknown.parentages.includes(member.id) && member.parent === null
+        : member.parent === (entry?.person ?? null),
+    );
+    if (own.length === 0) return [];
+    return [{ parent, certainty: leastSure(own.map(({ certainty }) => certainty)) }];
   }
 
   /** Ancestors, generation by generation: everybody stands as near as they can. */
@@ -301,13 +319,14 @@ class Builder {
         const entry = this.#enterPlace({ reference }, `parents ${child} ${parent}`, generation);
         nodes.push(this.#upNode(entry));
         const parents = people.map(personKey);
+        const ties = parents.flatMap((key) => this.#tieOf(set, key));
         links.push({ parents, parentsAt: entry.key });
         this.#references.push({
           type: "reference",
           reference: entry.key,
           to: parents,
           family: entry.key,
-          certainty: set.certainty,
+          certainty: leastSure(ties.map(({ certainty }) => certainty)),
           direct: false,
         });
         continue;
@@ -329,21 +348,18 @@ class Builder {
     return nodes;
   }
 
-  #enterSiblings(): Pick<Model, "siblings" | "siblingIds"> {
+  #enterSiblings(): Pick<Model, "siblings" | "kinSiblings"> {
     const siblings: Model["siblings"] = { older: [], younger: [] };
-    if (this.#reach.up < 1) return { siblings, siblingIds: [] };
-    const parents = this.#kin.sets(this.#focus).flatMap(({ known }) => known);
-    const ids = new Set(parents.flatMap((id) => this.#kin.children(id).map(({ child }) => child)));
-    ids.delete(this.#focus);
-    const siblingIds = [...ids].sort(this.#kin.byBirth);
-    if (!this.#reach.siblings) return { siblings, siblingIds };
-    for (const id of siblingIds) {
+    if (this.#reach.up < 1) return { siblings, kinSiblings: [] };
+    const kinSiblings = this.#kin.siblings(this.#focus);
+    if (!this.#reach.siblings) return { siblings, kinSiblings };
+    for (const { person: id } of kinSiblings) {
       if (this.#has(id)) continue;
       const isOlder = this.#kin.byBirth(id, this.#focus) < 0;
       siblings[isOlder ? "older" : "younger"].push(this.#enter(id, "sibling", 0));
       this.#linkToParents(id, (parent) => this.#entries.get(parent)?.generation === -1);
     }
-    return { siblings, siblingIds };
+    return { siblings, kinSiblings };
   }
 
   /** Lines from every parent who is drawn and has none yet. */
@@ -423,7 +439,7 @@ class Builder {
     const parents = partner === undefined ? [own] : [own, partner];
     const couple = this.#couples.get(familyOf(parents));
     const from = partner === undefined || couple === undefined ? [own] : couple.from;
-    let family = node.families.find((found) => found.from.join(" ") === from.join(" "));
+    let family = node.families.find((found) => familyOf(found.from) === familyOf(from));
     if (family === undefined) node.families.push((family = { from, children: [] }));
     family.children.push(child);
     this.#link(set, { parents, from, tree: true });

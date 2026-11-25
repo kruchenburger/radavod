@@ -9,16 +9,25 @@ export type MapRequest = {
   headWidths: [branch: string, width: number][];
 } & Pick<MapOptions, "lineOf" | "perRow" | "width">;
 
-/** One map for every level, with the same pages in a row on all of them. */
-export function answer({ snapshot, levels, headWidths, ...options }: MapRequest): BranchMap[] {
+/**
+ * One map for every level. The first level decides how many pages stand in a row, within `width`
+ * if there is one, and the others follow it.
+ */
+export function answer({
+  snapshot,
+  levels,
+  headWidths,
+  lineOf = null,
+  ...first
+}: MapRequest): BranchMap[] {
   const widths = new Map(headWidths);
   const maps: BranchMap[] = [];
   for (const level of levels) {
-    const perRow = maps[0]?.perRow ?? options.perRow;
+    const perRow = maps[0]?.perRow;
     maps.push(
       branchMap(snapshot, {
-        ...options,
-        ...(perRow === undefined ? {} : { perRow }),
+        ...(perRow === undefined ? first : { perRow }),
+        lineOf,
         level,
         headOf: ({ id }) => id,
         measure: (id) => widths.get(id) ?? 0,

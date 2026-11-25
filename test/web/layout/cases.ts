@@ -197,6 +197,9 @@ export const cases: Record<string, FamilySpec> = {
     people: ["x", "x", { id: "y", parents: ["x"] }, { id: "y", parents: ["y"] }],
     unions: [["x", "y"]],
   },
+  "one id for two parentages": {
+    people: [{ id: "x", parents: [null, { id: "x-0", parent: null, main: false }] }],
+  },
   "ids that look like something else": {
     people: ["__proto__", "p:a", "a", "?:parent a", { id: "x", parents: ["__proto__", "p:a"] }],
     unions: [["__proto__", "p:a"]],

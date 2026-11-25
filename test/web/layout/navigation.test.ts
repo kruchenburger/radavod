@@ -6,6 +6,7 @@ import { branchMap } from "../../../web/tree/layout/branch-map";
 import { cardIndex } from "../../../web/tree/layout/hit";
 import { type Arrow, aroundKeys, listKeys, mapKeys, pageKeys } from "../../../web/tree/layout/keys";
 import { peopleByPage, relativesOf } from "../../../web/tree/layout/relatives";
+import { unreachable } from "./reach";
 import { type FamilySpec, familyOf, measure, wordingOf } from "./family";
 
 const family: FamilySpec = {
@@ -107,20 +108,23 @@ describe("the keyboard on the map", () => {
     const example = snapshotOf(generateFamily(1, 300));
     const all = branchMap(example, { level: "near", measure, headOf: ({ title }) => title.ru });
     const step = mapKeys(all);
-    for (const page of all.pages.keys()) {
-      const people = all.cards.filter((card) => card.page === page && card.person !== null);
-      const seen = new Set([people[0]?.key ?? ""]);
-      for (const key of seen) {
-        for (const arrow of ["up", "down", "left", "right"] as const) {
-          const next = step(key, arrow, null);
-          if (next !== null) seen.add(next);
-        }
-      }
-      const rows = new Set(people.map(({ row }) => row));
-      const found = new Set(people.filter(({ key }) => seen.has(key)).map(({ row }) => row));
-      // Every row can be walked whole, so reaching a row reaches its people.
-      expect(found.size).toBe(rows.size);
-    }
+    expect(unreachable(all.cards, step)).toEqual([]);
+  });
+
+  it("loses nobody when a family goes to another page and comes back", () => {
+    const people = [
+      { id: "G", branch: "A" },
+      { id: "P", branch: "B", parents: ["G"] },
+      { id: "Y", branch: "B", parents: ["P"] },
+      { id: "X", branch: "A", parents: ["P"] },
+      { id: "below", branch: "A", parents: ["X"] },
+    ];
+    const lost = branchMap(familyOf({ people, branches: ["A", "B"] }), {
+      level: "near",
+      measure,
+      headOf: ({ title }) => title.ru,
+    });
+    expect(unreachable(lost.cards, mapKeys(lost))).toEqual([]);
   });
 
   it("knows nothing of strangers", () => {
@@ -165,6 +169,14 @@ describe("the keyboard around a person", () => {
     expect(go("gf", "left")).toBeNull();
   });
 
+  it("loses nobody, a column of one reference neither", () => {
+    const example = snapshotOf(generateFamily(1, 300));
+    for (const { id } of example.people) {
+      const layout = around(example, id, { measure, wording: wordingOf(example) });
+      expect(unreachable(layout.cards, aroundKeys(layout))).toEqual([]);
+    }
+  });
+
   it("goes through a list one by one", () => {
     const step = listKeys(["a", "b"]);
     expect([step("a", "down"), step("b", "up"), step("b", "down"), step("a", "left")]).toEqual([
@@ -184,16 +196,24 @@ describe("the list of relatives", () => {
         { person: "m", kind: "blood", main: true, certainty: "confirmed" },
       ],
       siblings: [
-        { person: "older", shared: ["f", "m"] },
-        { person: "half", shared: ["f"] },
+        {
+          person: "older",
+          shared: [
+            { parent: "f", own: "blood", theirs: "blood" },
+            { parent: "m", own: "blood", theirs: "blood" },
+          ],
+        },
+        { person: "half", shared: [{ parent: "f", own: "blood", theirs: "blood" }] },
       ],
       unions: [
         {
           union: "u3",
           partner: "wife",
+          kind: "marriage",
+          certainty: "confirmed",
           children: [{ person: "son", kind: "blood", main: true, certainty: "confirmed" }],
         },
-        { union: "u4", partner: null, children: [] },
+        { union: "u4", partner: null, kind: "marriage", certainty: "confirmed", children: [] },
       ],
       otherChildren: [{ person: "ward", kind: "guardianship", main: true, certainty: "confirmed" }],
     });
@@ -205,6 +225,133 @@ describe("the list of relatives", () => {
     expect(told?.parents.map(({ person }) => person)).toEqual(["m", null]);
     expect(told?.unions).toMatchObject([
       { union: null, partner: "m", children: [{ person: "y" }] },
+    ]);
+  });
+
+  it("tells the certainty of every parent and child apart", () => {
+    const people = [
+      "m",
+      {
+        id: "x",
+        parents: [
+          { parent: "m", certainty: "confirmed" as const },
+          { parent: null, certainty: "unresolved" as const },
+        ],
+      },
+    ];
+    const told = familyOf({ people });
+    expect(relativesOf(told, "x")?.parents.map(({ certainty }) => certainty)).toEqual([
+      "confirmed",
+      "unresolved",
+    ]);
+    expect(relativesOf(told, "m")?.otherChildren).toMatchObject([{ certainty: "confirmed" }]);
+  });
+
+  it("finds the other parent over all kinds of parentage", () => {
+    const step = { parent: "step", kind: "adoption" as const };
+    const guardian = { parent: "guardian", kind: "guardianship" as const };
+    const rival = { parent: "rival", main: false };
+    const people = [
+      "m",
+      "step",
+      "guardian",
+      "rival",
+      { id: "wed", parents: ["m", step] },
+      { id: "unwed", parents: ["guardian", step] },
+      { id: "ward", parents: ["m", guardian] },
+      { id: "disputed", parents: ["m", rival] },
+    ];
+    const told = familyOf({ people, unions: [["m", "step"]] });
+    const family = (person: string) => {
+      const { unions = [], otherChildren = [] } = relativesOf(told, person) ?? {};
+      return {
+        unions: unions.map(({ partner, children }) => [partner, children.map((c) => c.person)]),
+        others: otherChildren.map((c) => c.person),
+      };
+    };
+    expect(family("m")).toEqual({
+      unions: [["step", ["wed"]]],
+      others: ["ward", "disputed"],
+    });
+    expect(family("step")).toEqual({
+      unions: [
+        ["m", ["wed"]],
+        ["guardian", ["unwed"]],
+      ],
+      others: [],
+    });
+    // A guardian brings up a child of somebody else.
+    expect(family("guardian").others).toEqual(["ward"]);
+    expect(family("rival")).toEqual({ unions: [["m", ["disputed"]]], others: [] });
+  });
+
+  it("names every union of the same two, with its own children", () => {
+    const people = [
+      "a",
+      "b",
+      { id: "first", born: 1, parents: ["a", "b"] },
+      { id: "second", born: 9, parents: [{ parent: "a", union: "u1" }, "b"] },
+    ];
+    const told = familyOf({
+      people,
+      unions: [
+        ["a", "b"],
+        ["b", "a"],
+      ],
+    });
+    Object.assign(told.unions[1] ?? {}, { kind: "civil", certainty: "hypothesis" });
+    expect(relativesOf(told, "a")?.unions).toMatchObject([
+      { union: "u0", partner: "b", kind: "marriage", children: [{ person: "first" }] },
+      {
+        union: "u1",
+        partner: "b",
+        kind: "civil",
+        certainty: "hypothesis",
+        children: [{ person: "second" }],
+      },
+    ]);
+  });
+
+  it("gives children to the right one of two unknown partners", () => {
+    const people = [
+      "a",
+      { id: "x", parents: [{ parent: "a", union: "u1" }, null] },
+      { id: "y", parents: [{ parent: "a", union: "gone" }, null] },
+    ];
+    const told = familyOf({
+      people,
+      unions: [
+        ["a", null],
+        ["a", null],
+      ],
+    });
+    expect(
+      relativesOf(told, "a")?.unions.map(({ children }) => children.map(({ person }) => person)),
+    ).toEqual([["y"], ["x"]]);
+  });
+
+  it("marks a sibling by guardianship and leaves out those of a rejected version", () => {
+    const people = [
+      "m",
+      "guardian",
+      "rejected",
+      {
+        id: "x",
+        parents: [
+          "m",
+          { parent: "guardian", kind: "guardianship" as const },
+          { parent: "rejected", main: false },
+        ],
+      },
+      { id: "child-of-guardian", parents: ["guardian"] },
+      { id: "child-of-rejected", parents: ["rejected"] },
+      { id: "doubtful", parents: [{ parent: "m", main: false }] },
+    ];
+    expect(relativesOf(familyOf({ people }), "x")?.siblings).toEqual([
+      {
+        person: "child-of-guardian",
+        shared: [{ parent: "guardian", own: "guardianship", theirs: "blood" }],
+      },
     ]);
   });
 

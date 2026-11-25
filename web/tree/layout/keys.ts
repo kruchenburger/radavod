@@ -9,18 +9,17 @@ export type Arrow = "up" | "down" | "left" | "right";
 export type Move = (key: string, arrow: Arrow, cameFrom: string | null) => string | null;
 
 /**
- * Up to a parent, down to a child, left and right along the row of the page. Kin on the same page
- * come before kin on another, so that the arrows alone walk the whole page.
+ * Up to a parent, down to a child, left and right along the row of the page. At the end of a row
+ * the walk goes on in the next one, and then on the next page, so left and right alone come to
+ * everybody, wherever kinship leads.
  */
 export function mapKeys({ cards, links }: BranchMap): Move {
   const pages = new Map(cards.map(({ key, page }) => [key, page]));
   const kin = kinMoves(cards, links, (a, b) => pages.get(a) === pages.get(b));
-  const rows = new Map<string, BranchMap["cards"]>();
-  for (const card of cards) {
-    if (card.person !== null) listOf(rows, `${card.page} ${card.row}`).push(card);
-  }
-  for (const row of rows.values()) row.sort((a, b) => a.x - b.x || a.y - b.y);
-  const along = neighbors([...rows.values()].map((row) => row.map(({ key }) => key)));
+  const walk = cards
+    .filter(({ person }) => person !== null)
+    .sort((a, b) => a.page - b.page || a.row - b.row || a.x - b.x || a.y - b.y);
+  const along = neighbors(walk.map(({ key }) => key));
   return (key, arrow, cameFrom) => {
     if (arrow === "up") return kin.parent(key);
     if (arrow === "down") return kin.child(key, cameFrom);
@@ -28,13 +27,11 @@ export function mapKeys({ cards, links }: BranchMap): Move {
   };
 }
 
-/** Left to a parent, right to a child, up and down the column. */
+/** Left to a parent, right to a child, up and down the column and on into the next one. */
 export function aroundKeys({ cards, links }: AroundLayout): Move {
   const kin = kinMoves(cards, links);
-  const columns = new Map<number, AroundLayout["cards"]>();
-  for (const card of cards) listOf(columns, card.generation).push(card);
-  for (const column of columns.values()) column.sort((a, b) => a.y - b.y);
-  const along = neighbors([...columns.values()].map((column) => column.map(({ key }) => key)));
+  const walk = [...cards].sort((a, b) => a.generation - b.generation || a.y - b.y);
+  const along = neighbors(walk.map(({ key }) => key));
   return (key, arrow, cameFrom) => {
     if (arrow === "left") return kin.parent(key);
     if (arrow === "right") return kin.child(key, cameFrom);
@@ -44,7 +41,7 @@ export function aroundKeys({ cards, links }: AroundLayout): Move {
 
 /** Up and down a list. */
 export function listKeys(order: string[]): (key: string, arrow: Arrow) => string | null {
-  const along = neighbors([order]);
+  const along = neighbors(order);
   return (key, arrow) => {
     if (arrow === "up") return along(key, -1);
     return arrow === "down" ? along(key, 1) : null;
@@ -93,11 +90,10 @@ function kinMoves(
   };
 }
 
-function neighbors(tracks: string[][]): (key: string, by: 1 | -1) => string | null {
-  const places = new Map<string, { track: string[]; at: number }>();
-  for (const track of tracks) track.forEach((key, at) => places.set(key, { track, at }));
+function neighbors(order: string[]): (key: string, by: 1 | -1) => string | null {
+  const places = new Map(order.map((key, at) => [key, at]));
   return (key, by) => {
-    const place = places.get(key);
-    return place?.track[place.at + by] ?? null;
+    const at = places.get(key);
+    return at === undefined ? null : (order[at + by] ?? null);
   };
 }

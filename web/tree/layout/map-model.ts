@@ -1,5 +1,5 @@
 import type { TreeSnapshot } from "../../../src/shared/tree";
-import { isOfLine, type Kin, kinOf, listOf, type ParentSet } from "./kin";
+import { isOfLine, type Kin, kinOf, leastSure, listOf, type ParentSet } from "./kin";
 import { type ParentageLink, personKey, type Reference, type UnionLink } from "./types";
 
 /** What stands on which page and how it hangs together, the same for every level of detail. */
@@ -114,8 +114,8 @@ class MapBuilder {
 
   /** A couple stands together unless one of the two already stands with somebody as a partner. */
   #joinCouples(): void {
-    for (const { a, b } of this.#kin.couples) {
-      const [first, second] = this.#byPrecedence(a, b);
+    for (const { union, a, b } of this.#kin.couples) {
+      const [first, second] = this.#byPrecedence(a, b, union.branch);
       for (const [head, spouse] of [
         [first, second],
         [second, first],
@@ -133,11 +133,13 @@ class MapBuilder {
   }
 
   /** The one whose branch gives the couple its page comes first. */
-  #byPrecedence(a: string, b: string): [string, string] {
+  #byPrecedence(a: string, b: string, given: string | null): [string, string] {
     const weight = (id: string): number => {
       const person = this.#kin.person(id);
-      const hasPage = person?.branch != null && this.#pages.includes(person.branch);
-      return (hasPage ? 2 : 0) + (person?.sex === "male" ? 1 : 0);
+      const branch = person?.branch ?? null;
+      const hasPage = branch !== null && this.#pages.includes(branch);
+      const isGiven = hasPage && branch === given;
+      return (isGiven ? 4 : 0) + (hasPage ? 2 : 0) + (person?.sex === "male" ? 1 : 0);
     };
     return weight(b) > weight(a) ? [b, a] : [a, b];
   }
@@ -148,16 +150,23 @@ class MapBuilder {
     return isParent(a, b) || isParent(b, a);
   }
 
-  /** The page of the branch; without one, the page of the nearest kin. */
+  /** The page the couple was given, else that of the branch, else that of the nearest kin. */
   #findHomes(): void {
     const pageOf = new Map(this.#pages.map((branch, i) => [branch, i]));
     const queue: Unit[] = [];
     for (const unit of this.#units) {
-      for (const id of [unit.head, ...unit.spouses]) {
-        const page = pageOf.get(this.#kin.person(id)?.branch ?? null);
-        if (page === undefined || unit.home >= 0) continue;
+      const { head, spouses } = unit;
+      const given = this.#kin
+        .unions(head)
+        .filter(({ other }) => other === null || spouses.includes(other))
+        .flatMap(({ all }) => all.map(({ branch }) => branch));
+      const own = [head, ...spouses].map((id) => this.#kin.person(id)?.branch ?? null);
+      for (const branch of [...given, ...own]) {
+        const page = branch === null ? undefined : pageOf.get(branch);
+        if (page === undefined) continue;
         unit.home = page;
         queue.push(unit);
+        break;
       }
     }
     for (const unit of queue) {
@@ -443,13 +452,17 @@ class MapBuilder {
           to = { node: enter(childUnit, node, node.generation + 1), row: 0 };
           node.children.push(to.node);
         }
+        const ties = set.members.flatMap(({ parent, certainty }) =>
+          parent === null ? [] : [{ parent: personKey(parent), certainty }],
+        );
         const link: MapLink = {
           type: "parentage",
           parents: keys,
           child: personKey(child),
           kind: set.kind,
           main: set.main,
-          certainty: set.certainty,
+          ties,
+          certainty: leastSure(ties.map(({ certainty }) => certainty)),
           family: name,
           tree: isHere,
           direct: isOfLine(set) && this.#line.has(child),

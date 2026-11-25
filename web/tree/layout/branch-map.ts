@@ -8,8 +8,10 @@ export type MapLevel = "far" | "closer" | "near";
 
 /** Sizes of the map, those of docs/design.md. Widths are whole numbers of steps. */
 export type MapMetrics = {
-  /** Lines in one gap or gutter are this far apart. */
+  /** Lines in one gap between rows are this far apart, and places on the sides of cards. */
   step: number;
+  /** Lines between pages are this far apart, in the gutters and where they come in. */
+  apart: number;
   /** The width and the height of one person. */
   w: number;
   line: number;
@@ -27,6 +29,7 @@ export type MapMetrics = {
 export const mapMetrics: Record<MapLevel, MapMetrics> = {
   far: {
     step: 3,
+    apart: 6,
     w: 36,
     line: 9,
     axis: 9,
@@ -39,6 +42,7 @@ export const mapMetrics: Record<MapLevel, MapMetrics> = {
   },
   closer: {
     step: 6,
+    apart: 6,
     w: 138,
     line: 19,
     axis: 24,
@@ -51,6 +55,7 @@ export const mapMetrics: Record<MapLevel, MapMetrics> = {
   },
   near: {
     step: 8,
+    apart: 8,
     w: 184,
     line: 42,
     axis: 24,
@@ -66,6 +71,7 @@ export const mapMetrics: Record<MapLevel, MapMetrics> = {
 /** From far, when there are more branches than inks. */
 const farMetrics: MapMetrics = {
   step: 3,
+  apart: 6,
   w: 24,
   line: 8,
   axis: 6,

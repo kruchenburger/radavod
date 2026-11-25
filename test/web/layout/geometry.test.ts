@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import type { Card, Line, Link, ParentageLink } from "../../../web/tree/layout/types";
+import type { Card, Line, Link, ParentageLink, UnionLink } from "../../../web/tree/layout/types";
 import { familyOf, measure } from "./family";
 import { check, type Drawing, type Findings, problems, type Rules } from "./geometry";
 
@@ -27,8 +27,11 @@ const card = (id: string, x: number, y: number): Card => ({
   h: 40,
 });
 
-const parentage = (link: Partial<ParentageLink> & Pick<ParentageLink, "parents" | "child">) => ({
+const parentage = (
+  link: Partial<ParentageLink> & Pick<ParentageLink, "parents" | "child">,
+): ParentageLink => ({
   type: "parentage" as const,
+  ties: link.parents.map((parent) => ({ parent, certainty: "confirmed" as const })),
   family: link.parents.join(),
   certainty: "confirmed" as const,
   direct: false,
@@ -104,6 +107,8 @@ const rules = (lines: Line[]): Rules => ({
   children: "x",
   lines: () => lines,
   measure,
+  line: new Set(),
+  spacing: { least: 6, outside: [] },
 });
 
 const at = <T>(list: T[], i: number): T => list[i] as T;
@@ -223,6 +228,48 @@ const defects: Record<string, [keyof Findings, (d: ReturnType<typeof drawing>) =
       (at(d.links, 3) as ParentageLink).childAt = "p:aunt";
     },
   ],
+  "a kind of kinship nobody told": [
+    "mistold",
+    (d) => ((at(d.links, 1) as ParentageLink).kind = "adoption"),
+  ],
+  "a version drawn as the main one": [
+    "mistold",
+    (d) => ((at(d.links, 1) as ParentageLink).main = false),
+  ],
+  "a certainty of somebody else": [
+    "mistold",
+    (d) => {
+      const [, tie] = (at(d.links, 1) as ParentageLink).ties;
+      if (tie !== undefined) tie.certainty = "hypothesis";
+      at(d.links, 1).certainty = "hypothesis";
+    },
+  ],
+  "a line surer than its kinship": ["mistold", (d) => (at(d.links, 1).certainty = "hypothesis")],
+  "a tie left out": ["mistold", (d) => void (at(d.links, 1) as ParentageLink).ties.pop()],
+  "a tie to somebody else": [
+    "mistold",
+    (d) =>
+      void (at(d.links, 1) as ParentageLink).ties.push({
+        parent: "p:aunt",
+        certainty: "confirmed",
+      }),
+  ],
+  "a line off the direct line": ["mistold", (d) => (at(d.links, 1).direct = true)],
+  "a name off the direct line": ["mistold", (d) => (at(d.cards, 4).direct = true)],
+  "a kind of union nobody told": ["mistold", (d) => ((at(d.links, 0) as UnionLink).kind = "civil")],
+  "lines too near one another": [
+    "crowded",
+    (d) => {
+      at(d.links, 3).points = [
+        [450, 40],
+        [450, 74],
+        [250, 74],
+        [250, 80],
+        [450, 80],
+        [450, 100],
+      ];
+    },
+  ],
   "a card without a place": ["badNumbers", (d) => (at(d.cards, 5).x = Number.NaN)],
   "a card past the edge": ["outside", (d) => (d.width = 480)],
 };
@@ -239,4 +286,19 @@ describe("the checker", () => {
     const { lines, ...bad } = spoiled;
     expect(check(bad, rules(lines))[finding]).not.toEqual([]);
   });
+});
+
+it("lets lines run near one another inside of a page", () => {
+  const { lines, ...good } = drawing();
+  const own = rules(lines);
+  at(good.links, 3).points = [
+    [450, 40],
+    [450, 74],
+    [250, 74],
+    [250, 80],
+    [450, 80],
+    [450, 100],
+  ];
+  const page = { x: 0, y: 0, w: 500, h: 140 };
+  expect(check(good, { ...own, spacing: { least: 6, outside: [page] } }).crowded).toEqual([]);
 });

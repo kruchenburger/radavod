@@ -8,7 +8,7 @@ import {
   type NarrowOptions,
 } from "../../../web/tree/layout/around-narrow";
 import { cases } from "./cases";
-import { expectedAround } from "./expected";
+import { expectedAround, lineAround } from "./expected";
 import { type FamilySpec, familyOf, measure, wordingOf } from "./family";
 import { problems } from "./geometry";
 
@@ -25,6 +25,7 @@ function drawn(
     snapshot,
     people: expectedAround(snapshot, focus, { ...more, open: layout.open }),
     children: "y",
+    line: lineAround(snapshot, focus, more.lineOf),
     lines: ({ key }) => byKey.get(key)?.lines ?? [],
     measure,
     isList: true,
@@ -92,7 +93,7 @@ describe("around a person on a phone", () => {
     const layout = drawn(family, "x", { siblings: true });
     const told = layout.order.map((key) => key.slice(2));
     expect(told.slice(0, 7)).toEqual("gf gm f m older half x".split(" "));
-    expect(layout.siblings).toEqual(["older", "half"]);
+    expect(layout.siblings.map(({ person }) => person)).toEqual(["older", "half"]);
   });
 
   it("puts years and branch beside a short name and under a long one", () => {

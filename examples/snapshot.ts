@@ -1,11 +1,20 @@
-import type { TreeNameForm, TreePerson, TreeSnapshot, TreeYear } from "../src/shared/tree.ts";
-import type { ExampleFamily, FuzzyDate, NameForm, PartialDate } from "./family.ts";
+import type {
+  TreeNameForm,
+  TreePerson,
+  TreeSample,
+  TreeSnapshot,
+  TreeYear,
+} from "../src/shared/tree.ts";
+import type { ExampleFamily, FuzzyDate, NameForm, Parentage, PartialDate } from "./family.ts";
 
 /** The invented family as the browser will get a real one. */
 export function snapshotOf(family: ExampleFamily): TreeSnapshot {
   const parents = new Map<string, TreePerson["parents"]>();
-  for (const { child, ...parentage } of family.parentages) {
-    parents.set(child, [...(parents.get(child) ?? []), parentage]);
+  const unionOf = unionsOf(family);
+  for (const link of family.parentages) {
+    const { child, ...parentage } = link;
+    const parent = { ...parentage, union: unionOf(link) };
+    parents.set(child, [...(parents.get(child) ?? []), parent]);
   }
   const dates = new Map<string, TreeYear | null>();
   const places = new Map<string, string>();
@@ -41,6 +50,7 @@ export function snapshotOf(family: ExampleFamily): TreeSnapshot {
       kind,
       partners: [first, second],
       began: began.get(id) ?? null,
+      branch: null,
       certainty,
     })),
     branches: family.branches.map(({ id, name, color }) => ({
@@ -55,6 +65,28 @@ export function snapshotOf(family: ExampleFamily): TreeSnapshot {
   };
 }
 
+/** Finds the union of the parent of a child with the other parent of the same kind. */
+function unionsOf({ parentages, unions }: ExampleFamily) {
+  const groupOf = ({ child, kind, main }: Parentage): string => `${child} ${kind} ${main}`;
+  const parents = new Map<string, string[]>();
+  for (const link of parentages) {
+    if (link.parent === null) continue;
+    parents.set(groupOf(link), [...(parents.get(groupOf(link)) ?? []), link.parent]);
+  }
+  const ids = new Map(unions.map(({ id, partners }) => [[...partners].sort().join(" "), id]));
+  return (link: Parentage): string | null =>
+    link.parent === null
+      ? null
+      : (ids.get([...(parents.get(groupOf(link)) ?? [])].sort().join(" ")) ?? null);
+}
+
+/** The family with the person to begin with: one of the couple where all branches meet. */
+export function sampleOf(family: ExampleFamily): TreeSample {
+  const last = family.unions.find(({ id }) => id === family.lastCouple);
+  if (last === undefined) throw new Error("no last couple");
+  return { snapshot: snapshotOf(family), start: last.partners[0] };
+}
+
 function formOf(form: NameForm): TreeNameForm {
   const { kind, language, script, given, patronymic, surname, certainty } = form;
   return { kind, language, script, given, patronymic, surname, certainty };
@@ -66,7 +98,7 @@ export function yearOf({ text, parsed }: FuzzyDate): TreeYear {
   return {
     text: to === null ? String(from.year) : `${from.year}–${to.year}`,
     qualifier,
-    sort: dayNumber(from, calendar),
+    sort: qualifier === "before" ? null : dayNumber(from, calendar),
   };
 }
 

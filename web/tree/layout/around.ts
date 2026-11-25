@@ -11,6 +11,7 @@ import {
 import { type AroundMetrics, aroundMetrics, textsOf } from "./around-text";
 import { drawLines, type Row, type Rows } from "./around-lines";
 import { extent } from "./extent";
+import type { Sibling } from "./kin";
 import type { Card, Layout, Line, Measure, Wording } from "./types";
 
 export type AroundOptions = Reach & {
@@ -35,7 +36,7 @@ export type AroundLayout = Omit<Layout, "cards"> & {
   focus: string | null;
   columns: { generation: number; x: number; w: number }[];
   /** Siblings by age, folded or not. */
-  siblings: string[];
+  siblings: Sibling[];
   /** The partner whose family is unfolded, when there are three and more. */
   open: string | null;
 };
@@ -72,7 +73,7 @@ export function around(
     width,
     height,
     focus: model.focus.key,
-    siblings: model.siblingIds,
+    siblings: model.kinSiblings,
     open: model.open,
     order: readingOrder(model),
   };

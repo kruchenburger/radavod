@@ -91,6 +91,11 @@ export type ParentageLink = LinkBase & {
   /** Keys of one parent, or of both when the line leaves the couple. */
   parents: string[];
   child: string;
+  /**
+   * What is known of each parent by itself. The line of a couple carries two ties, and its own
+   * `certainty` is that of the less sure one. A partner nobody told of as a parent has no tie.
+   */
+  ties: { parent: string; certainty: Certainty }[];
   /** The reference that stands here for the parents, or for the child. */
   parentsAt?: string;
   childAt?: string;

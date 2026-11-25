@@ -13,8 +13,9 @@ const { FakeWorker } = vi.hoisted(() => {
   class FakeWorker extends EventTarget {
     static last: FakeWorker;
     static handle: Handle;
-    isBroken = false;
+    static isMissing = false;
     isStopped = false;
+    isDead = false;
 
     constructor() {
       super();
@@ -24,13 +25,23 @@ const { FakeWorker } = vi.hoisted(() => {
     postMessage(data: unknown): void {
       const sent = structuredClone(data);
       queueMicrotask(() => {
-        if (this.isBroken) {
+        if (FakeWorker.isMissing) this.break();
+        if (this.isDead) return;
+        let reply: unknown;
+        try {
+          reply = structuredClone(FakeWorker.handle(sent as never));
+        } catch {
           this.dispatchEvent(new Event("error"));
           return;
         }
-        const reply = structuredClone(FakeWorker.handle(sent as never));
         this.dispatchEvent(new MessageEvent("message", { data: reply }));
       });
+    }
+
+    /** What a script that did not load does: one event, and silence after it. */
+    break(): void {
+      this.isDead = true;
+      this.dispatchEvent(new Event("error"));
     }
 
     terminate(): void {
@@ -64,6 +75,14 @@ describe("a map asked for as a message", () => {
     expect(new Set(maps.map(({ perRow }) => perRow)).size).toBe(1);
   });
 
+  it("has as many pages in a row on every level, within a width too", () => {
+    for (const levels of [request.levels, [...request.levels].reverse()]) {
+      const maps = answer({ ...request, levels, width: 1200 });
+      expect(new Set(maps.map(({ perRow }) => perRow)).size).toBe(1);
+      expect(maps[0]?.perRow).toBeLessThan(5);
+    }
+  });
+
   it("manages a branch whose head nobody measured", () => {
     expect(answer({ ...request, headWidths: [] })[0]?.pages).toHaveLength(11);
   });
@@ -91,8 +110,52 @@ describe("the layout in a worker", () => {
   });
 
   it("fails every waiting question when the worker breaks", async () => {
-    FakeWorker.last.isBroken = true;
-    await expect(layouter.layOut(request)).rejects.toThrow("layout-worker-failed");
+    const answered = [layouter.layOut(request), layouter.layOut(request)];
+    FakeWorker.last.break();
+    for (const one of answered) await expect(one).rejects.toThrow("layout-worker-failed");
+  });
+
+  it("starts again after a worker that broke between questions", async () => {
+    await layouter.layOut(request);
+    const broken = FakeWorker.last;
+    broken.break();
+    expect(await layouter.layOut(request)).toEqual(answer(request));
+    expect(FakeWorker.last).not.toBe(broken);
+    expect(broken.isStopped).toBe(true);
+  });
+
+  it("does not wait for a worker that never loads", async () => {
+    FakeWorker.isMissing = true;
+    for (let i = 0; i < 2; i += 1) {
+      await expect(layouter.layOut(request)).rejects.toThrow("layout-worker-failed");
+    }
+    FakeWorker.isMissing = false;
+    expect(await layouter.layOut(request)).toEqual(answer(request));
+  });
+
+  it("is not disturbed by a late error of a worker it left", async () => {
+    await layouter.layOut(request);
+    const broken = FakeWorker.last;
+    broken.break();
+    const answered = layouter.layOut(request);
+    broken.break();
+    expect(await answered).toEqual(answer(request));
+  });
+
+  it("fails one question it cannot answer and answers the rest", async () => {
+    const bad = { ...request, snapshot: null as never };
+    const [failed, fine] = await Promise.allSettled([
+      layouter.layOut(bad),
+      layouter.layOut(request),
+    ]);
+    expect(failed).toMatchObject({ status: "rejected", reason: { message: "layout-failed" } });
+    expect(fine.status).toBe("fulfilled");
+  });
+
+  it("fails a question that cannot be sent", async () => {
+    const bad = { ...request, levels: [() => "far"] as never };
+    await expect(layouter.layOut(bad)).rejects.toThrow();
+    expect(await layouter.layOut(request)).toEqual(answer(request));
   });
 
   it("fails waiting questions, and later ones, when it is stopped", async () => {

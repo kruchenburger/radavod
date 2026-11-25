@@ -109,6 +109,22 @@ describe("the partners of a person", () => {
     ).toEqual(["c", "b"]);
   });
 
+  it("stand by the earliest of their unions, and keep all of them", () => {
+    const snapshot = familyOf({
+      people: ["a", "b", "c"],
+      unions: [
+        ["a", "c"],
+        ["a", "b"],
+        ["b", "a"],
+      ],
+    });
+    [50, 90, 10].forEach((began, i) => Object.assign(snapshot.unions[i] ?? {}, { began }));
+    const unions = kinOf(snapshot).unions("a");
+    expect(unions.map(({ other }) => other)).toEqual(["b", "c"]);
+    expect(unions[0]?.all.map(({ id }) => id)).toEqual(["u2", "u1"]);
+    expect(kinOf(snapshot).couples).toHaveLength(2);
+  });
+
   it("may be unknown", () => {
     const snapshot = familyOf({ people: ["a"], unions: [["a", null]] });
     expect(

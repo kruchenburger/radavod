@@ -33,7 +33,10 @@ const yearSchema = z.object({
   text: z.string(),
   /** The interface turns it into words, for example "about". */
   qualifier: z.enum(["exact", "about", "before", "after", "between", "unread"]),
-  /** Gregorian day number of the earliest possible day. */
+  /**
+   * Gregorian day number of the earliest possible day. Null when there is none: an unread date, and
+   * a date only known to be before some other. Whoever has no day stands last.
+   */
   sort: z.int().nullable(),
 });
 
@@ -41,6 +44,8 @@ const parentageSchema = z.object({
   id,
   /** Null for a parent who is known to exist and nothing more. */
   parent: id.nullable(),
+  /** The union of the parent the child was born or taken into, when it is known. */
+  union: id.nullable(),
   kind: z.enum(["blood", "adoption", "guardianship", "unknown"]),
   /** False for a version that contradicts the main one. */
   main: z.boolean(),
@@ -56,6 +61,8 @@ const personSchema = z.object({
   otherNames: z.array(nameFormSchema),
   branch: id.nullable(),
   parents: z.array(parentageSchema),
+  /** Children in an order set by hand. The server will send it; nothing reads it yet. */
+  childOrder: z.array(id).optional(),
   /** The main version of the birth and of the death. */
   birth: yearSchema.nullable(),
   death: yearSchema.nullable(),
@@ -70,6 +77,8 @@ const unionSchema = z.object({
   partners: z.tuple([id, id.nullable()]),
   /** The day it began, counted like `sort` of a year. It orders the unions of a person. */
   began: z.int().nullable(),
+  /** The branch the couple was given, whatever branches the two belong to. */
+  branch: id.nullable(),
   certainty: certaintySchema,
 });
 
@@ -96,6 +105,14 @@ export const treeSnapshotSchema = z.object({
   places: z.array(placeSchema),
 });
 
+/** A tree to look at without a sign-in: the invented family as the app fetches it. */
+export const treeSampleSchema = z.object({
+  snapshot: treeSnapshotSchema,
+  /** Who stands in the centre first. The direct line is that of the same person. */
+  start: id,
+});
+
+export type TreeSample = z.infer<typeof treeSampleSchema>;
 export type TreeSnapshot = z.infer<typeof treeSnapshotSchema>;
 export type TreePerson = z.infer<typeof personSchema>;
 export type TreeParentage = z.infer<typeof parentageSchema>;

@@ -14,6 +14,8 @@ export type MapPlan = {
   /** By page: the gap over every row, and the one under the last. */
   gaps: number[][];
   tracks: Track[][];
+  /** Lanes of lines between pages, in a band of their own under the rest of the gap. */
+  bands: Track[][];
   /** Where the line of a node comes in, from the left edge of the contents. */
   entry: (node: MapNode) => number;
   wires: Wire[];
@@ -34,7 +36,9 @@ export function planLines(model: MapModel, placed: Placed, metrics: MapMetrics):
   const tracks = placed.pages.map(({ rowHeights }) =>
     Array.from({ length: rowHeights.length + 1 }, () => new Track()),
   );
+  const bands = tracks.map((page) => page.map(() => new Track()));
   const trackAt = (page: number, gap: number): Track => tracks[page]?.[gap] as Track;
+  const bandAt = (page: number, gap: number): Track => bands[page]?.[gap] as Track;
 
   // Verticals that come into a gap from above, by place.
   const fromAbove = new Map<string, string>();
@@ -128,13 +132,13 @@ export function planLines(model: MapModel, placed: Placed, metrics: MapMetrics):
   }
   for (const { crossing, from, to, isShort } of wires) {
     const { family } = crossing;
-    trackAt(from.node.page, from.gap).touch(family, from.x);
-    trackAt(to.node.page, to.gap).touch(family, to.x);
+    bandAt(from.node.page, from.gap).touch(family, from.x);
+    bandAt(to.node.page, to.gap).touch(family, to.x);
     if (isShort) continue;
     // Which side it leaves the page on is not known yet.
     for (const { node, gap } of [from, to]) {
-      trackAt(node.page, gap).touch(family, -far);
-      trackAt(node.page, gap).touch(family, far);
+      bandAt(node.page, gap).touch(family, -far);
+      bandAt(node.page, gap).touch(family, far);
     }
   }
   const gaps = tracks.map((page, i) =>
@@ -142,11 +146,18 @@ export function planLines(model: MapModel, placed: Placed, metrics: MapMetrics):
       const count = track.lay();
       const isInner = gap > 0 && gap < (placed.pages[i]?.rowHeights.length ?? 0);
       const least = isInner ? metrics.rows : metrics.padY;
-      return Math.max(least, count === 0 ? 0 : (count + 3) * step);
+      const own = Math.max(least, count === 0 ? 0 : (count + 2) * step);
+      return own + bandHeight(bandAt(i, gap).lay(), metrics);
     }),
   );
-  return { gaps, tracks, entry: (node) => entries.get(node) ?? 0, wires };
+  return { gaps, tracks, bands, entry: (node) => entries.get(node) ?? 0, wires };
 }
+
+/**
+ * Lanes of a band are two spaces apart, so that those of the page across the gutter fit between.
+ */
+const bandHeight = (count: number, { apart }: MapMetrics): number =>
+  count === 0 ? 0 : (2 * count + 1) * apart;
 
 type Spot = { node: MapNode; row: number };
 
@@ -185,7 +196,7 @@ export function drawMapLines(
     metrics,
   }: { placed: Placed; plan: MapPlan; sheets: Sheets; metrics: MapMetrics },
 ): { links: Link[]; grid: MapGrid } {
-  const { step, line, w } = metrics;
+  const { step, apart, line, w } = metrics;
   const { list, perRow } = sheets;
   const sheetOf = (node: MapNode): Sheet => list[node.page] as Sheet;
   const gapTop = (node: MapNode, gap: number): number => {
@@ -199,8 +210,16 @@ export function drawMapLines(
   const gutters = Array.from({ length: columns + 1 }, () => new Track());
   const rowCount = Math.ceil(list.length / perRow);
   const streets = Array.from({ length: rowCount + 1 }, () => new Track());
-  const depth = ({ node, gap }: Wire["from"]): number =>
-    sheetOf(node).row * far + gapTop(node, gap);
+  /** A line may come in anywhere in its gap, so it holds the gutter beside all of it. */
+  const touchGap = (
+    track: Track | undefined,
+    family: string,
+    { node, gap }: Wire["from"],
+  ): void => {
+    const top = sheetOf(node).row * far + gapTop(node, gap);
+    track?.touch(family, top);
+    track?.touch(family, top + (plan.gaps[node.page]?.[gap] ?? 0));
+  };
   const routes = plan.wires.map((wire) => {
     const [a, b] = [sheetOf(wire.from.node), sheetOf(wire.to.node)];
     const isLeft = wire.from.x < (placed.pages[wire.from.node.page]?.width ?? 0) / 2;
@@ -219,15 +238,14 @@ export function drawMapLines(
   for (const { wire, first, last, street } of routes) {
     if (wire.isShort) continue;
     const { family } = wire.crossing;
-    const middle = street === null ? null : street * far - far / 2;
-    gutters[first]?.touch(family, depth(wire.from));
-    gutters[first]?.touch(family, middle ?? depth(wire.to));
-    gutters[last]?.touch(family, middle ?? depth(wire.from));
-    gutters[last]?.touch(family, depth(wire.to));
+    touchGap(gutters[first], family, wire.from);
+    touchGap(gutters[last], family, wire.to);
+    if (street === null) continue;
+    for (const gutter of [first, last]) gutters[gutter]?.touch(family, street * far - far / 2);
   }
   const strip = (track: Track): { size: number; count: number } => {
     const count = track.lay();
-    const size = Math.max(metrics.gutter, (count + 1) * step);
+    const size = Math.max(metrics.gutter, (count + 1) * apart);
     return { size: Math.ceil(size / step) * step, count };
   };
   const gutterStrips = gutters.map(strip);
@@ -236,7 +254,7 @@ export function drawMapLines(
     const { family } = wire.crossing;
     for (const gutter of [first, last]) {
       const lane = gutters[gutter]?.lane(family) ?? 0;
-      streets[street]?.touch(family, gutter * far + lane * step);
+      streets[street]?.touch(family, gutter * far + lane * apart);
     }
   }
   const streetStrips = streets.map(strip);
@@ -253,15 +271,22 @@ export function drawMapLines(
   /** From a place on the contents of a page to one on the map. */
   const onMap = (node: MapNode, x: number): number => corner(node).x - placed.x(node) + x;
   const gapY = (node: MapNode, gap: number, family: string): number => {
-    const { tracks, gaps } = plan;
-    const track = tracks[node.page]?.[gap] as Track;
-    const count = Math.max(1, track.count);
-    const size = gaps[node.page]?.[gap] ?? 0;
+    const track = plan.tracks[node.page]?.[gap] as Track;
+    const band = plan.bands[node.page]?.[gap] as Track;
+    const size = (plan.gaps[node.page]?.[gap] ?? 0) - bandHeight(band.count, metrics);
     const top = (boxes[node.page]?.y ?? 0) + gapTop(node, gap);
-    const start = top + (size - (count - 1) * step) / 2 - step;
-    // Pages on both sides of a gutter keep half a step apart, so their lines never meet in it.
-    const half = (sheetOf(node).column % 2) * (step / 2);
-    return Math.ceil(start / step) * step + half + track.lane(family) * step;
+    const inset = (size - (Math.max(1, track.count) - 1) * step) / 2;
+    return top + inset + track.lane(family) * step;
+  };
+  const bandY = (node: MapNode, gap: number, family: string): number => {
+    const band = plan.bands[node.page]?.[gap] as Track;
+    const bottom =
+      (boxes[node.page]?.y ?? 0) + gapTop(node, gap) + (plan.gaps[node.page]?.[gap] ?? 0);
+    const top = bottom - bandHeight(band.count, metrics);
+    // Pages on both sides of a gutter take turns, so their lines never come near in it.
+    const pitch = 2 * apart;
+    const turn = (sheetOf(node).column % 2) * apart;
+    return Math.ceil((top + apart / 2 - turn) / pitch) * pitch + turn + band.lane(family) * pitch;
   };
   const rowY = ({ node, row }: Spot): number => corner(node).y + (row + 0.5) * line;
 
@@ -299,8 +324,8 @@ export function drawMapLines(
     const { crossing, from, to, isShort } = wire;
     const { family, reference, certainty } = crossing;
     const [startX, endX] = [onMap(from.node, from.x), onMap(to.node, to.x)];
-    const startY = gapY(from.node, from.gap, family);
-    const endY = gapY(to.node, to.gap, family);
+    const startY = bandY(from.node, from.gap, family);
+    const endY = bandY(to.node, to.gap, family);
     const points: Point[] = [
       [corner(from.node).x, rowY(from)],
       [startX, rowY(from)],
@@ -352,7 +377,7 @@ function pagesOf(
     placed: Placed;
   },
 ) {
-  const { step } = metrics;
+  const { apart } = metrics;
   const widths = Array.from({ length: columns }, () => 0);
   const heights = Array.from({ length: rowCount }, () => 0);
   for (const { row, column, w, h } of list) {
@@ -391,8 +416,8 @@ function pagesOf(
     (strips: Strip[], edges: number[]) =>
     (at: number, tracks: Track[], family: string): number => {
       const { size, count } = strips[at] as Strip;
-      const inset = (size - (Math.max(1, count) - 1) * step) / 2;
-      return (edges[at] ?? 0) + inset + (tracks[at]?.lane(family) ?? 0) * step;
+      const inset = (size - (Math.max(1, count) - 1) * apart) / 2;
+      return (edges[at] ?? 0) + inset + (tracks[at]?.lane(family) ?? 0) * apart;
     };
   const last = list.length === 0;
   return {

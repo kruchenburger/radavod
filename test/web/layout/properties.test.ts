@@ -4,11 +4,13 @@ import { type TreeSnapshot, treeSnapshotSchema } from "../../../src/shared/tree"
 import { around, type AroundOptions } from "../../../web/tree/layout/around";
 import { aroundNarrow } from "../../../web/tree/layout/around-narrow";
 import { branchMap, type MapCard } from "../../../web/tree/layout/branch-map";
+import { aroundKeys, mapKeys } from "../../../web/tree/layout/keys";
 import { mapText } from "../../../web/tree/layout/map-text";
 import { personKey } from "../../../web/tree/layout/types";
-import { expectedAround } from "./expected";
+import { expectedAround, expectedLine, lineAround } from "./expected";
 import { measure, wordingOf } from "./family";
 import { problems } from "./geometry";
+import { unreachable } from "./reach";
 
 const size = 9;
 const certainty = fc.constantFrom(
@@ -54,8 +56,8 @@ const person = fc.record({
   branch: branchId,
   parents: fc.array(
     fc.record({
-      id: fc.constantFrom("k1", "k2", "k3"),
       parent: fc.option(someone),
+      union: fc.option(fc.constantFrom("u0", "u1", "u2", "u3", "gone"), { freq: 1 }),
       kind: fc.constantFrom("blood", "blood", "adoption", "guardianship", "unknown"),
       main: fc.boolean(),
       certainty,
@@ -75,6 +77,7 @@ const snapshots = fc
         kind: fc.constantFrom("marriage", "civil", "unknown"),
         partners: fc.tuple(someone, fc.option(someone, { freq: 8 })),
         began: fc.option(fc.integer({ min: 0, max: 5 })),
+        branch: branchId,
         certainty,
       }),
       { maxLength: 8, size: "max" },
@@ -89,6 +92,7 @@ const snapshots = fc
       // Sometimes the last person has the id of the first.
       people: people.map((one, i) => ({
         ...one,
+        parents: one.parents.map((parentage, k) => ({ ...parentage, id: `k${k}` })),
         id: sameIds && i === size - 1 ? "p0" : `p${i}`,
       })),
       unions: unions.map((one, i) => ({ ...one, id: `u${i}` })),
@@ -123,10 +127,12 @@ describe("any family the contract allows", () => {
             snapshot,
             people: expectedAround(snapshot, focus, { ...more, open: layout.open }),
             children: "y",
+            line: lineAround(snapshot, focus, focus),
             lines: ({ key }) => byKey.get(key)?.lines ?? [],
             measure,
           });
           expect({ focus, ...found }).toEqual({ focus });
+          expect(unreachable(layout.cards, aroundKeys(layout))).toEqual([]);
         }
       }),
       runs,
@@ -144,6 +150,7 @@ describe("any family the contract allows", () => {
             snapshot,
             people: expectedAround(snapshot, focus, { ...more, open: layout.open }),
             children: "y",
+            line: lineAround(snapshot, focus, focus),
             lines: ({ key }) => byKey.get(key)?.lines ?? [],
             measure,
             isList: true,
@@ -172,6 +179,8 @@ describe("any family the contract allows", () => {
           snapshot,
           people: byId.keys(),
           children: "x",
+          line: expectedLine(snapshot, more.lineOf),
+          spacing: { least: 6, outside: map.pages },
           row: ({ key }) => `${cards.get(key)?.page} ${cards.get(key)?.row}`,
           lines: ({ key }) => {
             const card = cards.get(key) as MapCard;
@@ -180,6 +189,7 @@ describe("any family the contract allows", () => {
           measure,
         });
         expect(found).toEqual({});
+        expect(unreachable(map.cards, mapKeys(map))).toEqual([]);
       }),
       { ...runs, numRuns: 1000 },
     );

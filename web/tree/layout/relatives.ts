@@ -1,6 +1,6 @@
-import type { TreeParentage, TreeSnapshot } from "../../../src/shared/tree";
+import type { TreeParentage, TreeSnapshot, TreeUnion } from "../../../src/shared/tree";
 import type { BranchMap } from "./branch-map";
-import { kinOf, type ParentSet } from "./kin";
+import { kinOf, type ParentSet, type Sibling } from "./kin";
 import { mapTracks } from "./stability";
 
 type Tie = Pick<TreeParentage, "kind" | "main" | "certainty">;
@@ -9,15 +9,17 @@ type Tie = Pick<TreeParentage, "kind" | "main" | "certainty">;
 export type Relatives = {
   /** Null for a parent nobody knows. */
   parents: (Tie & { person: string | null })[];
-  /** With the parents both have, so half-siblings can be told. */
-  siblings: { person: string; shared: string[] }[];
+  /** With the parents both have, so a half-sibling and one by guardianship can be told. */
+  siblings: Sibling[];
   unions: {
     /** Null for another parent of the children without a known union. */
     union: string | null;
     partner: string | null;
+    kind: TreeUnion["kind"] | null;
+    certainty: TreeUnion["certainty"] | null;
     children: (Tie & { person: string })[];
   }[];
-  /** Children without another known parent. */
+  /** Children without another parent to name them with. */
   otherChildren: (Tie & { person: string })[];
 };
 
@@ -30,42 +32,56 @@ export function relativesOf(snapshot: TreeSnapshot, person: string): Relatives |
     .flatMap(({ members, kind, main }) =>
       members.map(({ parent, certainty }) => ({ person: parent, kind, main, certainty })),
     );
-
-  const shared = new Map<string, string[]>();
-  for (const { known } of kin.sets(person)) {
-    for (const parent of known) {
-      for (const { child } of kin.children(parent)) {
-        if (child !== person) shared.set(child, [...(shared.get(child) ?? []), parent]);
-      }
-    }
-  }
-  const siblings = [...shared.keys()]
-    .sort(kin.byBirth)
-    .map((sibling) => ({ person: sibling, shared: shared.get(sibling) ?? [] }));
-
-  const unions: Relatives["unions"] = kin
-    .unions(person)
-    .map(({ union, other }) => ({ union: union.id, partner: other, children: [] }));
+  const unions: Relatives["unions"] = kin.unions(person).flatMap(({ all, other }) =>
+    all.map(({ id, kind, certainty }) => ({
+      union: id,
+      partner: other,
+      kind,
+      certainty,
+      children: [],
+    })),
+  );
   const otherChildren: Relatives["otherChildren"] = [];
   for (const { child, set } of kin.children(person)) {
-    familyOf(set).push({
-      person: child,
-      kind: set.kind,
-      main: set.main,
-      certainty: set.certainty,
-    });
+    const tie = set.members.find(({ parent }) => parent === person);
+    if (tie === undefined) continue;
+    const { kind, main, certainty } = tie;
+    familyOf(child, set, tie).push({ person: child, kind, main, certainty });
   }
-  return { parents, siblings, unions, otherChildren };
+  return { parents, siblings: kin.siblings(person), unions, otherChildren };
 
-  function familyOf({ known, unknown }: ParentSet): Relatives["otherChildren"] {
-    const other = known.find((id) => id !== person) ?? null;
-    if (other === null && unknown.length === 0) return otherChildren;
-    let union = unions.find(({ partner }) => partner === other);
-    if (union === undefined) {
-      if (other === null) return otherChildren;
-      unions.push((union = { union: null, partner: other, children: [] }));
-    }
-    return union.children;
+  function familyOf(child: string, set: ParentSet, tie: TreeParentage): Relatives["otherChildren"] {
+    const other = otherParent(child, set);
+    const named = [tie.union, ...set.members.map(({ union }) => union)];
+    const isOfStranger = other === null && set.unknown.length > 0;
+    const own = unions.filter(({ partner }) => partner === other);
+    const union =
+      own.find((one) => one.union !== null && named.includes(one.union)) ??
+      (other !== null || isOfStranger ? own[0] : undefined);
+    if (union !== undefined) return union.children;
+    if (other === null) return otherChildren;
+    const added = { union: null, partner: other, kind: null, certainty: null, children: [] };
+    unions.push(added);
+    return added.children;
+  }
+
+  /**
+   * The second parent of the child: told together with the person, else a partner by whatever
+   * kinship, else another main parent. A guardian brings up the child of somebody else, and a
+   * rejected version is nobody's second parent.
+   */
+  function otherParent(child: string, { known, kind }: ParentSet): string | null {
+    const together = known.find((id) => id !== person);
+    if (together !== undefined) return together;
+    const rest = kin
+      .sets(child)
+      .filter(({ main }) => main)
+      .flatMap((set) => set.known.map((id) => ({ id, kind: set.kind })))
+      .filter(({ id }) => id !== person);
+    const partner = rest.find(({ id }) => unions.some((one) => one.partner === id));
+    if (partner !== undefined) return partner.id;
+    if (kind === "guardianship") return null;
+    return rest.find((one) => one.kind !== "guardianship")?.id ?? null;
   }
 }
 

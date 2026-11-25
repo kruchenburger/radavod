@@ -207,7 +207,7 @@ export function aroundNarrow(
     width: right + marginWidth,
     height: y,
     focus: model.focus.key,
-    siblings: model.siblingIds,
+    siblings: model.kinSiblings,
     open: model.open,
     order: cards.map(({ key }) => key),
   };

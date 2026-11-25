@@ -48,7 +48,7 @@ Every text a person reads is in `web/i18n/ru.ts` and `web/i18n/en.ts`, reached t
 
 `examples/` holds an invented family of 300. `generateFamily(seed, size)` makes it and `examples/family.json` is its output for seed 1; a test compares them, so change the generator and run `pnpm examples`. Every invented name is in `examples/names.ts`. The app never imports `examples/`, and its types are not the domain model.
 
-`examples/snapshot.ts` turns the family into a tree snapshot. `pnpm build` writes it to `dist/client/sample/tree.json`, and the app fetches it from there.
+`examples/snapshot.ts` turns the family into a tree snapshot. `pnpm build` writes it with the person to begin with to `dist/client/sample/tree.json`, and the app fetches it from there.
 
 ## Tree
 

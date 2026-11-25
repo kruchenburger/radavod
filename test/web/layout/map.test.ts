@@ -12,6 +12,7 @@ import {
 import { carry } from "../../../web/tree/layout/carry";
 import { barOf, mapText } from "../../../web/tree/layout/map-text";
 import { cases } from "./cases";
+import { expectedLine } from "./expected";
 import { type FamilySpec, familyOf, measure, wordingOf } from "./family";
 import { crossings, problems } from "./geometry";
 
@@ -31,6 +32,8 @@ function drawn(spec: FamilySpec | TreeSnapshot, more: Partial<MapOptions> = {}):
     snapshot,
     people: new Set(byId.keys()),
     children: "x",
+    line: expectedLine(snapshot, more.lineOf),
+    spacing: { least: 6, outside: map.pages },
     row: ({ key }) => `${cards.get(key)?.page} ${cards.get(key)?.row}`,
     lines: ({ key }) => {
       const card = cards.get(key) as MapCard;
@@ -210,6 +213,27 @@ describe("the map of branches", () => {
     expect(pageOf(drawn({ ...snapshot }), "b")).toBe("A");
   });
 
+  it("gives a couple the page it was given, whatever branches the two belong to", () => {
+    const people = [
+      { id: "a", branch: "A" },
+      { id: "b", branch: "B" },
+      { id: "c", branch: "A" },
+    ];
+    const unions: [string, string | null][] = [
+      ["a", "b"],
+      ["c", null],
+    ];
+    const snapshot = familyOf({ people, unions, branches: ["A", "B", "C"] });
+    const given = (branch: string): BranchMap =>
+      drawn({ ...snapshot, unions: snapshot.unions.map((union) => ({ ...union, branch })) });
+    expect([pageOf(given("B"), "a"), pageOf(given("B"), "b")]).toEqual(["B", "B"]);
+    expect([pageOf(given("C"), "a"), pageOf(given("C"), "c")]).toEqual(["C", "C"]);
+    expect(pageOf(given("nowhere"), "a")).toBe("A");
+    // The one of the two whose branch the page is stands for the couple.
+    expect(card(given("B"), "a").isSpouse).toBe(true);
+    expect(card(given("B"), "b").isSpouse).toBe(false);
+  });
+
   it("draws only the direct line between pages", () => {
     const spec = cases["a branch that marries a branch"] as FamilySpec;
     const between = (map: BranchMap) => map.links.filter(({ type }) => type === "reference");
@@ -342,7 +366,7 @@ it("draws five thousand people, and no ribbon of them", () => {
   const family = generateFamily(1, 5000);
   const snapshot = snapshotOf(family);
   const last = family.unions.find(({ id }) => id === family.lastCouple);
-  drawn(snapshot, { level: "closer", lineOf: last?.partners[0] ?? null });
+  for (const level of levels) drawn(snapshot, { level, lineOf: last?.partners[0] ?? null });
   const maps = levels.map((level) => draw(snapshot, { level }));
   expect(new Set(maps.map(({ perRow }) => perRow)).size).toBe(1);
   expect((maps[0]?.width ?? 0) / (maps[0]?.height ?? 1)).toBeLessThan(8);

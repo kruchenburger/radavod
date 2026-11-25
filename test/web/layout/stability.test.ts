@@ -52,6 +52,7 @@ const changes: Record<string, Change> = {
         kind: "marriage",
         partners: [id, "new"],
         began: null,
+        branch: null,
         certainty: "hypothesis",
       },
     ],
