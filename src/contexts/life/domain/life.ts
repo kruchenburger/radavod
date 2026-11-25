@@ -30,14 +30,17 @@ export type EventError =
   | Duplicate
   | Missing;
 
-/** Adds an event or replaces the one with its identifier. */
-export function recordEvent(reader: LifeReader, event: LifeEvent): Result<Change, EventError> {
+/** Adds an event, or puts it in the place of the one stored with its identifier. */
+export function recordEvent(
+  reader: LifeReader,
+  event: LifeEvent,
+  stored: LifeEvent | null,
+): Result<Change, EventError> {
   const home = event.participants[0]?.person;
   if (home === undefined) return { ok: false, error: { code: "nobody" } };
   const roles = event.participants.map(({ person, role }) => JSON.stringify([person, role]));
   if (new Set(roles).size < roles.length) return duplicate;
-  const oldHome = reader.homeOf(event.id);
-  if (oldHome !== null && oldHome !== home) {
+  if (stored !== null && stored.participants[0]?.person !== home) {
     return { ok: false, error: { code: "another-subject" } };
   }
   const { events } = lifeOf(reader, home);

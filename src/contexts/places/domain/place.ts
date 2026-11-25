@@ -79,29 +79,34 @@ function spanOf(date: FuzzyDate): Span | null {
   return { from, to };
 }
 
+/**
+ * The days of a period, a year at either end whole. One that began "before 1922" counts from the last
+ * day of 1921, and one that ended "after 1918" to the last day of 1918: more nobody knows.
+ */
 function periodOf({ period }: Dated): Span {
+  const from = period?.from ? spanOf(period.from) : null;
+  const to = period?.to ? spanOf(period.to) : null;
   return {
-    from: (period?.from && spanOf(period.from)?.from) ?? null,
-    to: (period?.to && spanOf(period.to)?.to) ?? null,
+    from: from && (from.from ?? from.to),
+    to: to && (to.to ?? (to.from === null ? null : to.from - 1)),
   };
 }
 
 /**
- * What held on the first day of a span, the best first; if nothing did, what began in it, the first
- * first. "Before" has no first day, so it goes by the last one.
+ * What held on the first day of a span, the best first, then what began later in it, the first first.
+ * "Before" has no first day and goes by the last one; nobody knows what is still within "after".
  */
 function during<T extends Dated>(list: readonly T[], { from, to }: Span): T[] {
   const day = from ?? to ?? 0;
   const held = list.filter((one) => distance(periodOf(one), day) === 0);
-  if (held.length > 0) {
-    const isLost = (one: T) => Number(mayHaveEndedBy(one, day));
-    return held.toSorted((a, b) => isLost(a) - isLost(b) || later(periodOf(a), periodOf(b)));
-  }
   const began = list.filter((one) => {
     const start = periodOf(one).from;
     return start !== null && to !== null && day < start && start <= to;
   });
-  return began.toSorted((a, b) => later(periodOf(b), periodOf(a)));
+  return [
+    ...held.toSorted((a, b) => later(periodOf(a), periodOf(b))),
+    ...began.toSorted((a, b) => later(periodOf(b), periodOf(a))),
+  ];
 }
 
 /** Everything, what has not ended first. */
@@ -118,16 +123,6 @@ function nearest<T extends Dated>(list: readonly T[], { from, to }: Span): T[] {
 /** How many days a day is from a period. */
 function distance({ from, to }: Span, day: number): number {
   return Math.max((from ?? day) - day, day - (to ?? day), 0);
-}
-
-/** Whether a period has an end nobody can date and is not known to have held on a day. */
-function mayHaveEndedBy({ period }: Dated, day: number): boolean {
-  if (!period?.to) return false;
-  const end = spanOf(period.to);
-  if (end !== null && end.to !== null) return false;
-  // "After 1918" ended some day, and held to the last one of 1918.
-  const heldTo = end?.from == null ? periodOf({ period }).from : end.from - 1;
-  return heldTo === null || day > heldTo;
 }
 
 /** The later beginning first, then what has a beginning or an end at all. */

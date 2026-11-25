@@ -138,25 +138,56 @@ describe("the name of a place", () => {
     expect(places.nameOn(id("a"), date("1900"), "ru")).toBe("Осочье");
   });
 
-  it("that ended on a day nobody knows gives way after what is known of it", () => {
-    for (const end of ["при немцах", "после 1918"]) {
-      for (const now of [null, period(null, null)]) {
-        const { places } = start({
-          names: [
-            { text: "Осочье", language: "ru", period: period("1900", end) },
-            { text: "Осочьевск", language: "ru", period: now },
-          ],
-        });
-        const nameAt = (text: string | null) =>
-          places.nameOn(id("a"), text === null ? null : date(text), "ru");
-        expect(nameAt(null)).toBe("Осочьевск");
-        expect(nameAt("1960")).toBe("Осочьевск");
-        expect(nameAt("1.01.1900")).toBe("Осочье");
-        if (end !== "после 1918") continue;
-        expect(nameAt("31.12.1918")).toBe("Осочье");
-        expect(nameAt("1.01.1919")).toBe("Осочьевск");
-      }
+  it("that ended after a date is known to have been used to that date", () => {
+    for (const now of [null, period(null, null)]) {
+      const { places } = start({
+        names: [
+          { text: "Осочье", language: "ru", period: period("1900", "после 1918") },
+          { text: "Осочьевск", language: "ru", period: now },
+        ],
+      });
+      const nameAt = (text: string) => places.nameOn(id("a"), date(text), "ru");
+      expect(places.nameOn(id("a"), null, "ru")).toBe("Осочьевск");
+      expect(nameAt("1.01.1900")).toBe("Осочье");
+      expect(nameAt("31.12.1918")).toBe("Осочье");
+      expect(nameAt("1.01.1919")).toBe("Осочьевск");
     }
+  });
+
+  it("that ended nobody knows when is used on any date, but is not the latest", () => {
+    const { places } = start({
+      names: [
+        { text: "Осочье", language: "ru", period: period("1900", "при немцах") },
+        { text: "Осочьевск", language: "ru", period: null },
+      ],
+    });
+    expect(places.nameOn(id("a"), date("1.01.1900"), "ru")).toBe("Осочье");
+    expect(places.nameOn(id("a"), date("1905"), "ru")).toBe("Осочье");
+    expect(places.nameOn(id("a"), null, "ru")).toBe("Осочьевск");
+  });
+
+  it("that began before a date is known to have been used from that date", () => {
+    const { places } = start({
+      names: [
+        { text: "Осочье", language: "ru", period: null },
+        { text: "Осочьевск", language: "ru", period: period("до 1922", null) },
+      ],
+    });
+    expect(places.nameOn(id("a"), date("1950"), "ru")).toBe("Осочьевск");
+    expect(places.nameOn(id("a"), date("31.12.1921"), "ru")).toBe("Осочьевск");
+    expect(places.nameOn(id("a"), date("30.12.1921"), "ru")).toBe("Осочье");
+  });
+
+  it("in the language asked for may have begun within the date", () => {
+    const { places } = start({
+      names: [
+        { text: "Osocze", language: "pl", period: period("1900", null) },
+        { text: "Осочьевск", language: "ru", period: period("11.11.1918", null) },
+      ],
+    });
+    expect(places.nameOn(id("a"), date("1918"), "ru")).toBe("Осочьевск");
+    expect(places.nameOn(id("a"), date("1918"), "lt")).toBe("Osocze");
+    expect(places.nameOn(id("a"), date("10.1918"), "ru")).toBe("Osocze");
   });
 
   it("with a period nobody could read is as one without", () => {
@@ -234,6 +265,16 @@ describe("the affiliation of a place", () => {
       ],
     });
     expect(vague.affiliationOn(id("a"), date("05.1939"))).toBe("Республика");
+    const { places: ended } = start({
+      affiliations: [
+        { name: "Империя", period: period("1795", "после 1910") },
+        { name: "Республика", period: period("11.11.1918", "1939") },
+      ],
+    });
+    expect(ended.affiliationOn(id("a"), date("1910"))).toBe("Империя");
+    expect(ended.affiliationOn(id("a"), date("1918"))).toBe("Республика");
+    expect(ended.affiliationOn(id("a"), date("1950"))).toBeNull();
+    expect(ended.affiliationOn(id("a"), date("после 1917"))).toBeNull();
     const { places: after } = start({
       affiliations: [
         { name: "Империя", period: period("1795", "1917") },

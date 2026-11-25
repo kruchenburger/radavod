@@ -60,7 +60,7 @@ export function lifeOver(
       if (union !== null && union !== old?.union && kinship.union(union) === null) {
         return missing(union);
       }
-      return saved(recordEvent(store, event));
+      return saved(recordEvent(store, event, old));
     },
     remove: (id) => saved(removeEvent(store, id)),
     warnings: (id) => warningsOf(store, id, descentsOf(kinship, id)),
