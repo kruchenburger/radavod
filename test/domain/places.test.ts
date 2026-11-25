@@ -60,6 +60,20 @@ describe("a place", () => {
   });
 });
 
+describe("a place that is removed", () => {
+  it("is gone, and was told before", () => {
+    const { places } = start();
+    expect(places.remove(id("a"))).toMatchObject({
+      value: [{ kind: "place", id: id("a"), before: { names: [] }, after: null }],
+    });
+    expect(places.get(id("a"))).toBeNull();
+    expect(places.remove(id("a"))).toEqual({
+      ok: false,
+      error: { code: "missing", id: id("a") },
+    });
+  });
+});
+
 describe("the name of a place", () => {
   const named = start({
     names: [

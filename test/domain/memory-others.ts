@@ -1,7 +1,7 @@
 import type { Change as EvidenceChange, EvidenceStore } from "../../src/contexts/evidence";
 import type { Change as LifeChange, LifeStore } from "../../src/contexts/life";
 import type { Change as PlacesChange, PlacesStore } from "../../src/contexts/places";
-import type { EventId, PersonId, PlaceId, SourceId, UnionId } from "../../src/kernel/id";
+import type { PersonId, PlaceId, SourceId, UnionId } from "../../src/kernel/id";
 
 /** Stores that hold copies, as a database does: nobody can change what they hold but by `save`. */
 class Memory<Id, Value> {
@@ -48,11 +48,9 @@ export class MemoryEvidence implements EvidenceStore {
     return this.cited.get(id);
   }
 
-  subjectOf(citation: string) {
-    for (const [id, { citations }] of this.cited.rows) {
-      if (citations.some((one) => one.id === citation)) return id;
-    }
-    return null;
+  countOf(source: SourceId) {
+    const all = [...this.cited.rows.values()].flatMap(({ citations }) => citations);
+    return all.filter((one) => one.source === source).length;
   }
 
   save(change: EvidenceChange): void {
@@ -72,11 +70,9 @@ export class MemoryLife implements LifeStore {
     return this.lives.get(id);
   }
 
-  homeOf(event: EventId) {
-    for (const [id, { events }] of this.lives.rows) {
-      if (events.some((one) => one.id === event)) return id;
-    }
-    return null;
+  countAt(place: PlaceId) {
+    const all = [...this.lives.rows.values()].flatMap(({ events }) => events);
+    return all.filter((one) => one.place === place).length;
   }
 
   save(change: LifeChange): void {

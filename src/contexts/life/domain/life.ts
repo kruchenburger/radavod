@@ -1,6 +1,6 @@
 import { type Write, writes } from "../../../kernel/change";
 import { sortKey } from "../../../kernel/fuzzy-date";
-import type { EventId, PersonId } from "../../../kernel/id";
+import type { EventId, PersonId, PlaceId } from "../../../kernel/id";
 import { type Duplicate, duplicate, type Missing, missing } from "../../../kernel/refusal";
 import type { Result } from "../../../kernel/result";
 import { type LifeEvent, versionedKinds } from "./event";
@@ -18,8 +18,8 @@ export type Change = Write<"life", PersonId, PersonLife>[];
 
 export interface LifeReader {
   lifeOf(id: PersonId): PersonLife | null;
-  /** Whom an event is about. */
-  homeOf(event: EventId): PersonId | null;
+  /** How many events happened at a place. */
+  countAt(place: PlaceId): number;
 }
 
 export type EventError =
@@ -30,36 +30,58 @@ export type EventError =
   | Duplicate
   | Missing;
 
-/** Adds an event, or puts it in the place of the one stored with its identifier. */
-export function recordEvent(
-  reader: LifeReader,
-  event: LifeEvent,
-  stored: LifeEvent | null,
-): Result<Change, EventError> {
+/** Adds an event. Identifiers are random: a new one is not looked for at other people. */
+export function addEvent(reader: LifeReader, event: LifeEvent): Result<Change, EventError> {
   const home = event.participants[0]?.person;
-  if (home === undefined) return { ok: false, error: { code: "nobody" } };
-  const roles = event.participants.map(({ person, role }) => JSON.stringify([person, role]));
-  if (new Set(roles).size < roles.length) return duplicate;
-  if (stored !== null && stored.participants[0]?.person !== home) {
-    return { ok: false, error: { code: "another-subject" } };
-  }
+  if (home === undefined) return nobody;
+  const { events, takesPart } = lifeOf(reader, home);
+  const isThere = [...events.map(({ id }) => id), ...takesPart.map((one) => one.event)];
+  if (isThere.includes(event.id) || hasTwice(event)) return duplicate;
+  return {
+    ok: true,
+    value: changed(reader, home, withMains([...events, event], event), null, event),
+  };
+}
+
+/** Replaces an event of the person it is believed to be about. */
+export function editEvent(
+  reader: LifeReader,
+  home: PersonId,
+  event: LifeEvent,
+): Result<Change, EventError> {
+  const old = eventOf(reader, home, event.id);
+  if (old === null) return missing(event.id);
+  const first = event.participants[0]?.person;
+  if (first === undefined) return nobody;
+  if (first !== home) return { ok: false, error: { code: "another-subject" } };
+  if (hasTwice(event)) return duplicate;
   const { events } = lifeOf(reader, home);
-  const old = events.find(({ id }) => id === event.id);
-  const all = old ? events.map((one) => (one === old ? event : one)) : [...events, event];
+  const all = events.map((one) => (one.id === event.id ? event : one));
   return { ok: true, value: changed(reader, home, withMains(all, event), old, event) };
 }
 
-export function removeEvent(reader: LifeReader, id: EventId): Result<Change, Missing> {
-  const event = eventOf(reader, id);
-  const home = event?.participants[0]?.person;
-  if (event === null || home === undefined) return missing(id);
+/** Removes an event of the person it is believed to be about. */
+export function removeEvent(
+  reader: LifeReader,
+  home: PersonId,
+  id: EventId,
+): Result<Change, Missing> {
+  const event = eventOf(reader, home, id);
+  if (event === null) return missing(id);
   const left = lifeOf(reader, home).events.filter((one) => one.id !== id);
-  return { ok: true, value: changed(reader, home, withMains(left), event, undefined) };
+  return { ok: true, value: changed(reader, home, withMains(left), event, null) };
 }
 
-export function eventOf(reader: LifeReader, id: EventId): LifeEvent | null {
-  const home = reader.homeOf(id);
-  return home && (lifeOf(reader, home).events.find((one) => one.id === id) ?? null);
+export function eventOf(reader: LifeReader, home: PersonId, id: EventId): LifeEvent | null {
+  return lifeOf(reader, home).events.find((one) => one.id === id) ?? null;
+}
+
+const nobody = { ok: false, error: { code: "nobody" } } as const;
+
+/** Whether somebody stands twice in one role. */
+function hasTwice({ participants }: LifeEvent): boolean {
+  const roles = participants.map(({ person, role }) => JSON.stringify([person, role]));
+  return new Set(roles).size < roles.length;
 }
 
 /** Every event a person takes part in by the first day, those without one last, as recorded. */
@@ -108,8 +130,8 @@ function changed(
   reader: LifeReader,
   home: PersonId,
   events: LifeEvent[],
-  old: LifeEvent | undefined,
-  now: LifeEvent | undefined,
+  old: LifeEvent | null,
+  now: LifeEvent | null,
 ): Change {
   const before = reader.lifeOf(home);
   const change: Change = writes("life", home, before, { ...lifeOf(reader, home), events });
@@ -126,7 +148,7 @@ function changed(
 }
 
 /** Those who take part in an event of somebody else. */
-function othersIn(event: LifeEvent | undefined): Set<PersonId> {
+function othersIn(event: LifeEvent | null): Set<PersonId> {
   const [home, ...others] = event?.participants.map(({ person }) => person) ?? [];
   return new Set(others.filter((person) => person !== home));
 }

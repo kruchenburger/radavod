@@ -11,10 +11,15 @@ export interface FamilyGraph {
   branch(id: BranchId): Branch | null;
   /** The parents of a person, for a walk up that needs nothing else. */
   parentsOf(id: PersonId): readonly Parentage[];
+  membersOf(id: BranchId): Members;
 }
 
-/** A branch may be given to hundreds at once, so it is told apart from the person. */
+/** Who is in a branch. */
+export type Members = { people: PersonId[]; unions: UnionId[] };
+
+/** A branch may be given to hundreds at once, so it is told apart from whoever is in it. */
 export type PersonRecord = Omit<Person, "branch">;
+export type UnionRecord = Omit<Union, "branch">;
 
 /**
  * What a rule makes of the family, each aggregate once and only if it differs. Written in this order
@@ -24,7 +29,8 @@ export type PersonRecord = Omit<Person, "branch">;
 export type Change = (
   | Write<"person", PersonId, PersonRecord>
   | Write<"person-branch", PersonId, BranchId>
-  | Write<"union", UnionId, Union>
+  | Write<"union", UnionId, UnionRecord>
+  | Write<"union-branch", UnionId, BranchId>
   | Write<"branch", BranchId, Branch>
 )[];
 
@@ -34,7 +40,7 @@ export class Draft {
   readonly #stored = new Map<PersonId, Person | null>();
   readonly #people = new Map<PersonId, Person>();
   readonly #unions = new Map<UnionId, Union | null>();
-  readonly #branches = new Map<BranchId, Branch>();
+  readonly #branches = new Map<BranchId, Branch | null>();
 
   constructor(graph: FamilyGraph) {
     this.#graph = graph;
@@ -67,15 +73,23 @@ export class Draft {
     this.#branches.set(branch.id, branch);
   }
 
+  removeBranch(id: BranchId): void {
+    this.#branches.set(id, null);
+  }
+
   change(): Change {
     const change: Change = [];
     for (const [id, person] of this.#people) {
       const stored = this.#storedPerson(id);
-      change.push(...writes("person", id, stored && recordOf(stored), recordOf(person)));
+      change.push(...writes("person", id, stored && withoutBranch(stored), withoutBranch(person)));
       change.push(...writes("person-branch", id, stored?.branch ?? null, person.branch));
     }
     for (const [id, after] of this.#unions) {
-      change.push(...writes("union", id, this.#graph.union(id), after));
+      const before = this.#graph.union(id);
+      change.push(
+        ...writes("union", id, before && withoutBranch(before), after && withoutBranch(after)),
+      );
+      change.push(...writes("union-branch", id, before?.branch ?? null, after?.branch ?? null));
     }
     for (const [id, after] of this.#branches) {
       change.push(...writes("branch", id, this.#graph.branch(id), after));
@@ -92,8 +106,7 @@ export class Draft {
   }
 }
 
-function recordOf(person: Person): PersonRecord {
-  const { id, version, sex, living, names, mainName, parents, children, unions, childOrder } =
-    person;
-  return { id, version, sex, living, names, mainName, parents, children, unions, childOrder };
+function withoutBranch<T extends { branch: BranchId | null }>(value: T): Omit<T, "branch"> {
+  const { branch: _branch, ...record } = value;
+  return record;
 }

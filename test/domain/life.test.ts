@@ -3,7 +3,7 @@ import { describe, expect, it } from "vitest";
 import { type Change, type EventKind, type LifeEvent, lifeOver } from "../../src/contexts/life";
 import { placesOver } from "../../src/contexts/places";
 import { parseFuzzyDate } from "../../src/kernel/fuzzy-date";
-import type { EventId, PlaceId } from "../../src/kernel/id";
+import type { EventId, PersonId, PlaceId } from "../../src/kernel/id";
 import { Family, person, union } from "./memory-kinship";
 import { MemoryLife, MemoryPlaces } from "./memory-others";
 
@@ -38,14 +38,33 @@ const start = (...names: string[]) => {
   const places = placesOver(placesStore);
   places.add({ id: place("town"), names: [], affiliations: [], coordinates: null });
   const store = new MemoryLife();
-  const life = lifeOver(store, family.kinship, places);
+  const rules = lifeOver(store, family.kinship, places);
+  // A client knows whom each event is about.
+  const homes = new Map<EventId, PersonId>();
+  const homeOf = (id: EventId) => homes.get(id) ?? person("nobody");
+  const life = {
+    ...rules,
+    event: (id: EventId) => rules.event(homeOf(id), id),
+    remove(id: EventId) {
+      const result = rules.remove(homeOf(id), id);
+      if (result.ok) homes.delete(id);
+      return result;
+    },
+    record(one: LifeEvent) {
+      const home = homes.get(one.id);
+      const result = home === undefined ? rules.add(one) : rules.edit(home, one);
+      const first = one.participants[0]?.person;
+      if (result.ok && first !== undefined) homes.set(one.id, first);
+      return result;
+    },
+  };
   const record = (one: LifeEvent): Change => {
     const result = life.record(one);
     if (!result.ok) throw new Error(`refused: ${JSON.stringify(result.error)}`);
     return result.value;
   };
   const ids = (who: string) => life.eventsOf(person(who)).map(({ id }) => id.slice(6));
-  return { family, placesStore, life, store, record, ids };
+  return { family, placesStore, rules, life, store, record, ids };
 };
 const refused = (code: string, more: object = {}) => ({ ok: false, error: { code, ...more } });
 
@@ -161,6 +180,32 @@ describe("an event", () => {
     const { saves } = store;
     expect(record(event("e", "burial", ["a", "c"], { note: "новое" }))).toEqual([]);
     expect(store.saves).toBe(saves);
+  });
+
+  it("is added once at one person, and edited and removed only where it is", () => {
+    const { rules } = start("a", "b", "c");
+    const baptism = event("e", "baptism", ["a", "b"]);
+    expect(rules.add(baptism).ok).toBe(true);
+    expect(rules.add(baptism)).toEqual(refused("duplicate"));
+    // The one who takes part knows the event, so it is not added there either.
+    expect(rules.add(event("e", "baptism", ["b", "a"]))).toEqual(refused("duplicate"));
+    const gone = refused("missing", { id: eventId("e") });
+    expect(rules.edit(person("b"), baptism)).toEqual(gone);
+    expect(rules.remove(person("b"), eventId("e"))).toEqual(gone);
+    expect(rules.remove(person("nobody"), eventId("e"))).toEqual(gone);
+    expect(rules.event(person("b"), eventId("e"))).toBeNull();
+    expect(rules.edit(person("a"), event("e", "baptism", "a", { participants: [] }))).toEqual(
+      refused("nobody"),
+    );
+    expect(rules.edit(person("a"), { ...baptism, note: "новое" }).ok).toBe(true);
+  });
+
+  it("is counted at its place", () => {
+    const { rules, record } = start("a");
+    expect(rules.countAt(place("town"))).toBe(0);
+    record(event("one", "birth", "a", { place: place("town") }));
+    record(event("two", "death", "a", { place: place("town") }));
+    expect(rules.countAt(place("town"))).toBe(2);
   });
 
   it("stays with whom it is about: its citations hold to them", () => {

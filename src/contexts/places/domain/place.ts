@@ -40,6 +40,12 @@ export function editPlace(
   return { ok: true, value: writes("place", id, place, { ...place, ...patch }) };
 }
 
+/** Removes a place. Whether an event happened there is asked before, by whoever knows the events. */
+export function removePlace(reader: PlaceReader, id: PlaceId): Result<Change, Missing> {
+  const place = reader.place(id);
+  return place === null ? missing(id) : { ok: true, value: writes("place", id, place, null) };
+}
+
 /**
  * What a place was called on a date, in the language asked for if it had such a name then. If none is
  * known of that time, it is the nearest one, and without a date the latest. Null when the place has no

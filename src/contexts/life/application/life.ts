@@ -1,16 +1,17 @@
-import type { EventId, PersonId } from "../../../kernel/id";
+import type { EventId, PersonId, PlaceId } from "../../../kernel/id";
 import { missing } from "../../../kernel/refusal";
 import type { Result } from "../../../kernel/result";
 import { descends, type Kinship } from "../../kinship";
 import type { Places } from "../../places";
 import type { LifeEvent } from "../domain/event";
 import {
+  addEvent,
   type Change,
+  editEvent,
   type EventError,
   eventOf,
   eventsOf,
   mainOf,
-  recordEvent,
   removeEvent,
 } from "../domain/life";
 import { type Descent, type Warning, warningsOf } from "../domain/warnings";
@@ -18,16 +19,21 @@ import type { LifeStore } from "./ports";
 
 export type LifeError = EventError;
 
-/** A command that is refused or changes nothing is not stored. */
+/**
+ * A command that is refused or changes nothing is not stored. An event is asked for and changed at the
+ * person it is about.
+ */
 export interface Life {
-  event(id: EventId): LifeEvent | null;
+  event(home: PersonId, id: EventId): LifeEvent | null;
   /** Every event a person takes part in, by date. */
   eventsOf(id: PersonId): LifeEvent[];
   /** The main version of the birth or of the death of a person. */
   main(id: PersonId, kind: "birth" | "death"): LifeEvent | null;
-  /** Adds an event or replaces the one with its identifier. */
-  record(event: LifeEvent): Result<Change, LifeError>;
-  remove(id: EventId): Result<Change, LifeError>;
+  /** How many events happened at a place. It looks at them all. */
+  countAt(place: PlaceId): number;
+  add(event: LifeEvent): Result<Change, LifeError>;
+  edit(home: PersonId, event: LifeEvent): Result<Change, LifeError>;
+  remove(home: PersonId, id: EventId): Result<Change, LifeError>;
   /** What is odd about a person. It blocks nothing. */
   warnings(id: PersonId): Warning[];
 }
@@ -41,28 +47,32 @@ export function lifeOver(
     if (result.ok && result.value.length > 0) store.save(result.value);
     return result;
   };
+  /** The first thing an event names that is not there, unless it named it before. */
+  const lost = ({ participants, place, union }: LifeEvent, old: LifeEvent | null) => {
+    const known = old?.participants.map(({ person }) => person) ?? [];
+    const stranger = participants.find(
+      ({ person }) => !known.includes(person) && kinship.get(person) === null,
+    );
+    if (stranger !== undefined) return stranger.person;
+    if (place !== null && place !== old?.place && places.get(place) === null) return place;
+    if (union !== null && union !== old?.union && kinship.union(union) === null) return union;
+    return null;
+  };
   return {
-    event: (id) => eventOf(store, id),
+    event: (home, id) => eventOf(store, home, id),
     eventsOf: (id) => eventsOf(store, id),
     main: (id, kind) => mainOf(store, id, kind),
-    record(event) {
-      // What an event named before may have gone since. That does not stop an edit of the rest.
-      const old = eventOf(store, event.id);
-      const known = old?.participants.map(({ person }) => person) ?? [];
-      const { participants, place, union } = event;
-      const stranger = participants.find(
-        ({ person }) => !known.includes(person) && kinship.get(person) === null,
-      );
-      if (stranger !== undefined) return missing(stranger.person);
-      if (place !== null && place !== old?.place && places.get(place) === null) {
-        return missing(place);
-      }
-      if (union !== null && union !== old?.union && kinship.union(union) === null) {
-        return missing(union);
-      }
-      return saved(recordEvent(store, event, old));
+    countAt: (place) => store.countAt(place),
+    add(event) {
+      const id = lost(event, null);
+      return id === null ? saved(addEvent(store, event)) : missing(id);
     },
-    remove: (id) => saved(removeEvent(store, id)),
+    edit(home, event) {
+      // What an event named before may have gone since. That does not stop an edit of the rest.
+      const id = lost(event, eventOf(store, home, event.id));
+      return id === null ? saved(editEvent(store, home, event)) : missing(id);
+    },
+    remove: (home, id) => saved(removeEvent(store, home, id)),
     warnings: (id) => warningsOf(store, id, descentsOf(kinship, id)),
   };
 }
