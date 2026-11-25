@@ -1,7 +1,7 @@
 import { readdirSync } from "node:fs";
 import { expect, it } from "vitest";
 import { checkText } from "./banned.ts";
-import { check, readTree, repository, runCopyGuard } from "./guard.ts";
+import { check, fixture, readTree, repository, runCopyGuard } from "./guard.ts";
 
 const bad: [fixture: string, rule: string][] = [
   ["jsx-literal", "jsx-text"],
@@ -28,7 +28,32 @@ const bad: [fixture: string, rule: string][] = [
   ["select-data", "attribute-text"],
   ["error-class", "property-text"],
   ["sentence-elsewhere", "text-outside-catalog"],
-  ["schema-message", "text-outside-catalog"],
+  ["schema-message", "form-text"],
+  ["schema-word", "form-text"],
+  ["schema-error", "form-text"],
+  ["form-check", "form-text"],
+  ["form-validate", "property-text"],
+  ["confirm-labels", "property-text"],
+  ["table-data", "attribute-text"],
+  ["component-prop", "attribute-text"],
+  ["canvas-text", "dom-text"],
+  ["svg-selection", "dom-text"],
+  ["jsx-reexported", "jsx-text"],
+  ["jsx-namespace", "jsx-text"],
+  ["jsx-pushed", "jsx-text"],
+  ["error-message-variable", "error-message-shown"],
+  ["error-message-destructured", "error-message-shown"],
+  ["error-message-caught", "error-message-shown"],
+  ["error-message-callback", "error-message-shown"],
+  ["error-message-template", "error-message-shown"],
+  ["error-message-to-string", "error-message-shown"],
+  ["css-variable", "css-text"],
+  ["server-exception", "response-text"],
+  ["server-nested", "response-text"],
+  ["server-stringified", "response-text"],
+  ["server-html", "response-text"],
+  ["unknown-key-with-locale", "unknown-key"],
+  ["html-data", "unread-file"],
   ["server-sentence", "text-outside-catalog"],
   ["aria-label-literal", "attribute-text"],
   ["placeholder-literal", "attribute-text"],
@@ -124,6 +149,25 @@ it("reads the real tree", () => {
   expect(texts).toBeGreaterThan(20);
 });
 
+// Each of these once took the guard minutes: every path through the assignments was followed.
+it.each([
+  ["reassigned", "let line = read();\n" + "line = line.slice(1);\n".repeat(200)],
+  [
+    "doubled",
+    'const line0 = "a";\n' +
+      Array.from({ length: 200 }, (_, i) => `const line${i + 1} = line${i} + line${i};\n`).join(
+        "",
+      ) +
+      "const line = line200;\n",
+  ],
+  ["in a circle", "let line = read(), next = line;\nline = next;\nnext = line + next;\n"],
+])("ends soon on a text that is %s", (_, lines) => {
+  const source = `export function parse(read) {\n${lines}throw new SyntaxError(\`bad-\${line}\`);\n}`;
+  const started = performance.now();
+  check(new Map([...fixture("clean"), ["src/kernel/parse.ts", source]]));
+  expect(performance.now() - started).toBeLessThan(2000);
+});
+
 const rulesOf = (locale: "ru" | "en", text: string) => [...new Set(checkText(locale, text))];
 
 it.each([
@@ -160,16 +204,20 @@ it.each([
   "Запись сохраняется — вы увидите её в журнале",
   "Выберите ветвь – цвет изменится",
   "Загрузите файл - мы покажем отчёт",
+  "Сервер не ответил — проверьте интернет",
+  "Нет связи — обновите страницу",
 ])("bans a dash between two clauses in Russian: %s", (text) => {
   expect(rulesOf("ru", text)).toEqual(["dash-ru"]);
 });
 
-it.each(["Add a person — they appear", "Saved—see the log", "Saved -- see the log"])(
-  "bans a dash between two clauses in English: %s",
-  (text) => {
-    expect(rulesOf("en", text)).toEqual(["dash-en"]);
-  },
-);
+it.each([
+  "Add a person — they appear",
+  "Saved—see the log",
+  "Saved -- see the log",
+  "Saved (1) — see the log",
+])("bans a dash between two clauses in English: %s", (text) => {
+  expect(rulesOf("en", text)).toEqual(["dash-en"]);
+});
 
 it.each(["Ты хранитель", "Покажи своё древо", "Нажми «+»", "Если хочешь, позови родню"])(
   "bans «ты»: %s",
@@ -191,6 +239,14 @@ it.each([
   "Что-то ещё",
   "Читатель — смотрит, но не правит",
   "Минск — столица",
+  "Люди, которые родились в 1885 – 1890 годах, отмечаются цветом",
+  "Откройте годы 1885 – 1890 и выберите человека",
+  "Выберите «Отец — сын» или добавьте связь",
+  "Он — отец, она — мать",
+  "Родилась — 1885, переселилась — 1910",
+  "Вадим — он же Дмитрий",
+  "Светлана — сестра Елены",
+  "Почерк не просто разобрать",
   "Иван — сын Петра",
   "Михаил — брат Людмилы",
   "Портрет — работа неизвестного",
@@ -217,6 +273,7 @@ it.each([
   "The effort of many people",
   "Please choose a branch",
   "This looks like the same person",
+  "See what it looks like before you print it",
   "Note",
   "A note about the date",
   "1885–1890",

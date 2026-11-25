@@ -24,7 +24,10 @@ export function checkMarkup(file: string, source: string, shared: Set<string>) {
       return "";
     })
     .replace(/(<script\b[^>]*>)([\s\S]*?)<\/script\s*>/gi, (_, tag: string, code: string) => {
-      if (code.trim() !== "") scripts.push(code);
+      const type = /\btype\s*=\s*["']?([^"'\s>]*)/i.exec(tag)?.[1] ?? "";
+      if (code.trim() === "") return tag;
+      if (/^(?:module|text\/javascript)?$/.test(type)) scripts.push(code);
+      else findings.push({ rule: "unread-file", file, line: 1, text: `a script of type ${type}` });
       return tag;
     })
     .replace(/<![^>]*>/g, "")
@@ -47,10 +50,11 @@ export function checkMarkup(file: string, source: string, shared: Set<string>) {
   return { findings, scripts };
 }
 
-/** A stylesheet shows text through content. */
+/** A stylesheet shows text through content, and through a variable given to it. */
 export function checkStyles(file: string, source: string): Finding[] {
   const plain = source.replace(/\/\*[\s\S]*?\*\//g, (comment) => comment.replace(/[^\n]/g, " "));
-  return [...plain.matchAll(/(?:^|[\s;{])content\s*:([^;}]*)/g)].flatMap((match) => {
+  return [...plain.matchAll(/(?:^|[\s;{])(?:content|--[\w-]+)\s*:([^;}]*)/g)].flatMap((match) => {
+    if (/\b(?:serif|monospace|system-ui)\b/.test(match[1] ?? "")) return [];
     const text = [...(match[1] ?? "").matchAll(/"([^"]*)"|'([^']*)'/g)]
       .map(([, a, b]) => a ?? b ?? "")
       .join(" ");

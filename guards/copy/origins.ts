@@ -1,28 +1,47 @@
 import { posix } from "node:path";
-import { bare, isNode, type Module, nameOf, type Node, nodes, walk } from "./ast.ts";
+import { bare, isFunction, isNode, type Module, nameOf, type Node, nodes, walk } from "./ast.ts";
+import { read, type Scope, type Scopes } from "./scopes.ts";
 
 /** Where an expression comes from: the module it stands in matters for its names. */
 export type Origin = { node: Node; module: Module };
 
-type Names = Map<string, Origin[]>;
+/** One question to Origins: every node is followed once, and a circle adds nothing. */
+type Answers = Map<Node, Origin[]>;
 
 /**
  * Follows an expression to the literals it can be: through conditions, concatenation, constants,
- * maps, functions and relative imports. Scopes are not told apart: one name in a file is one thing.
+ * state, maps, functions and relative imports. The text of an error ends as "ErrorText".
  */
 export class Origins {
   readonly #modules: Map<string, Module>;
-  readonly #names = new Map<Module, Names>();
+  readonly #scopes = new Map<Module, Scopes>();
 
   constructor(modules: Map<string, Module>) {
     this.#modules = modules;
   }
 
-  of(node: Node, module: Module, seen = new Set<Node>()): Origin[] {
+  of(node: Node, module: Module): Origin[] {
+    return this.#of(node, module, new Map());
+  }
+
+  /** What a function returns; nothing for anything else. */
+  returned(origin: Origin): Origin[] {
+    return this.#returned(origin, new Map());
+  }
+
+  #of(node: Node, module: Module, answers: Answers): Origin[] {
     const expression = bare(node);
-    if (seen.has(expression)) return [];
-    seen = new Set(seen).add(expression);
-    const follow = (value: unknown) => nodes(value).flatMap((next) => this.of(next, module, seen));
+    const known = answers.get(expression);
+    if (known) return known;
+    answers.set(expression, []);
+    const found = unique(this.#follow(expression, module, answers));
+    answers.set(expression, found);
+    return found;
+  }
+
+  #follow(expression: Node, module: Module, answers: Answers): Origin[] {
+    const follow = (value: unknown) =>
+      nodes(value).flatMap((next) => this.#of(next, module, answers));
 
     switch (expression.type) {
       case "ConditionalExpression":
@@ -32,13 +51,18 @@ export class Origins {
           expression.operator === "&&" ? expression.right : [expression.left, expression.right],
         );
       case "BinaryExpression":
-        return expression.operator === "+" ? follow([expression.left, expression.right]) : [];
+        return expression.operator === "+"
+          ? this.#spell([expression.left, expression.right], module, answers)
+          : [];
       case "AssignmentExpression":
         return follow(expression.right);
       case "SequenceExpression":
         return follow(nodes(expression.expressions).slice(-1));
       case "TemplateLiteral":
-        return [{ node: expression, module }, ...follow(expression.expressions)];
+        return [
+          { node: expression, module },
+          ...this.#spell(expression.expressions, module, answers),
+        ];
       case "TaggedTemplateExpression":
         return follow(expression.quasi);
       case "ArrayExpression":
@@ -46,81 +70,149 @@ export class Origins {
           nodes(expression.elements).map((e) => (e.type === "SpreadElement" ? e.argument : e)),
         );
       case "Identifier":
-        return this.named(String(expression.name), module).flatMap((o) =>
-          this.of(o.node, o.module, seen),
-        );
+        return this.#named(expression, module).flatMap((o) => this.#of(o.node, o.module, answers));
       case "MemberExpression":
-        return this.#property(expression, module, seen);
+        return this.#property(expression, module, answers);
       case "CallExpression":
-        return this.#call(expression, module, seen);
+        return this.#call(expression, module, answers);
+      case "NewExpression":
+        if (nameOf(expression.callee) === "Map") {
+          const [entries] = nodes(expression.arguments).map(bare);
+          return follow(
+            nodes(entries?.elements).flatMap((entry) => nodes(entry.elements).slice(1, 2)),
+          );
+        }
+        return [{ node: expression, module }];
       default:
         return [{ node: expression, module }];
     }
   }
 
-  /** What a name of the module stands for. */
-  named(name: string, module: Module): Origin[] {
-    let names = this.#names.get(module);
-    if (!names) this.#names.set(module, (names = declarations(module)));
-    return (names.get(name) ?? []).flatMap((origin) => {
-      const { source, imported } = origin.node;
-      if (origin.node.type !== "Import" || typeof source !== "string") return [origin];
+  /** Follows what becomes a text by being put into one, which an error can. */
+  #spell(value: unknown, module: Module, answers: Answers): Origin[] {
+    return nodes(value).flatMap((next) =>
+      this.#isError(next, module) ? [errorText(next, module)] : this.#of(next, module, answers),
+    );
+  }
+
+  #scopesOf(module: Module): Scopes {
+    let scopes = this.#scopes.get(module);
+    if (!scopes) this.#scopes.set(module, (scopes = read(module)));
+    return scopes;
+  }
+
+  /** What an identifier stands for. */
+  #named(identifier: Node, module: Module): Origin[] {
+    const { root, of } = this.#scopesOf(module);
+    return this.#inScope(String(identifier.name), of.get(identifier) ?? root, module);
+  }
+
+  #inScope(name: string, scope: Scope, module: Module): Origin[] {
+    return scope.find(name).flatMap((node) => {
+      if (node.type !== "Import") return [{ node, module }];
+      const from = this.#resolve(String(node.source), module.file);
+      if (!from) return [];
+      if (node.imported === "*") return [{ node: { ...node, type: "Namespace" }, module: from }];
+      return this.#exported(String(node.imported), from, new Set());
+    });
+  }
+
+  #exported(name: string, module: Module, seen: Set<Module>): Origin[] {
+    if (seen.has(module)) return [];
+    seen.add(module);
+    const { root, exports, stars } = this.#scopesOf(module);
+    const found = exports.get(name);
+    if (found?.node) return [{ node: found.node, module }];
+    const next: [source: string, name: string][] = found?.source
+      ? [[found.source, found.local ?? name]]
+      : stars.map((source) => [source, name]);
+    if (!found?.source) {
+      const own = this.#inScope(found?.local ?? name, root, module);
+      if (own.length > 0) return own;
+    }
+    return next.flatMap(([source, imported]) => {
       const from = this.#resolve(source, module.file);
-      return from && from !== module ? this.named(String(imported), from) : [];
+      return from ? this.#exported(imported, from, seen) : [];
     });
   }
 
-  #property(member: Node, module: Module, seen: Set<Node>): Origin[] {
+  #resolve(source: string, from: string): Module | undefined {
+    if (!source.startsWith(".")) return undefined;
+    const path = posix.join(posix.dirname(from), source);
+    return ["", ".ts", ".tsx", "/index.ts", "/index.tsx"]
+      .map((end) => this.#modules.get(path + end))
+      .find((module) => module !== undefined);
+  }
+
+  #property(member: Node, module: Module, answers: Answers): Origin[] {
     if (!isNode(member.object)) return [];
-    if (member.element === true) return this.of(member.object, module, seen);
+    const objects = this.#of(member.object, module, answers);
+    if (member.element === true) return objects;
     const name = nameOf(member);
-    return this.of(member.object, module, seen).flatMap((origin) => {
-      if (origin.node.type !== "ObjectExpression") {
-        // names[0] of a list is one of its texts; "text".length is not a text.
-        return member.computed === true ? [origin] : [];
-      }
-      return nodes(origin.node.properties)
-        .filter((p) => p.type === "Property" && (name === undefined || nameOf(p.key) === name))
-        .flatMap((p) => nodes(p.value))
-        .flatMap((value) => this.of(value, origin.module, seen));
-    });
-  }
-
-  #call(call: Node, module: Module, seen: Set<Node>): Origin[] {
-    const callee = isNode(call.callee) ? bare(call.callee) : undefined;
-    if (!callee || isTranslation(call)) return [];
-    const follow = (value: unknown) => nodes(value).flatMap((next) => this.of(next, module, seen));
-    if (callee.type === "MemberExpression") {
-      const method = nameOf(callee) ?? "";
-      if (/^(?:map|flatMap)$/.test(method)) {
-        return nodes(call.arguments).flatMap((f) =>
-          this.of(f, module, seen).flatMap((o) => this.#returned(o, seen)),
+    if (/^(?:message|stack)$/.test(name ?? "") && this.#isError(member.object, module)) {
+      return [errorText(member, module)];
+    }
+    const seen = new Set<Node>();
+    const pick = (origin: Origin): Origin[] => {
+      if (seen.has(origin.node)) return [];
+      seen.add(origin.node);
+      if (origin.node.type === "Namespace") {
+        return this.#exported(name ?? "", origin.module, new Set()).flatMap((o) =>
+          this.#of(o.node, o.module, answers),
         );
       }
-      if (nameOf(callee.object) === "Object") {
-        return follow(call.arguments).flatMap((o) =>
+      // names[0] of a list is one of its texts; "text".length is not a text.
+      if (origin.node.type !== "ObjectExpression") return member.computed === true ? [origin] : [];
+      return nodes(origin.node.properties).flatMap((p) => {
+        if (p.type === "SpreadElement") {
+          return nodes(p.argument)
+            .flatMap((spread) => this.#of(spread, origin.module, answers))
+            .filter((o) => o.node.type === "ObjectExpression")
+            .flatMap(pick);
+        }
+        if (name !== undefined && nameOf(p.key) !== name) return [];
+        return nodes(p.value).flatMap((value) => this.#of(value, origin.module, answers));
+      });
+    };
+    return objects.flatMap(pick);
+  }
+
+  #call(call: Node, module: Module, answers: Answers): Origin[] {
+    const callee = isNode(call.callee) ? bare(call.callee) : undefined;
+    if (!callee || isTranslation(call)) return [];
+    const args = nodes(call.arguments);
+    const follow = (value: unknown) =>
+      nodes(value).flatMap((next) => this.#of(next, module, answers));
+    const results = (value: unknown) =>
+      follow(value).flatMap((o) => [o, ...this.#returned(o, answers)]);
+
+    if (callee.type === "MemberExpression") {
+      const method = nameOf(callee) ?? "";
+      const owner = nameOf(callee.object);
+      if (owner === "JSON" && method === "stringify") return follow(args[0]);
+      if (owner === "React") return results(args);
+      if (owner === "Object") {
+        if (!/^(?:values|entries)$/.test(method)) return follow(args);
+        return follow(args).flatMap((o) =>
           nodes(o.node.properties).flatMap((p) =>
-            nodes(p.value).flatMap((value) => this.of(value, o.module, seen)),
+            nodes(p.value).flatMap((value) => this.#of(value, o.module, answers)),
           ),
         );
       }
-      if (texts.test(method)) return follow([callee.object, ...nodes(call.arguments)]);
+      if (/^(?:map|flatMap)$/.test(method)) return results(args[0]);
+      if (method === "toString") return this.#spell(callee.object, module, answers);
+      if (/^(?:join|concat)$/.test(method)) return follow([callee.object, ...args]);
+      // What is replaced is gone; what it is replaced with is seen.
+      if (/^(?:replace(?:All)?|pad(?:Start|End))$/.test(method)) {
+        return follow([callee.object, ...args.slice(1)]);
+      }
       if (parts.test(method)) return follow(callee.object);
-    }
-    if (callee.type === "Identifier" && wrappers.test(String(callee.name))) {
-      return nodes(call.arguments).flatMap((argument) =>
-        this.of(argument, module, seen).flatMap((o) => [o, ...this.#returned(o, seen)]),
-      );
-    }
-    return this.of(callee, module, seen).flatMap((o) => this.#returned(o, seen));
+    } else if (nameOf(callee) === "String") return this.#spell(args, module, answers);
+    else if (wrappers.test(nameOf(callee) ?? "")) return results(args);
+    return this.#of(callee, module, answers).flatMap((o) => this.#returned(o, answers));
   }
 
-  /** What a function returns; nothing for anything else. */
-  returned(origin: Origin): Origin[] {
-    return this.#returned(origin, new Set());
-  }
-
-  #returned({ node, module }: Origin, seen: Set<Node>): Origin[] {
+  #returned({ node, module }: Origin, answers: Answers): Origin[] {
     if (!isFunction(node) || !isNode(node.body)) return [];
     const results: Node[] = [];
     if (node.body.type !== "BlockStatement") results.push(node.body);
@@ -131,103 +223,49 @@ export class Origins {
         return true;
       });
     }
-    return results.flatMap((result) => this.of(result, module, seen));
+    return results.flatMap((result) => this.#of(result, module, answers));
   }
 
-  #resolve(source: string, from: string): Module | undefined {
-    if (!source.startsWith(".")) return undefined;
-    const path = posix.join(posix.dirname(from), source);
-    return ["", ".ts", ".tsx", "/index.ts", "/index.tsx"]
-      .map((end) => this.#modules.get(path + end))
-      .find((module) => module !== undefined);
+  /** By its name, its cast, or because it was caught. */
+  #isError(node: Node, module: Module, depth = 0): boolean {
+    if (depth > 4) return false;
+    if (node.type === "CaughtError") return true;
+    if (node.type === "TSAsExpression" && isNode(node.typeAnnotation)) {
+      if (nameOf(node.typeAnnotation.typeName)?.endsWith("Error")) return true;
+    }
+    const expression = bare(node);
+    if (node.type === "ParenthesizedExpression" && isNode(node.expression)) {
+      return this.#isError(node.expression, module, depth + 1);
+    }
+    if (expression !== node) return this.#isError(expression, module, depth + 1);
+    if (node.type === "MemberExpression") return errorName.test(nameOf(node) ?? "");
+    if (node.type !== "Identifier") return false;
+    return (
+      errorName.test(String(node.name)) ||
+      this.#named(node, module).some((o) => this.#isError(o.node, o.module, depth + 1))
+    );
   }
 }
 
-/** String methods whose result holds the text and the arguments, or a part of the text. */
-const texts = /^(?:concat|join|replace|replaceAll|padStart|padEnd)$/;
+/** String and list methods whose result holds the text or a part of it. */
 const parts =
-  /^(?:trim\w*|to(?:Locale)?(?:Upper|Lower)Case|toString|slice|substring|at|normalize|repeat|split|filter|find|reverse|sort|pop|shift|get)$/;
-const wrappers = /^(?:String|useMemo|useState|useRef|useCallback|memo)$/;
-
-export function isFunction(node: Node): boolean {
-  return /Function(?:Expression|Declaration)$/.test(node.type);
-}
+  /^(?:trim\w*|to(?:Locale)?(?:Upper|Lower)Case|slice|substring|at|normalize|repeat|split|filter|find|reverse|sort|pop|shift|get)$/;
+const wrappers = /^(?:useMemo|useState|useRef|useCallback|memo|forwardRef)$/;
+const errorName = /^(?:e|err|ex|exception|failure)$|error$/i;
 
 /** A call of t: its result comes from the catalog. */
 export function isTranslation(node: Node): boolean {
   return node.type === "CallExpression" && nameOf(node.callee) === "t";
 }
 
-function declarations(module: Module): Names {
-  const names: Names = new Map();
-  const declare = (name: string, node: Node) =>
-    names.set(name, [...(names.get(name) ?? []), { node, module }]);
+function errorText({ start }: Node, module: Module): Origin {
+  return { node: { type: "ErrorText", start }, module };
+}
 
-  const bind = (pattern: Node, value: Node | undefined): void => {
-    switch (pattern.type) {
-      case "Identifier":
-        if (value) declare(String(pattern.name), value);
-        break;
-      case "AssignmentPattern":
-        for (const left of nodes(pattern.left)) {
-          bind(left, value);
-          for (const right of nodes(pattern.right)) bind(left, right);
-        }
-        break;
-      case "ArrayPattern":
-        for (const element of nodes(pattern.elements)) bind(element, value);
-        break;
-      case "ObjectPattern":
-        for (const property of nodes(pattern.properties)) {
-          const { key, start } = property;
-          if (!isNode(property.value)) continue;
-          const part: Node = { type: "MemberExpression", object: value, property: key, start };
-          bind(property.value, value && isNode(key) ? part : undefined);
-        }
-        break;
-    }
-  };
-
-  const setters = new Map<string, Node>();
-  walk(module.program, (node) => {
-    if (node.type === "VariableDeclarator" && isNode(node.id)) {
-      bind(node.id, isNode(node.init) ? node.init : undefined);
-      const [state, setter] = node.id.type === "ArrayPattern" ? nodes(node.id.elements) : [];
-      const name = nameOf(setter);
-      if (state && name) setters.set(name, state);
-    }
-    if (node.type === "AssignmentExpression" && isNode(node.left) && isNode(node.right)) {
-      bind(node.left, node.right);
-    }
-    if (node.type === "ImportDeclaration") {
-      const { source, start } = node;
-      for (const specifier of nodes(node.specifiers)) {
-        const local = nameOf(specifier.local);
-        const imported = nameOf(specifier.imported);
-        if (!local || !imported || !isNode(source)) continue;
-        declare(local, { type: "Import", source: source.value, imported, start });
-      }
-    }
-    if (isFunction(node)) {
-      const name = nameOf(node.id);
-      if (name) declare(name, node);
-      // Defaults of parameters.
-      for (const parameter of nodes(node.params)) bind(parameter, undefined);
-    }
-    if (node.type === "CallExpression" && isNode(node.callee)) {
-      const { callee } = node;
-      const [first] = nodes(node.arguments);
-      const state = setters.get(nameOf(callee) ?? "");
-      if (state && first) bind(state, first);
-      // The parameter of a callback is an element of the list.
-      if (callee.type === "MemberExpression" && /^(?:map|flatMap)$/.test(nameOf(callee) ?? "")) {
-        const [parameter] = first && isFunction(first) ? nodes(first.params) : [];
-        if (parameter && isNode(callee.object)) {
-          bind(parameter, { ...callee, element: true });
-        }
-      }
-    }
-    return true;
+function unique(origins: Origin[]): Origin[] {
+  const seen = new Set<unknown>();
+  return origins.filter(({ node, module }) => {
+    const key = node.type === "ErrorText" ? `${module.file}:${node.start}` : node;
+    return !seen.has(key) && seen.add(key);
   });
-  return names;
 }

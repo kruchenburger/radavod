@@ -44,12 +44,15 @@ function Server() {
   const isDown = data?.status === "error";
   const version = data && t("health.version", { version: data.version });
 
+  const isBroken = data === null;
+
   let state = version ?? t("health.checking");
   if (isDown) state = t("health.degraded");
+  if (isBroken) state = t("health.broken");
   if (isError) state = t("health.unreachable");
   return (
     <footer className={classes.server}>
-      <Text role="status" mod={{ problem: isError || isDown }}>
+      <Text role="status" mod={{ problem: isError || isBroken || isDown }}>
         {state}
       </Text>
       {isDown && !isError && <Text>{version}</Text>}

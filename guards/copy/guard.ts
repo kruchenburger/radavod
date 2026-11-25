@@ -58,7 +58,7 @@ export function check(tree: Tree): Report {
   const violations = catalogs.flatMap(({ findings }) => findings);
   const shared = sharedTexts(catalogs);
   for (const [file, source] of tree) {
-    if (isCode(file) || !file.startsWith("web/") || isPicture(file)) continue;
+    if (isCode(file) || !file.startsWith("web/") || isForMachines(file)) continue;
     if (file.endsWith(".css")) violations.push(...checkStyles(file, source));
     else if (/\.(?:html|svg)$/.test(file)) {
       const { findings, scripts } = checkMarkup(file, source, shared);
@@ -112,6 +112,6 @@ function isCode(file: string): boolean {
   return /\.[cm]?[jt]sx?$/.test(file);
 }
 
-function isPicture(file: string): boolean {
-  return /\.(?:woff2|png|jpe?g|webp|avif|ico)$/.test(file);
+function isForMachines(file: string): boolean {
+  return /\.(?:woff2|png|jpe?g|webp|avif|ico)$|\/(?:robots\.txt|_headers|_redirects)$/.test(file);
 }

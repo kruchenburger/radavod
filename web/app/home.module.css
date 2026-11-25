@@ -55,6 +55,9 @@
 /* Mantine colours its options per theme; the tokens already do. */
 .choice .option {
   color: var(--ink);
+  /* Inside the option: around it the focus ring would merge with the fill. */
+  outline-color: currentcolor;
+  outline-offset: -4px;
 }
 
 .choice .option[data-active] {

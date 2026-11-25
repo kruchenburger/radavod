@@ -28,6 +28,10 @@ export function walk(node: Node, visit: (node: Node) => unknown): void {
   for (const child of Object.values(node).flatMap(nodes)) walk(child, visit);
 }
 
+export function isFunction(node: Node): boolean {
+  return /Function(?:Expression|Declaration)$/.test(node.type);
+}
+
 /** The name of an identifier, of a property or of a dotted path's last part. */
 export function nameOf(value: unknown): string | undefined {
   if (!isNode(value)) return undefined;

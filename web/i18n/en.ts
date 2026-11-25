@@ -12,6 +12,7 @@ export const en = {
   "theme.dark": "Dark",
   "health.checking": "Checking the server",
   "health.version": "Version {version}",
-  "health.degraded": "Your family's data is unavailable right now. Come back in a few minutes.",
+  "health.degraded": "The tree won't open: its storage isn't responding. Tell a keeper.",
   "health.unreachable": "The server didn't respond. Check your connection and reload the page.",
+  "health.broken": "The server answered with an error. Reload the page or tell a keeper.",
 } satisfies Record<keyof typeof ru, Text>;

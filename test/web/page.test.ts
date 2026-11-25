@@ -21,8 +21,17 @@ it("is built where the Worker looks for it", () => {
   expect(config).toContain(`outDir: ".${assets.directory}"`);
 });
 
-it("applies the remembered theme before the first paint", () => {
-  expect(page).toContain(`"${THEME_KEY}"`);
+it.each([
+  ["dark", "dark"],
+  ["light", null],
+  [null, null],
+])("starts with the remembered theme %s before the app does", (remembered, attribute) => {
+  const [, script = ""] = /<script>([\s\S]*?)<\/script>/.exec(page) ?? [];
+  document.documentElement.removeAttribute("data-mantine-color-scheme");
+  if (remembered) localStorage.setItem(THEME_KEY, remembered);
+  // oxlint-disable-next-line no-new-func -- the script stands in the page, not in a module
+  new Function(script)();
+  expect(document.documentElement.getAttribute("data-mantine-color-scheme")).toBe(attribute);
 });
 
 it.each([

@@ -6,7 +6,8 @@ const word = (pattern: string) => new RegExp(`(?<!\\p{L})(?:${pattern})(?!\\p{L}
 const banned = {
   ru: [
     "(?:легко|быстро|просто|удобно) и (?:легко|быстро|просто|удобно)",
-    "не просто",
+    // «не просто разобрать» means that it is hard.
+    "не просто(?! \\p{L}+(?:ть|ти|чь)(?:ся)?(?!\\p{L}))",
     "в один клик",
     "одним кликом",
     "позвол(?:яет|яют|ит|ят)",
@@ -21,7 +22,7 @@ const banned = {
     "effortless(?:ly)?",
     "delv(?:e|es|ed|ing)",
     "please note",
-    "it looks like",
+    "(?<=(?:^|[.!?,]) ?)it looks like",
     "(?:oops|whoops)",
     "something went wrong",
     "(?:in|with) (?:one|a single) click",
@@ -41,12 +42,11 @@ const informal = [
 
 // Enough to tell a clause from a name or a label: «Добавьте человека — он появится» from
 // «Иван — сын Петра». The endings are the ones nouns do not share.
-const clause = [
-  "\\p{L}+(?:йте|ьте|ните|дите|рите|жите|зите|тите|сите|мите|вите|лите)(?:сь)?",
+const request = ["\\p{L}+(?:йте|ьте|ните|дите|рите|жите|зите|тите|сите|мите|вите|лите)(?:сь)?"];
+const statement = [
   "\\p{L}+(?:ется|ются|ится|атся|ятся|лось|лись|лась)",
   "\\p{L}+(?:ает|яет|ают|яют|уют|еют)",
-  "\\p{L}+(?:дим|жем|дет|дут)",
-  "я|мы|вы|он|она|они|оно",
+  "\\p{L}{2,}(?:жем|дет|дут)",
 ];
 
 const rules: { rule: string; locale: Locale; breaks: (text: string) => boolean }[] = [
@@ -54,7 +54,11 @@ const rules: { rule: string; locale: Locale; breaks: (text: string) => boolean }
   { rule: "banned-en", locale: "en", breaks: matches(banned.en) },
   { rule: "informal-ty", locale: "ru", breaks: matches(informal) },
   { rule: "dash-ru", locale: "ru", breaks: joinsClauses },
-  { rule: "dash-en", locale: "en", breaks: (text) => /\p{L}\s*(?:—|--)\s*\p{L}/u.test(text) },
+  {
+    rule: "dash-en",
+    locale: "en",
+    breaks: (text) => /[\p{L})”"]\s*(?:—|--)\s*[\p{L}(“"]/u.test(text),
+  },
 ];
 
 /** The rules a text of a catalog breaks. */
@@ -69,8 +73,14 @@ function matches(patterns: string[]): (text: string) => boolean {
 }
 
 function joinsClauses(text: string): boolean {
-  const isClause = matches(clause);
+  const isRequest = matches(request);
+  const isStatement = matches(statement);
   return text
+    .replace(/«[^»]*»/g, "«»")
     .split(/(?<=[.!?…]) /)
-    .some((sentence) => sentence.split(/ (?:—|–|--?) /).filter(isClause).length > 1);
+    .some((sentence) => {
+      // A dash next to a number is a range or a pause.
+      const parts = sentence.split(/(?<!\d) (?:—|–|--?) (?!\d)/);
+      return parts.length > 1 && (parts.some(isRequest) || parts.filter(isStatement).length > 1);
+    });
 }

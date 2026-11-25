@@ -4,7 +4,10 @@ import { App } from "../../web/app/app";
 
 const healthy = { status: "ok", version: "1.2.3", tree: "ok", access: "ok" };
 
+let timeout: ReturnType<typeof vi.spyOn>;
+
 beforeEach(() => {
+  timeout = vi.spyOn(AbortSignal, "timeout");
   answerWith(Response.json(healthy));
   useBrowserLanguages("ru-RU");
 });
@@ -86,15 +89,32 @@ it("has a text of its own for data that is down", async () => {
   answerWith(Response.json({ ...healthy, status: "error", tree: "error" }, { status: 503 }));
   render(<App />);
   await waitFor(() =>
-    expect(status()).toBe("Данные семьи сейчас недоступны. Откройте сайт через несколько минут."),
+    expect(status()).toBe("Древо не открывается: хранилище не отвечает. Напишите хранителю."),
   );
   expect(screen.getByText("Версия 1.2.3")).toBeTruthy();
 });
 
 it.each([
-  ["no connection", () => Promise.reject(new TypeError("Failed to fetch"))],
-  ["a page instead of the answer", () => Promise.resolve(new Response("<html>"))],
+  ["a page", () => Promise.resolve(new Response("<html>", { status: 502 }))],
   ["another answer", () => Promise.resolve(Response.json({ version: 1 }))],
+])("has a text of its own for a server that answers with %s", async (_, fetch) => {
+  vi.stubGlobal("fetch", fetch);
+  render(<App />);
+  await waitFor(() =>
+    expect(status()).toBe("Сервер ответил с ошибкой. Обновите страницу или напишите хранителю."),
+  );
+});
+
+it("does not wait for a silent server forever", () => {
+  render(<App />);
+  const [, options] = vi.mocked(fetch).mock.calls[0] ?? [];
+  expect(options?.signal).toBeInstanceOf(AbortSignal);
+  expect(timeout).toHaveBeenCalledWith(10_000);
+});
+
+it.each([
+  ["no connection", () => Promise.reject(new TypeError("Failed to fetch"))],
+  ["too long a wait", () => Promise.reject(new DOMException("", "TimeoutError"))],
 ])("has a text of its own for a server that does not answer: %s", async (_, fetch) => {
   vi.stubGlobal("fetch", fetch);
   render(<App />);
