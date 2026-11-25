@@ -11,6 +11,8 @@
   "examples/random.ts": [],
   "examples/snapshot.test.ts": [],
   "examples/snapshot.ts": [],
+  "examples/start.test.ts": [],
+  "examples/start.ts": [],
   "examples/tree.ts": [],
   "examples/write-sample.ts": [],
   "examples/write.ts": []

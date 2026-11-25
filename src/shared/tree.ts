@@ -109,8 +109,10 @@ export const treeSnapshotSchema = z.object({
 /** A tree to look at without a sign-in: the invented family as the app fetches it. */
 export const treeSampleSchema = z.object({
   snapshot: treeSnapshotSchema,
-  /** Who stands in the centre first. The direct line is that of the same person. */
+  /** Who stands in the centre first. */
   start: id,
+  /** Whose ancestors are the direct line. */
+  line: id,
 });
 
 export type TreeSample = z.infer<typeof treeSampleSchema>;

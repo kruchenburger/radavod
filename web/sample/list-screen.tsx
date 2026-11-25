@@ -47,8 +47,8 @@ export function ListScreen({ person: id }: { person: string }) {
 
 function Branches({ own }: { own: string | null }) {
   const { t } = useLanguage();
-  const { snapshot, start, words } = useData();
-  const maps = useMaps(snapshot, start);
+  const { snapshot, line, words } = useData();
+  const maps = useMaps(snapshot, line);
   if (maps.status === "loading") return <p role="status">{t("map.loading")}</p>;
   if (maps.status === "failed") return <p role="alert">{t("map.failed")}</p>;
   return peopleByPage(maps.of.far).map(({ branch, people, generations }) => (

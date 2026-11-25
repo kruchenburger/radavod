@@ -32,7 +32,7 @@ const levels: MapLevel[] = ["far", "closer", "near"];
 
 export function BranchesScreen({ place }: { place: BranchesPlace }) {
   const { t } = useLanguage();
-  const { snapshot, start } = useData();
+  const { snapshot, start, line } = useData();
   const heading = useArrival<HTMLHeadingElement>();
   const page = usePage();
   const [latest, setLatest] = useState<Latest | null>(null);
@@ -47,7 +47,7 @@ export function BranchesScreen({ place }: { place: BranchesPlace }) {
     : page.width < 1100
       ? Math.max(1, Math.round(Math.sqrt(pages * 1.6)))
       : null;
-  const maps = useMaps(snapshot, start, perRow);
+  const maps = useMaps(snapshot, line, perRow);
   const person = place.person;
   const back = hrefOf(treePlace(person));
   const list = hrefOf({ screen: "list", person: person ?? start });
