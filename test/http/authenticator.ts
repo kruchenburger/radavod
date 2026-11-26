@@ -66,6 +66,11 @@ export class Authenticator {
     };
   }
 
+  /** Counts one use back, as a copy of the passkey made earlier would. */
+  rewind(): void {
+    this.#counter -= 1;
+  }
+
   /** What a browser answers sign-in options with. */
   async signIn(options: { challenge: string }, origin = this.origin) {
     if (this.#keys === undefined) throw new Error("no passkey yet");

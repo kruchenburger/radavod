@@ -10,8 +10,14 @@ import type { z } from "zod";
 import type { Credential, Purpose } from "../../contexts/access";
 import type { MemberId } from "../../kernel/id";
 import type { passkeyAnswerSchema } from "../../shared/access";
-import { type SessionAnswer } from "../../shared/access";
-import { accessOf, type ApiContext, countryOf, lasts, refused, sessionCookie } from "../auth";
+import {
+  accessOf,
+  type ApiContext,
+  countryOf,
+  refused,
+  sessionAnswerOf,
+  sessionCookie,
+} from "../auth";
 import { base64url, fromBase64url, hashOf, newSecret } from "../secrets";
 
 /** What WebAuthn needs of the installation: its domain and its address. */
@@ -22,17 +28,11 @@ function siteOf(c: ApiContext): { rpID: string; origin: string } | null {
 
 export const notConfigured = (c: ApiContext) => c.json({ error: "not-configured" }, 503);
 
-/** Reads a body by its schema; anything else is a bad request. */
-export async function bodyOf<T>(c: ApiContext, schema: z.ZodType<T>): Promise<T | null> {
-  const parsed = schema.safeParse(await c.req.json().catch(() => undefined));
-  return parsed.success ? parsed.data : null;
-}
-
-export const badRequest = (c: ApiContext) => c.json({ error: "bad-request" }, 400);
-
 /** Begins making a passkey for a member: the options for the browser and the token of the step. */
 export async function registration(
   c: ApiContext,
+  /** What the passkey dialog of a phone calls the site: the family. */
+  family: string,
   member: { id: MemberId; name: string },
   step: (
     hash: string,
@@ -41,7 +41,6 @@ export async function registration(
 ) {
   const site = siteOf(c);
   if (site === null) return notConfigured(c);
-  const family = (await accessOf(c).family()) ?? "Radavod";
   const options = await generateRegistrationOptions({
     rpName: family,
     rpID: site.rpID,
@@ -149,7 +148,6 @@ export async function taken<P extends Purpose>(c: ApiContext, flow: string, purp
 export async function signedIn(
   c: ApiContext,
   credential: string,
-  kind: "passkey" | "device",
   counter?: number,
 ): Promise<Response> {
   const token = newSecret();
@@ -163,20 +161,9 @@ export async function signedIn(
     ...(counter === undefined ? {} : { counter }),
   });
   if (!started.ok) return refused(c, started.error);
-  c.header("set-cookie", sessionCookie(token, lasts[kind]));
   const signed = await access.session(await hashOf(token), now);
   if (signed === null) return c.json({ error: "unauthorized" }, 401);
-  return c.json(await sessionAnswerOf(c, signed.member, signed.role, signed.person));
-}
-
-export async function sessionAnswerOf(
-  c: ApiContext,
-  member: MemberId,
-  role: SessionAnswer["role"],
-  person: SessionAnswer["person"],
-): Promise<SessionAnswer> {
-  const access = accessOf(c);
-  const [members, family] = await Promise.all([access.members(), access.family()]);
-  const name = members.find(({ id }) => id === member)?.name ?? "";
-  return { member, name, role, person, family };
+  // The cookie lasts as long as the session the rules gave.
+  c.header("set-cookie", sessionCookie(token, signed.expiresAt - now));
+  return c.json(await sessionAnswerOf(c, signed));
 }

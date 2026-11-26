@@ -7,35 +7,35 @@ import {
   registerInput,
   setupInput,
 } from "../../shared/access";
-import { accessOf, addressOf, type Api, type ApiContext, refused } from "../auth";
-import { hashOf, newId, newSecret } from "../secrets";
 import {
-  authentication,
+  accessOf,
+  addressOf,
+  type Api,
+  type ApiContext,
   badRequest,
   bodyOf,
-  madePasskey,
-  registration,
-  signedBy,
-  signedIn,
-  taken,
-} from "./passkeys";
+  refused,
+} from "../auth";
+import { hashOf, newId, newSecret } from "../secrets";
+import { authentication, madePasskey, registration, signedBy, signedIn, taken } from "./passkeys";
+
+/** A setup code shorter than this is no secret: setting up stays closed. */
+const shortestCode = 20;
 
 /** Setting a family up, invitations, passkeys and bound devices: the routes open without a session. */
 export function signInRoutes(app: Hono<Api>): void {
-  // The first keeper, or one more with a new setup code. A wrong code and a used one look the same.
+  // The first keeper, or one more with a new setup code. A wrong code, a used one and none look alike.
   app.post("/api/setup/options", async (c) => {
     const input = await bodyOf(c, setupInput);
     if (input === null) return badRequest(c);
-    const setupCode = c.env.SETUP_CODE;
-    if (!setupCode) return c.json({ error: "not-found" }, 404);
     const limited = await limit(c, "setup");
     if (limited !== null) return limited;
-    const [code, expected] = await Promise.all([hashOf(input.code), hashOf(setupCode)]);
-    if (code !== expected || (await accessOf(c).isCodeUsed(code))) {
-      return c.json({ error: "setup-refused" }, 403);
+    const code = await hashOf(input.code);
+    if (code !== (await setupCodeOf(c)) || !(await accessOf(c).maySetUp(code))) {
+      return setupRefused(c);
     }
     const member = { id: newId("member"), name: input.name };
-    return registration(c, member, (hash, challenge) => ({
+    return registration(c, input.family, member, (hash, challenge) => ({
       hash,
       challenge,
       purpose: "setup",
@@ -52,12 +52,14 @@ export function signInRoutes(app: Hono<Api>): void {
     if (!step.ok) return refused(c, step.error);
     if (step.value.purpose !== "setup") return badRequest(c);
     const { challenge, code, family, member } = step.value;
+    // A code changed while the passkey was made is no longer the code.
+    if (code !== (await setupCodeOf(c))) return setupRefused(c);
     const passkey = await madePasskey(c, challenge, input.response, input.label ?? "");
     if (passkey === null) return c.json({ error: "passkey-refused" }, 400);
     const now = Date.now();
     const done = await accessOf(c).setUp({ member, credential: passkey, now, code, family });
-    if (!done.ok) return refused(c, done.error);
-    return signedIn(c, passkey.id, "passkey");
+    if (!done.ok) return done.error.code === "set-up" ? setupRefused(c) : refused(c, done.error);
+    return signedIn(c, passkey.id);
   });
 
   // What an invitation is: its role and the family, nothing more. Opening it spends nothing.
@@ -77,16 +79,18 @@ export function signInRoutes(app: Hono<Api>): void {
     if (input === null) return badRequest(c);
     const access = accessOf(c);
     const hash = await hashOf(input.secret);
-    const found = await access.inspect(hash, Date.now());
-    if (!found.ok) return refused(c, found.error);
-    const member = await newcomer(c, found.value, input.name);
-    if (member === null) return badRequest(c);
-    return registration(c, member, (flow, challenge) => ({
+    const member = await access.newcomer(hash, Date.now(), {
+      id: newId("member"),
+      name: input.name,
+    });
+    if (!member.ok) return refused(c, member.error);
+    const family = (await access.family()) ?? "";
+    return registration(c, family, member.value, (flow, challenge) => ({
       hash: flow,
       challenge,
       purpose: "register",
       invitation: hash,
-      member,
+      member: member.value,
     }));
   });
 
@@ -106,7 +110,7 @@ export function signInRoutes(app: Hono<Api>): void {
       credential: passkey,
     });
     if (!done.ok) return refused(c, done.error);
-    return signedIn(c, passkey.id, "passkey");
+    return signedIn(c, passkey.id);
   });
 
   app.post("/api/passkey/login/options", async (c) => {
@@ -125,9 +129,10 @@ export function signInRoutes(app: Hono<Api>): void {
       credential === null || credential.kind !== "passkey"
         ? null
         : await signedBy(c, step.value.challenge, input.response, credential);
-    // Which passkey is unknown and which signature is wrong look the same.
-    if (credential === null || counter === null) return c.json({ error: "sign-in-refused" }, 401);
-    return signedIn(c, credential.id, "passkey", counter);
+    // Which passkey is unknown, which signature is wrong and which count went back look the same.
+    if (credential === null || counter === null) return signInRefused(c);
+    const done = await signedIn(c, credential.id, counter);
+    return done.status === 401 ? signInRefused(c) : done;
   });
 
   // A reader whose passkey does not work binds this browser instead, once.
@@ -139,28 +144,23 @@ export function signInRoutes(app: Hono<Api>): void {
     const access = accessOf(c);
     const hash = await hashOf(input.secret);
     const now = Date.now();
-    const found = await access.inspect(hash, now);
-    if (!found.ok) return refused(c, found.error);
-    const member = await newcomer(c, found.value, input.name);
-    if (member === null) return badRequest(c);
+    const member = await access.newcomer(hash, now, { id: newId("member"), name: input.name });
+    if (!member.ok) return refused(c, member.error);
     const device = { id: `device_${newSecret()}`, kind: "device" as const, label: input.label };
-    const done = await access.redeem({ hash, now, member, credential: device });
+    const done = await access.redeem({ hash, now, member: member.value, credential: device });
     if (!done.ok) return refused(c, done.error);
-    return signedIn(c, device.id, "device");
+    return signedIn(c, device.id);
   });
 }
 
-/** Who an invitation lets in: somebody new with the name they give, or the member it recovers. */
-async function newcomer(
-  c: ApiContext,
-  invitation: { kind: "join" | "recovery"; member: string | null },
-  name: string | undefined,
-) {
-  if (invitation.kind === "join") return name === undefined ? null : { id: newId("member"), name };
-  const members = await accessOf(c).members();
-  const member = members.find(({ id }) => id === invitation.member);
-  return member === undefined ? null : { id: member.id, name: member.name };
+/** The hash of the setup code of the installation, null when it has none worth the name. */
+async function setupCodeOf(c: ApiContext): Promise<string | null> {
+  const code = c.env.SETUP_CODE ?? "";
+  return code.length < shortestCode ? null : hashOf(code);
 }
+
+const setupRefused = (c: ApiContext) => c.json({ error: "setup-refused" }, 403);
+const signInRefused = (c: ApiContext) => c.json({ error: "sign-in-refused" }, 401);
 
 /** Counts a try from an address; one too many is 429 with when to try again. */
 async function limit(c: ApiContext, kind: "sign-in" | "setup"): Promise<Response | null> {

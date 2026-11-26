@@ -57,7 +57,7 @@ export function setUp(
   },
 ): Result<Change, SetUp | Duplicate | CredentialError> {
   const { member, credential, now, code } = input;
-  if (reader.isCodeUsed(code)) return { ok: false, error: { code: "set-up" } };
+  if (!maySetUp(reader, code)) return { ok: false, error: { code: "set-up" } };
   const made = joined(reader, { ...member, role: "keeper", person: null }, credential, now);
   if (!made.ok) return made;
   const used = writes("setup", code, null, { hash: code, usedAt: now });
@@ -67,6 +67,27 @@ export function setUp(
       ? writes("family", "family" as const, null, { name: input.family })
       : [];
   return { ok: true, value: [...made.value, ...used, ...named] };
+}
+
+/** Whether a setup code, by its hash, may still let a keeper in: each does so once. */
+export function maySetUp(reader: AccessReader, code: string): boolean {
+  return !reader.isCodeUsed(code);
+}
+
+/**
+ * Who an invitation lets in: somebody new, with the name they give and an identifier made for them,
+ * or the member a recovery link is for.
+ */
+export function newcomerOf(
+  reader: AccessReader,
+  invitation: Invitation,
+  fresh: { id: MemberId; name?: string | undefined },
+): NewMember | null {
+  if (invitation.kind === "join") {
+    return fresh.name === undefined ? null : { id: fresh.id, name: fresh.name };
+  }
+  const member = invitation.member === null ? null : reader.member(invitation.member);
+  return isLive(member) ? { id: member.id, name: member.name } : null;
 }
 
 export function invite(

@@ -456,3 +456,20 @@ describe("a step of signing in", () => {
     expect(done.taken).toMatchObject({ ok: true, value: { challenge: "c" } });
   });
 });
+
+describe("a passkey that signs in", () => {
+  it("counts on, and one that counts the same or back is refused", () => {
+    const { access } = family();
+    expect(access.signIn({ hash: "s1", credential: "ann-1", now: start, counter: 5 }).ok).toBe(
+      true,
+    );
+    for (const counter of [5, 4]) {
+      expect(
+        access.signIn({ hash: `s${counter}x`, credential: "ann-1", now: start, counter }),
+      ).toEqual(refused("stale-counter"));
+    }
+    expect(access.signIn({ hash: "s2", credential: "ann-1", now: start, counter: 6 }).ok).toBe(
+      true,
+    );
+  });
+});

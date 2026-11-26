@@ -1,5 +1,5 @@
 import { isId, type MemberId, type PersonId } from "../../../kernel/id";
-import type { Duplicate, Missing } from "../../../kernel/refusal";
+import { type Duplicate, type Missing, missing } from "../../../kernel/refusal";
 import type { Result } from "../../../kernel/result";
 import {
   addCredential,
@@ -19,6 +19,8 @@ import {
   type Invitation,
   invite,
   liveInvitation,
+  maySetUp,
+  newcomerOf,
   recover,
   redeem,
   type RedeemError,
@@ -29,6 +31,7 @@ import {
 import {
   allowed,
   type Change,
+  isLive,
   changeRole,
   deleteAccount,
   type Forbidden,
@@ -41,8 +44,8 @@ import {
   revokeMember,
   withoutPeople,
 } from "../domain/member";
-import type { Role } from "../domain/rights";
-import { type Signed, signIn, signOut, slide } from "../domain/session";
+import { can, type Role } from "../domain/rights";
+import { type Signed, signIn, signOut, slide, type StaleCounter } from "../domain/session";
 import {
   allowance,
   type Limit,
@@ -69,7 +72,15 @@ export type AccessError =
   | Duplicate
   | CredentialError
   | RedeemError
-  | Expired;
+  | Expired
+  | StaleCounter;
+
+/** The members as one of them sees them. */
+export type Roster = {
+  members: (Pick<Member, "id" | "name" | "role"> &
+    Partial<Member> & { credentials?: Omit<Credential, "publicKey" | "counter">[] })[];
+  invitations?: Omit<Invitation, "hash">[];
+};
 
 /** A step of signing in as it begins. */
 export type NewChallenge = Parameters<typeof openChallenge>[0];
@@ -94,9 +105,19 @@ export interface Access {
   }): Result<Change, AccessError>;
   /** The name of the family, null until it is set up. */
   family(): string | null;
-  /** Whether a setup code, by its hash, already let a keeper in. */
-  isCodeUsed(hash: string): boolean;
+  /** A live credential, with what checks a signature by it. */
   credential(id: string): Credential | null;
+  invitation(id: string): Invitation | null;
+  /** Whether a setup code, by its hash, may still let a keeper in. */
+  maySetUp(code: string): boolean;
+  /** Who a live invitation lets in. */
+  newcomer(
+    hash: string,
+    now: number,
+    fresh: { id: MemberId; name?: string | undefined },
+  ): Result<NewMember, AccessError>;
+  /** The members as a member may see them: names for all, credentials and invitations for keepers. */
+  roster(by: MemberId): Result<Roster, AccessError>;
   /** What a live invitation is, without spending it. */
   inspect(hash: string, now: number): Result<Invitation, AccessError>;
   /** The invitations a keeper gave or may see. */
@@ -173,8 +194,41 @@ export function accessOver(store: AccessStore): Access {
     members: () => store.members(),
     credentialsOf: (id) => store.credentialsOf(id),
     family: () => store.family()?.name ?? null,
-    isCodeUsed: (hash) => store.isCodeUsed(hash),
-    credential: (id) => store.credential(id),
+    credential(id) {
+      const found = store.credential(id);
+      return isLive(found) ? found : null;
+    },
+    invitation: (id) => store.invitation(id),
+    maySetUp: (code) => maySetUp(store, code),
+    newcomer(hash, now, fresh) {
+      const live = liveInvitation(store, hash, now);
+      if (!live.ok) return live;
+      const member = newcomerOf(store, live.value, fresh);
+      return member === null ? missing("member") : { ok: true, value: member };
+    },
+    roster(by) {
+      const reader = allowed(store, by, "see-members");
+      if (!reader.ok) return reader;
+      const members = store.members();
+      if (!can(reader.value.role, "manage-members")) {
+        const names = members
+          .filter((one) => isLive(one))
+          .map(({ id, name, role }) => ({ id, name, role }));
+        return { ok: true, value: { members: names } };
+      }
+      return {
+        ok: true,
+        value: {
+          members: members.map((one) => ({
+            ...one,
+            credentials: store
+              .credentialsOf(one.id)
+              .map(({ publicKey: _key, counter: _counter, ...credential }) => credential),
+          })),
+          invitations: store.invitations().map(({ hash: _hash, ...one }) => one),
+        },
+      };
+    },
     inspect: (hash, now) => liveInvitation(store, hash, now),
     invitations(by) {
       const keeper = allowed(store, by, "manage-members");

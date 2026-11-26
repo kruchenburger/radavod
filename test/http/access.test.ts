@@ -32,24 +32,28 @@ describe("setting a family up", () => {
       });
       expect(again).toEqual({ status: 403, body: { error: "setup-refused" } });
     }
-    const renewed = new Family({ SETUP_CODE: "a new code" });
+    const renewed = new Family({ SETUP_CODE: "a second setup code for tests" });
     Object.assign(renewed.env, { ACCESS: family.env.ACCESS });
-    expect((await renewed.browser().setUp("Bob", "x", "a new code")).body).toMatchObject({
+    expect(
+      (await renewed.browser().setUp("Bob", "x", "a second setup code for tests")).body,
+    ).toMatchObject({
       role: "keeper",
       family: "Oaks",
     });
     const third = await renewed.browser().json("POST", "/api/setup/options", {
-      body: { code: "a new code", family: "x", name: "Eve" },
+      body: { code: "a second setup code for tests", family: "x", name: "Eve" },
     });
     expect(third.status).toBe(403);
   });
 
   it("is not there without a setup code, and counts guesses by address", async () => {
-    const closed = new Family({ SETUP_CODE: "" });
-    const none = await closed.browser().json("POST", "/api/setup/options", {
-      body: { code: "x", family: "x", name: "x" },
-    });
-    expect(none.status).toBe(404);
+    for (const SETUP_CODE of ["", "too short a code"]) {
+      const closed = new Family({ SETUP_CODE });
+      const none = await closed.browser().json("POST", "/api/setup/options", {
+        body: { code: SETUP_CODE || "x", family: "x", name: "x" },
+      });
+      expect(none).toEqual({ status: 403, body: { error: "setup-refused" } });
+    }
     const family = new Family();
     const guesser = family.browser();
     for (let i = 0; i < 10; i++) {
@@ -72,6 +76,41 @@ describe("setting a family up", () => {
 });
 
 describe("a step of signing in", () => {
+  it("is refused when the setup code changed while the passkey was made", async () => {
+    const family = new Family();
+    const browser = family.browser();
+    const options = await browser.json<{ flow: string; options: never }>(
+      "POST",
+      "/api/setup/options",
+      { body: { code: SETUP_CODE, family: "x", name: "Ann" } },
+    );
+    const response = await browser.passkey.register(options.body.options);
+    Object.assign(family.env, { SETUP_CODE: "a second setup code for tests" });
+    const done = await browser.json("POST", "/api/setup/verify", {
+      body: { flow: options.body.flow, response },
+    });
+    expect(done).toEqual({ status: 403, body: { error: "setup-refused" } });
+  });
+
+  it("comes from the site itself on every open route", async () => {
+    const browser = new Family().browser();
+    for (const path of [
+      "/api/setup/options",
+      "/api/setup/verify",
+      "/api/invitation",
+      "/api/passkey/register/options",
+      "/api/passkey/register/verify",
+      "/api/passkey/login/options",
+      "/api/passkey/login/verify",
+      "/api/device/bind",
+    ]) {
+      for (const origin of ["https://elsewhere.test", null]) {
+        const response = await browser.json("POST", path, { body: {}, origin });
+        expect(response, `${path} ${origin}`).toEqual({ status: 403, body: { error: "origin" } });
+      }
+    }
+  });
+
   it("is answered once", async () => {
     const browser = new Family().browser();
     const options = await browser.json<{ flow: string; options: never }>(
@@ -136,6 +175,33 @@ describe("signing in", () => {
     expect((await keeper.call("GET", "/api/session", { origin: null })).status).toBe(200);
   });
 
+  it("refuses a passkey that counts back, as a copy of it would", async () => {
+    const family = new Family();
+    const ann = family.browser();
+    await ann.setUp();
+    expect((await ann.signIn()).status).toBe(200);
+    ann.passkey.rewind();
+    expect(await ann.signIn()).toEqual({ status: 401, body: { error: "sign-in-refused" } });
+  });
+
+  it("counts an IPv6 household by its /64, and binding a device too", async () => {
+    const browser = new Family().browser();
+    for (let i = 0; i < 10; i++) {
+      const address = `2001:db8:1:2::${(i + 1).toString(16)}`;
+      const options = await browser.call("POST", "/api/passkey/login/options", { address });
+      expect(options.status).toBe(200);
+    }
+    const bind = await browser.call("POST", "/api/device/bind", {
+      body: { secret: "A".repeat(43), name: "x", label: "x" },
+      address: "2001:0db8:0001:0002:ffff::1",
+    });
+    expect(bind.status).toBe(429);
+    const other = await browser.call("POST", "/api/passkey/login/options", {
+      address: "2001:db8:1:3::1",
+    });
+    expect(other.status).toBe(200);
+  });
+
   it("is limited to ten tries in a quarter of an hour by address", async () => {
     const browser = new Family().browser();
     for (let i = 0; i < 10; i++) {
@@ -186,6 +252,23 @@ describe("an invitation", () => {
       (await family.browser().json("POST", "/api/invitation", { body: { secret } })).status,
     ).toBe(410);
     expect((await family.browser().join(secret, "Dan")).status).toBe(410);
+  });
+
+  it("is not spent by a passkey a browser failed to make", async () => {
+    const { family, keeper } = await Family.withRoles();
+    const secret = await keeper.invite("editor");
+    const eve = family.browser();
+    const options = await eve.json<{ flow: string; options: never }>(
+      "POST",
+      "/api/passkey/register/options",
+      { body: { secret, name: "Eve" } },
+    );
+    const response = await eve.passkey.register(options.body.options, "https://elsewhere.test");
+    const failed = await eve.json("POST", "/api/passkey/register/verify", {
+      body: { flow: options.body.flow, response },
+    });
+    expect(failed).toEqual({ status: 400, body: { error: "passkey-refused" } });
+    expect((await eve.join(secret, "Eve")).status).toBe(200);
   });
 
   it("binds one device of a reader, for 180 days, and no device of an editor", async () => {
@@ -333,6 +416,28 @@ describe("the routes of members", () => {
     );
     expect(all.body.members.every(({ credentials }) => credentials.length > 0)).toBe(true);
     expect(JSON.stringify(all.body)).not.toMatch(/publicKey|"hash"/u);
+  });
+
+  it("leave one keeper when two keepers revoke each other at once", async () => {
+    const { family, keeper } = await Family.withRoles();
+    const bob = family.browser();
+    expect((await bob.join(await keeper.invite("keeper"), "Bob")).status).toBe(200);
+    const ids = await Promise.all(
+      [keeper, bob].map(
+        async (one) => (await one.json<{ member: string }>("GET", "/api/session")).body.member,
+      ),
+    );
+    const [ann, other] = ids as [string, string];
+    const both = await Promise.all([
+      keeper.call("POST", `/api/members/${other}/revoke`, { body: { version: 1 } }),
+      bob.call("POST", `/api/members/${ann}/revoke`, { body: { version: 1 } }),
+    ]);
+    // The second is refused: by the gate if the first came first, else by the rules.
+    const statuses = both.map(({ status }) => status);
+    expect(statuses.filter((status) => status === 204)).toHaveLength(1);
+    expect(statuses.filter((status) => status === 401 || status === 403)).toHaveLength(1);
+    const left = await Promise.all([keeper, bob].map((one) => one.call("GET", "/api/session")));
+    expect(left.map(({ status }) => status).sort()).toEqual([200, 401]);
   });
 
   it("keep the last keeper whatever is asked", async () => {

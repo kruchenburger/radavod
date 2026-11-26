@@ -1,16 +1,27 @@
 import type { Hono } from "hono";
-import { can } from "../../contexts/access";
 import type { MemberId } from "../../kernel/id";
 import { inviteInput, type LinkAnswer, roleInput, versionInput } from "../../shared/access";
-import { accessOf, allow, type Api, type ApiContext, clearedCookie, refused } from "../auth";
+import {
+  accessOf,
+  allow,
+  type Api,
+  type ApiContext,
+  badRequest,
+  bodyOf,
+  clearedCookie,
+  refused,
+  sessionAnswerOf,
+  sessionCookie,
+} from "../auth";
 import { hashOf, newSecret } from "../secrets";
-import { badRequest, bodyOf, sessionAnswerOf } from "./passkeys";
 
 /** Who is signed in, the members of the family, and one's own account. Each needs a session. */
 export function memberRoutes(app: Hono<Api>): void {
+  // Each time the app opens, the cookie is given again for as long as the session now lasts.
   app.get("/api/session", allow("own-account"), async (c) => {
-    const { member, role, person } = c.get("signed");
-    return c.json(await sessionAnswerOf(c, member, role, person));
+    const signed = c.get("signed");
+    c.header("set-cookie", sessionCookie(c.get("token"), signed.expiresAt - Date.now()));
+    return c.json(await sessionAnswerOf(c, signed));
   });
 
   app.post("/api/logout", allow("own-account"), async (c) => {
@@ -21,20 +32,8 @@ export function memberRoutes(app: Hono<Api>): void {
 
   // Everybody sees the names; a keeper sees credentials and invitations too.
   app.get("/api/members", allow("see-members"), async (c) => {
-    const access = accessOf(c);
-    const signed = c.get("signed");
-    const members = (await access.members()).filter(({ revokedAt }) => revokedAt === null);
-    if (!can(signed.role, "manage-members")) {
-      return c.json({ members: members.map(({ id, name, role }) => ({ id, name, role })) });
-    }
-    const invitations = await access.invitations(signed.member);
-    const all = await access.members();
-    return c.json({
-      members: await Promise.all(
-        all.map(async (one) => ({ ...one, credentials: await access.credentialsOf(one.id) })),
-      ),
-      invitations: invitations.ok ? invitations.value.map(({ hash: _hash, ...one }) => one) : [],
-    });
+    const roster = await accessOf(c).roster(c.get("signed").member);
+    return roster.ok ? c.json(roster.value) : refused(c, roster.error);
   });
 
   app.post("/api/members/invitations", allow("manage-members"), async (c) => {

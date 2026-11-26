@@ -8,6 +8,7 @@ import {
   type Invitation,
   type NewChallenge,
   type Purpose,
+  type Roster,
   type Expected,
   type StaleVersion,
   type UnknownAggregate,
@@ -71,20 +72,25 @@ export class FamilyAccess extends DurableObject<Env> {
   }
 
   /** The credentials of a member, without the keys of passkeys: nobody outside needs them. */
-  credentialsOf(id: MemberId): Omit<Credential, "publicKey" | "counter">[] {
-    return this.#access()
-      .credentialsOf(id)
-      .map(({ publicKey: _key, counter: _counter, ...one }) => one);
-  }
-
   /** A live credential, with what checks a signature by it. */
   credential(id: string): Credential | null {
-    const found = this.#access().credential(id);
-    return found !== null && found.revokedAt === null ? found : null;
+    return this.#access().credential(id);
   }
 
-  isCodeUsed(hash: string): boolean {
-    return this.#access().isCodeUsed(hash);
+  roster(by: MemberId): Result<Roster, AccessError> {
+    return this.#access().roster(by);
+  }
+
+  newcomer(
+    hash: string,
+    now: number,
+    fresh: { id: MemberId; name?: string | undefined },
+  ): Result<NewMember, AccessError> {
+    return this.#access().newcomer(hash, now, fresh);
+  }
+
+  maySetUp(code: string): boolean {
+    return this.#access().maySetUp(code);
   }
 
   family(): string | null {
@@ -129,7 +135,7 @@ export class FamilyAccess extends DurableObject<Env> {
     by: MemberId,
     input: { id: string; hash: string; role: Role; person: PersonId | null; now: number },
   ): Promise<Done<{ expiresAt: number }>> {
-    return this.#run({}, (access) => given(access.invite(by, input), input.id));
+    return this.#run({}, (access) => given(access, access.invite(by, input), input.id));
   }
 
   recover(
@@ -137,7 +143,7 @@ export class FamilyAccess extends DurableObject<Env> {
     input: { id: string; hash: string; member: MemberId; now: number },
     expected: Expected = {},
   ): Promise<Done<{ expiresAt: number }>> {
-    return this.#run(expected, (access) => given(access.recover(by, input), input.id));
+    return this.#run(expected, (access) => given(access, access.recover(by, input), input.id));
   }
 
   revokeInvitation(by: MemberId, id: string): Promise<Done> {
@@ -254,13 +260,12 @@ export class FamilyAccess extends DurableObject<Env> {
   }
 }
 
-/** When the link a change gave is over. */
+/** The link a command gave, and when it is over. */
 function given<E extends { code: string }>(
+  access: Access,
   done: Result<Change, E>,
   id: string,
 ): Result<{ expiresAt: number }, E> {
   if (!done.ok) return done;
-  const write = done.value.find((one) => one.kind === "invitation" && one.id === id);
-  const after = write?.after as { expiresAt?: number } | null | undefined;
-  return { ok: true, value: { expiresAt: after?.expiresAt ?? 0 } };
+  return { ok: true, value: { expiresAt: access.invitation(id)?.expiresAt ?? 0 } };
 }
