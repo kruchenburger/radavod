@@ -52,7 +52,7 @@ it.each([
 ])(
   "starts with the theme %s, a dark browser %s, before the app does",
   (remembered, isDark, attribute) => {
-    const [, script = ""] = /<script>([\s\S]*?)<\/script>/.exec(page) ?? [];
+    const [, script = ""] = /<script>([\s\S]*?)<\/script\s*>/i.exec(page) ?? [];
     document.documentElement.removeAttribute("data-mantine-color-scheme");
     vi.spyOn(window, "matchMedia").mockImplementation(
       (query) =>
