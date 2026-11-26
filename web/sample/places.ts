@@ -1,5 +1,4 @@
 import { parseSamplePath, samplePath } from "../../src/shared/sample-path";
-import type { MapLevel } from "../tree/layout/branch-map";
 
 export type Half = "ancestors" | "descendants";
 
@@ -18,16 +17,15 @@ export type TreePlace = {
 
 export type BranchesPlace = {
   screen: "branches";
-  /** The map of all branches, or the fan of the ancestors of the chosen person. */
+  /** The canvas of all branches, or the fan of the ancestors of the chosen person. */
   as: "map" | "fan";
-  level: MapLevel;
   /** The chosen person. */
   person: string | null;
   /** The branch to come closer to. */
   branch: string | null;
   /** What stands in the middle. */
   at: Spot | null;
-  /** How much larger than the level is, 1 by default. */
+  /** How much larger than names are set, 1 by default. */
   scale: number;
   /** On the fan, the partner who stands in the centre with the chosen person. */
   partner: string | null;
@@ -50,7 +48,6 @@ export const treePlace = (person: string | null): TreePlace => ({
 export const branchesPlace = (place: Partial<BranchesPlace> = {}): BranchesPlace => ({
   screen: "branches",
   as: "map",
-  level: "far",
   person: null,
   branch: null,
   at: null,
@@ -62,7 +59,10 @@ export const branchesPlace = (place: Partial<BranchesPlace> = {}): BranchesPlace
 const id = /^[\w-]{1,64}$/;
 const spot = /^([\w-]{1,64})\.(-?\d{1,6})\.(-?\d{1,6})$/;
 
-/** What an address means. Anything it does not understand in the query is left out. */
+/**
+ * What an address means. Anything it does not understand in the query is left out: an address of
+ * the old map, with its level, opens the canvas on the same person.
+ */
 export function readPlace(path: string, search: string): Place | null {
   const found = parseSamplePath(path);
   if (found === null) return null;
@@ -80,13 +80,11 @@ export function readPlace(path: string, search: string): Place | null {
     };
   }
   if (found.screen !== "branches") return found;
-  const level = query.get("level");
   const [, person, dx, dy] = spot.exec(query.get("at") ?? "") ?? [];
   const scale = Number(query.get("scale") ?? 1);
   return branchesPlace({
     as: query.get("as") === "fan" ? "fan" : "map",
     partner: idOf("with"),
-    level: level === "closer" || level === "near" ? level : "far",
     person: idOf("person"),
     branch: idOf("branch"),
     at: person === undefined ? null : { person, dx: Number(dx), dy: Number(dy) },
@@ -106,7 +104,6 @@ export function hrefOf(place: Place): string {
     if (place.person !== null) query.set("person", place.person);
     if (place.partner !== null) query.set("with", place.partner);
   } else if (place.screen === "branches") {
-    if (place.level !== "far") query.set("level", place.level);
     if (place.person !== null) query.set("person", place.person);
     if (place.branch !== null) query.set("branch", place.branch);
     if (place.at !== null) {

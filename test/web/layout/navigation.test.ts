@@ -4,7 +4,7 @@ import { snapshotOf } from "../../../examples/snapshot.ts";
 import { around } from "../../../web/tree/layout/around";
 import { branchMap } from "../../../web/tree/layout/branch-map";
 import { cardIndex } from "../../../web/tree/layout/hit";
-import { type Arrow, aroundKeys, listKeys, mapKeys, pageKeys } from "../../../web/tree/layout/keys";
+import { type Arrow, aroundKeys, listKeys, mapKeys } from "../../../web/tree/layout/keys";
 import { relativesOf } from "../../../web/tree/layout/relatives";
 import { unreachable } from "./reach";
 import { type FamilySpec, familyOf, measure, wordingOf } from "./family";
@@ -35,7 +35,6 @@ const family: FamilySpec = {
 };
 const snapshot = familyOf(family);
 const map = branchMap(snapshot, {
-  level: "closer",
   measure,
   headOf: ({ title }) => title.ru,
   lineOf: "x",
@@ -106,7 +105,7 @@ describe("the keyboard on the map", () => {
 
   it("reaches everybody", () => {
     const example = snapshotOf(generateFamily(1, 300));
-    const all = branchMap(example, { level: "near", measure, headOf: ({ title }) => title.ru });
+    const all = branchMap(example, { measure, headOf: ({ title }) => title.ru });
     const step = mapKeys(all);
     expect(unreachable(all.cards, step)).toEqual([]);
   });
@@ -120,7 +119,6 @@ describe("the keyboard on the map", () => {
       { id: "below", branch: "A", parents: ["X"] },
     ];
     const lost = branchMap(familyOf({ people, branches: ["A", "B"] }), {
-      level: "near",
       measure,
       headOf: ({ title }) => title.ru,
     });
@@ -130,28 +128,6 @@ describe("the keyboard on the map", () => {
   it("knows nothing of strangers", () => {
     expect(go("nobody", "up")).toBeNull();
     expect(go("nobody", "left")).toBeNull();
-  });
-});
-
-describe("the keyboard on pages", () => {
-  const branches = ["A", "B", "C", "D", "E"];
-  const people = branches.map((branch) => ({ id: branch, branch }));
-  const pages = branchMap(familyOf({ people, branches }), {
-    level: "far",
-    measure,
-    headOf: ({ title }) => title.ru,
-    perRow: 2,
-  });
-  const move = pageKeys(pages);
-
-  it("goes to the page before, after, above and below", () => {
-    expect(move(0, "right")).toBe(1);
-    expect(move(1, "right")).toBe(2);
-    expect(move(0, "left")).toBeNull();
-    expect(move(0, "down")).toBe(2);
-    expect(move(3, "up")).toBe(1);
-    expect(move(3, "down")).toBeNull();
-    expect(move(4, "right")).toBeNull();
   });
 });
 

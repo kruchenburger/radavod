@@ -2,6 +2,7 @@ import { useComputedColorScheme } from "@mantine/core";
 import {
   type KeyboardEvent,
   memo,
+  type PointerEvent,
   useCallback,
   useEffect,
   useLayoutEffect,
@@ -13,9 +14,9 @@ import type { TreeSnapshot } from "../../../src/shared/tree";
 import { useLanguage } from "../../app/language";
 import { Link } from "../../app/router";
 import { CardLines } from "../card-lines";
-import type { BranchMap, MapCard, MapLevel } from "../layout/branch-map";
+import type { BranchMap, MapCard } from "../layout/branch-map";
 import { cardIndex } from "../layout/hit";
-import { type Arrow, mapKeys, pageKeys } from "../layout/keys";
+import { type Arrow, mapKeys } from "../layout/keys";
 import { kinOf } from "../layout/kin";
 import { barOf, mapText } from "../layout/map-text";
 import { personKey } from "../layout/types";
@@ -24,92 +25,69 @@ import { measure, rem } from "../type";
 import type { Words } from "../words";
 import { listen } from "./gestures";
 import classes from "./map-view.module.css";
-import { type Drawing, drawingOf, type Paint, paint } from "./paint";
-import {
-  between,
-  hold,
-  kept,
-  type Maps,
-  pan,
-  reveal,
-  settle,
-  type Size,
-  toLevel,
-  type View,
-  zoom,
-} from "./view";
+import { type Drawing, drawingOf, type Paint, paint, paintWhole } from "./paint";
+import { between, hold, pan, reveal, type Size, type View, windowOnWhole, zoom } from "./view";
 
-type Goal = (maps: Maps, window: Size) => View;
+type Goal = (map: BranchMap, window: Size) => View;
 
 /** A view to go to. The same object is gone to once. */
 export type Target = { view: Goal; isSmooth: boolean };
 
 export type MapViewProps = {
   snapshot: TreeSnapshot;
-  maps: Maps;
+  map: BranchMap;
   words: Words;
   chosen: string | null;
   target: Target;
   label: string;
   describedBy: string;
-  /** Where a page leads, and the people a reference stands for, and a person. */
+  /** Where a page of the strip leads, and the people a reference stands for, and a person. */
   hrefOfPage: (branch: string | null) => string;
-  hrefOfReference: (person: string, level: MapLevel) => string;
+  hrefOfReference: (person: string) => string;
   hrefOfPerson: (person: string) => string;
   /** The view has come to rest. */
   onRest: (view: View, window: Size) => void;
-  /** Esc: one step further away. */
-  onAway: (view: View, window: Size) => void;
 };
 
-const zoomTime = 200;
+const moveTime = 200;
 /** Cards this far outside the window are there already. */
 const ahead = 240;
-const levels: MapLevel[] = ["far", "closer", "near"];
 
+/**
+ * The canvas of all branches: names as real links over lines painted on a canvas, the heads of the
+ * pages kept to the top of the window, and above it the strip of the whole family with the window
+ * marked on it. Nothing goes through React while the canvas moves.
+ */
 export function MapView(props: MapViewProps) {
-  const { snapshot, maps, words, chosen, target, label, describedBy, onRest, onAway } = props;
+  const { snapshot, map, words, chosen, target, label, describedBy, onRest } = props;
   const root = useRef<HTMLDivElement>(null);
   const canvas = useRef<HTMLCanvasElement>(null);
   const world = useRef<HTMLDivElement>(null);
   const heads = useRef<HTMLDivElement>(null);
+  const mark = useRef<HTMLDivElement>(null);
   const [size, setSize] = useState<Size | null>(null);
-  const [level, setLevel] = useState<MapLevel>("far");
   const [seen, setSeen] = useState<{ x: number; y: number; w: number; h: number } | null>(null);
   const colorScheme = useComputedColorScheme("light");
   const colors = useColors(root, words, chosen, snapshot, colorScheme);
-  const drawings = useMemo(
-    () => (colors === null ? null : drawingsOf(maps, words, snapshot, colors)),
-    [maps, words, snapshot, colors],
+  const drawing = useMemo(
+    () => (colors === null || typeof Path2D === "undefined" ? null : drawingOf(map, colors, null)),
+    [map, colors],
   );
 
   const view = useRef<View | null>(null);
-  const sameLevel = useRef<MapLevel | null>(null);
-  /** The focus was on something that a change of the level took away. */
-  const isFocusLost = useRef(false);
-  const lastPage = useRef(0);
-  const [rests, setRests] = useState(0);
-  const state = useRef({ maps, size, drawings, colors, onRest });
-  state.current = { maps, size, drawings, colors, onRest };
+  const state = useRef({ map, size, drawing, colors, onRest });
+  state.current = { map, size, drawing, colors, onRest };
 
-  /** Puts everything where the view says. Nothing here goes through React while the map moves. */
   const show = useCallback((next: View): void => {
-    const { maps: own, size: window, drawings: drawn, colors: inks } = state.current;
+    const { map: own, size: window, drawing: drawn, colors: inks } = state.current;
     if (window === null) return;
-    const map = own[next.level];
-    const held = hold(next, map, window);
+    const held = hold(next, own, window);
     view.current = held;
-    if (sameLevel.current !== held.level && root.current?.contains(document.activeElement)) {
-      isFocusLost.current = document.activeElement !== root.current;
-    }
-    setLevel(held.level);
+    placeWorld(world.current, held, window);
+    placeHeads(heads.current, own, held, window);
+    placeMark(mark.current, own, held, window);
     const left = window.w / 2 - held.x * held.k;
     const top = window.h / 2 - held.y * held.k;
-    placeWorld(world.current, held, window);
-    placeHeads(heads.current, map, held, window);
-    // A window of cards is kept until the view comes to its edge.
-    const isOther = sameLevel.current !== held.level;
-    sameLevel.current = held.level;
     setSeen((old) => {
       const here = {
         x: -left / held.k,
@@ -124,13 +102,13 @@ export function MapView(props: MapViewProps) {
         here.x + here.w <= old.x + old.w &&
         here.y + here.h <= old.y + old.h &&
         old.w <= here.w + 6 * ahead;
-      if (isInside && !isOther) return old;
+      if (isInside) return old;
       return { x: here.x - ahead, y: here.y - ahead, w: here.w + 2 * ahead, h: here.h + 2 * ahead };
     });
     const brush = canvas.current?.getContext("2d");
     if (brush && drawn !== null && inks !== null && canvas.current !== null) {
       const unit = canvas.current.width / window.w;
-      paint(brush, drawn[held.level], { view: held, window, unit, colors: inks });
+      paint(brush, drawn, { view: held, window, unit, colors: inks });
     }
   }, []);
 
@@ -143,50 +121,36 @@ export function MapView(props: MapViewProps) {
     },
     [show],
   );
-  /** Where a movement goes, told again when the window changes on the way. */
-  const running = useRef<Goal | null>(null);
   const stop = useCallback((): void => cancelAnimationFrame(frame.current), []);
+  const rest = useCallback((at: View): void => {
+    const { size: window, onRest: told } = state.current;
+    if (window !== null) told(at, window);
+  }, []);
   const goTo = useCallback(
     (goal: View | Goal, isSmooth: boolean): void => {
       cancelAnimationFrame(frame.current);
-      const { maps: own, size: window } = state.current;
-      const from = view.current;
+      const { map: own, size: window } = state.current;
       if (window === null) return;
-      const end = typeof goal === "function" ? goal(own, window) : goal;
-      const to = hold(end, own[end.level], window);
-      const before = { maps: own, window };
-      running.current =
-        typeof goal === "function" ? goal : (maps, window) => kept(to, before, { maps, window });
-      const rest = (): void => {
-        running.current = null;
-        show(to);
-        setRests((count) => count + 1);
-        state.current.onRest(to, window);
-      };
+      const from = view.current;
+      const to = hold(typeof goal === "function" ? goal(own, window) : goal, own, window);
       if (from === null || !isSmooth || prefersStill()) {
-        rest();
+        show(to);
+        rest(to);
         return;
       }
-      // On the level it ends on, beginning as large as it is.
-      const ratio = own[from.level].metrics.w / own[to.level].metrics.w;
-      const about = { maps: own, window, px: window.w / 2, py: window.h / 2 };
-      const start = toLevel(from, to.level, from.k * ratio, about);
       const begun = performance.now();
       const step = (): void => {
-        const share = Math.min(1, (performance.now() - begun) / zoomTime);
-        if (share === 1) {
-          rest();
-          return;
-        }
-        show(between(start, to, 1 - (1 - share) ** 3));
-        frame.current = requestAnimationFrame(step);
+        const share = Math.min(1, (performance.now() - begun) / moveTime);
+        show(between(from, to, 1 - (1 - share) ** 3));
+        if (share < 1) frame.current = requestAnimationFrame(step);
+        else rest(to);
       };
       frame.current = requestAnimationFrame(step);
     },
-    [show],
+    [show, rest],
   );
 
-  // The window of the map, in units of the text.
+  // The window of the canvas, in units of the text.
   useLayoutEffect(() => {
     const element = root.current;
     if (element === null) return undefined;
@@ -212,114 +176,86 @@ export function MapView(props: MapViewProps) {
     return () => observer.disconnect();
   }, []);
 
-  const shown = useRef<{ target: Target; maps: Maps; size: Size } | null>(null);
+  const shown = useRef<{ target: Target; map: BranchMap; size: Size } | null>(null);
   useLayoutEffect(() => {
     if (size === null) return;
     const before = shown.current;
-    shown.current = { target, maps, size };
+    shown.current = { target, map, size };
     const now = view.current;
     if (before === null || now === null) goTo(target.view, false);
     else if (before.target !== target) goTo(target.view, target.isSmooth);
-    else if (before.maps === maps && before.size === size) show(now);
-    else if (running.current !== null) goTo(running.current, before.maps === maps);
-    else {
-      const was = { maps: before.maps, window: before.size };
-      goTo(kept(now, was, { maps, window: size }), false);
-    }
-  }, [target, maps, size, drawings, goTo, show]);
+    else show(now);
+  }, [target, map, size, drawing, goTo, show]);
 
   // What React has just put on the page has no place yet.
   useLayoutEffect(() => {
-    if (view.current === null || size === null || view.current.level !== level) return;
+    if (view.current === null || size === null) return;
     placeWorld(world.current, view.current, size);
-    placeHeads(heads.current, maps[level], view.current, size);
+    placeHeads(heads.current, map, view.current, size);
+    placeMark(mark.current, map, view.current, size);
   });
-
-  // Whoever walks by keys goes on from the place where the levels changed.
-  useEffect(() => {
-    if (!isFocusLost.current) return;
-    isFocusLost.current = false;
-    const all = root.current?.querySelectorAll<HTMLElement>("a[href]");
-    const links = [...(all ?? [])];
-    const next =
-      view.current?.level === "far"
-        ? links[lastPage.current]
-        : links.find(({ tabIndex }) => tabIndex === 0);
-    next?.focus({ preventScroll: true });
-  }, [rests]);
 
   useEffect(() => {
     const element = root.current;
     if (element === null) return undefined;
-    let direction: "in" | "out" = "in";
-    const about = (px: number, py: number) => {
-      const { maps: own, size: window } = state.current;
-      const unit = unitOf();
-      return window && { maps: own, window, px: px / unit, py: py / unit };
-    };
     return listen(element, {
       begin: stop,
-      release: () => {
-        if (running.current !== null) goTo(running.current, true);
-      },
+      release: () => undefined,
       pan: (dx, dy) => {
         const unit = unitOf();
-        running.current = null;
         if (view.current !== null) request(pan(view.current, dx / unit, dy / unit));
       },
       zoom: (factor, px, py) => {
-        const at = about(px, py);
-        if (view.current === null || at === null) return;
-        direction = factor > 1 ? "in" : "out";
-        running.current = null;
-        request(zoom(view.current, factor, at));
+        const { size: window } = state.current;
+        const unit = unitOf();
+        if (view.current === null || window === null) return;
+        request(zoom(view.current, factor, window, px / unit, py / unit));
       },
-      rest: (px, py) => {
-        const at = about(px, py);
-        if (view.current === null || at === null) return;
-        const end = settle(view.current, direction, at);
-        const isSmooth = end !== view.current;
-        goTo(end, isSmooth);
+      rest: () => {
+        if (view.current !== null) rest(view.current);
       },
     });
-  }, [goTo, request, stop]);
+  }, [request, stop, rest]);
   useEffect(() => stop, [stop]);
 
-  const map = maps[level];
   return (
-    <div
-      ref={root}
-      className={classes.window}
-      role="group"
-      aria-label={label}
-      aria-describedby={describedBy}
-      data-level={level}
-      onScroll={({ currentTarget }) => {
-        // A browser scrolls to what has the focus; the view moves there itself.
-        currentTarget.scrollTop = 0;
-        currentTarget.scrollLeft = 0;
-      }}
-      onKeyDown={(event) => {
-        if (event.key !== "Escape" || view.current === null || size === null) return;
-        onAway(view.current, size);
-      }}
-    >
-      <canvas ref={canvas} className={classes.canvas} aria-hidden="true" />
-      {level !== "far" && seen !== null && (
-        <div ref={world} className={classes.world}>
-          <People
-            {...props}
-            key={level}
-            map={map}
-            seen={seen}
-            view={view}
-            goTo={goTo}
-            size={size}
-            lastPage={lastPage}
-          />
+    <div className={classes.frame}>
+      <Whole {...props} ref={mark} goTo={goTo} view={view} size={size} />
+      <div
+        ref={root}
+        className={classes.window}
+        data-canvas
+        role="group"
+        aria-label={label}
+        aria-describedby={describedBy}
+        onScroll={({ currentTarget }) => {
+          // A browser scrolls to what has the focus; the view moves there itself.
+          currentTarget.scrollTop = 0;
+          currentTarget.scrollLeft = 0;
+        }}
+      >
+        <canvas ref={canvas} className={classes.canvas} aria-hidden="true" />
+        {seen !== null && (
+          <div ref={world} className={classes.world}>
+            <People {...props} seen={seen} view={view} goTo={goTo} size={size} />
+          </div>
+        )}
+        <div ref={heads} className={classes.heads} aria-hidden="true">
+          {map.pages.map(({ branch, people }, i) => (
+            <div
+              key={branch ?? `none ${i}`}
+              className={classes.page}
+              style={{ color: words.ink(branch) }}
+            >
+              <span className={classes.title} data-double={i >= 12 || undefined}>
+                <span>
+                  <b>{words.page(branch)}</b> <i>{people}</i>
+                </span>
+              </span>
+            </div>
+          ))}
         </div>
-      )}
-      <Pages {...props} map={map} ref={heads} view={view} goTo={goTo} size={size} />
+      </div>
     </div>
   );
 }
@@ -328,11 +264,104 @@ const unitOf = (): number =>
   Number.parseFloat(getComputedStyle(document.documentElement).fontSize) / 16 || 1;
 
 type MovingProps = {
-  map: BranchMap;
   view: React.RefObject<View | null>;
   goTo: (view: View | Goal, isSmooth: boolean) => void;
   size: Size | null;
 };
+
+/**
+ * The strip of the whole family over the canvas: every page in proportion, every person a bar in
+ * the ink of the branch, the direct line, and a frame where the window is. A press or a drag moves
+ * the window there; the names of the branches are links to their pages.
+ */
+function Whole(props: MapViewProps & MovingProps & { ref: React.Ref<HTMLDivElement> }) {
+  const { ref, map, words, snapshot, chosen, hrefOfPage, goTo, view, size } = props;
+  const { t } = useLanguage();
+  const box = useRef<HTMLDivElement>(null);
+  const canvas = useRef<HTMLCanvasElement>(null);
+  const [width, setWidth] = useState(0);
+  const colorScheme = useComputedColorScheme("light");
+  const colors = useColors(box, words, chosen, snapshot, colorScheme);
+  const drawing = useMemo((): Drawing | null => {
+    if (colors === null || typeof Path2D === "undefined") return null;
+    const kin = kinOf(snapshot);
+    const lengthOf = (card: MapCard): number => {
+      const ids = card.person === null ? (card.reference?.people ?? []) : [card.person];
+      const person = kin.person(ids[0] ?? "");
+      return person === undefined ? card.w : barOf(words.person(person), map, measure);
+    };
+    return drawingOf(map, colors, lengthOf);
+  }, [map, colors, words, snapshot]);
+
+  useLayoutEffect(() => {
+    const element = box.current;
+    if (element === null) return undefined;
+    const read = (): void => setWidth(element.clientWidth);
+    read();
+    const observer = new ResizeObserver(read);
+    observer.observe(element);
+    return () => observer.disconnect();
+  }, []);
+  useLayoutEffect(() => {
+    const element = canvas.current;
+    const brush = element?.getContext("2d");
+    if (!brush || element == null || drawing === null || colors === null || width === 0) return;
+    const dots = Math.min(window.devicePixelRatio || 1, 2);
+    const height = element.clientHeight;
+    element.width = Math.round(width * dots);
+    element.height = Math.round(height * dots);
+    const scale: [number, number] = [
+      (width * dots) / Math.max(1, map.width),
+      (height * dots) / Math.max(1, map.height),
+    ];
+    paintWhole(brush, drawing, { size: { w: element.width, h: element.height }, scale, colors });
+  }, [drawing, colors, width, map]);
+
+  const to = (event: PointerEvent<HTMLElement>): void => {
+    const element = box.current;
+    if (element === null || size === null) return;
+    const { left, top, width: across, height: down } = element.getBoundingClientRect();
+    const x = ((event.clientX - left) / across) * map.width;
+    const y = ((event.clientY - top) / down) * map.height;
+    goTo({ x, y, k: view.current?.k ?? 1 }, false);
+  };
+  return (
+    <div className={classes.whole}>
+      <div
+        ref={box}
+        className={classes.strip}
+        data-whole
+        onPointerDown={(event) => {
+          if ((event.target as Element).closest("a") !== null) return;
+          event.currentTarget.setPointerCapture(event.pointerId);
+          to(event);
+        }}
+        onPointerMove={(event) => {
+          if (event.currentTarget.hasPointerCapture(event.pointerId)) to(event);
+        }}
+      >
+        <canvas ref={canvas} className={classes.stripCanvas} aria-hidden="true" />
+        <div ref={ref} className={classes.mark} aria-hidden="true" data-mark />
+        <nav className={classes.branches} aria-label={t("map.whole")}>
+          {map.pages.map(({ branch, people, x, w }) => (
+            <Link
+              key={branch ?? "none"}
+              href={hrefOfPage(branch)}
+              className={classes.branch}
+              style={{
+                left: `${(x / Math.max(1, map.width)) * 100}%`,
+                width: `${(w / Math.max(1, map.width)) * 100}%`,
+                color: words.ink(branch),
+              }}
+            >
+              <span>{words.page(branch)}</span> <i>{people}</i>
+            </Link>
+          ))}
+        </nav>
+      </div>
+    </div>
+  );
+}
 
 const arrows: Partial<Record<string, Arrow>> = {
   ArrowUp: "up",
@@ -341,16 +370,12 @@ const arrows: Partial<Record<string, Arrow>> = {
   ArrowRight: "right",
 };
 
-/** Names as real links, those that are near the window and the one with the focus. */
+/** Names as real links, those near the window and the one with the focus. */
 function People(
-  props: MapViewProps &
-    MovingProps & {
-      seen: { x: number; y: number; w: number; h: number };
-      lastPage: React.RefObject<number>;
-    },
+  props: MapViewProps & MovingProps & { seen: { x: number; y: number; w: number; h: number } },
 ) {
   const { map, words, snapshot, chosen, seen, view, goTo, size } = props;
-  const { hrefOfPerson, hrefOfReference, lastPage } = props;
+  const { hrefOfPerson, hrefOfReference } = props;
   const box = useRef<HTMLDivElement>(null);
   const index = useMemo(() => cardIndex(map.cards), [map]);
   const byKey = useMemo(() => new Map(map.cards.map((card) => [card.key, card])), [map]);
@@ -396,7 +421,6 @@ function People(
   // A card that stays as it was must not bring itself into a window that was.
   const focused = useRef<((card: MapCard) => void) | null>(null);
   focused.current = (card) => {
-    lastPage.current = card.page;
     setCurrent(card.key);
     bring(card);
   };
@@ -476,7 +500,7 @@ const PersonOnMap = memo(
       return (
         <Link
           className={classes.person}
-          href={rest.hrefOfReference(first, map.level)}
+          href={rest.hrefOfReference(first)}
           tabIndex={-1}
           style={style}
         >
@@ -530,118 +554,39 @@ const PersonOnMap = memo(
     a.hrefOfReference === b.hrefOfReference,
 );
 
-/** The heads of the pages stand over the drawing and do not shrink with it. */
-function Pages(props: MapViewProps & MovingProps & { ref: React.Ref<HTMLDivElement> }) {
-  const { ref, map, words, snapshot, hrefOfPage, view, goTo, size } = props;
-  const [current, setCurrent] = useState(0);
-  const move = useMemo(() => pageKeys(map), [map]);
-  const links = useRef<(HTMLAnchorElement | null)[]>([]);
-  const isFar = map.level === "far";
-  const double = new Set(snapshot.branches.slice(12).map(({ id }) => id));
-  const stop = current < map.pages.length ? current : 0;
-
-  const onKeyDown = (event: KeyboardEvent): void => {
-    const arrow = arrows[event.key];
-    if (arrow === undefined || !isFar) return;
-    event.preventDefault();
-    const next = move(stop, arrow);
-    if (next === null) return;
-    setCurrent(next);
-    links.current[next]?.focus({ preventScroll: true });
-  };
-  const bring = (page: number): void => {
-    const box = map.pages[page];
-    if (box === undefined || view.current === null || size === null) return;
-    const next = reveal(view.current, { ...box.head, w: box.w }, size, 0);
-    if (next.x !== view.current.x || next.y !== view.current.y) goTo(next, true);
-  };
-  return (
-    <div ref={ref} className={classes.heads} onKeyDown={onKeyDown}>
-      {map.pages.map(({ branch, people }, i) => {
-        const text = (
-          <span className={classes.title} data-double={double.has(branch ?? "") || undefined}>
-            <span>
-              <b>{words.page(branch)}</b> <i>{people}</i>
-            </span>
-          </span>
-        );
-        const style = { color: words.ink(branch) };
-        return isFar ? (
-          <Link
-            key={branch ?? ""}
-            ref={(link) => {
-              links.current[i] = link;
-            }}
-            className={classes.page}
-            href={hrefOfPage(branch)}
-            tabIndex={i === stop ? 0 : -1}
-            style={style}
-            onFocus={({ target }) => {
-              setCurrent(i);
-              if (target.matches(":focus-visible")) bring(i);
-            }}
-          >
-            {text}
-          </Link>
-        ) : (
-          <div key={branch ?? ""} className={classes.page} style={style}>
-            {text}
-          </div>
-        );
-      })}
-    </div>
-  );
-}
-
 function placeWorld(world: HTMLElement | null, { x, y, k }: View, window: Size): void {
   if (world === null) return;
   const [left, top] = [window.w / 2 - x * k, window.h / 2 - y * k];
   world.style.transform = `translate(${rem(left)}, ${rem(top)}) scale(${k})`;
 }
 
-/** A head keeps to the edge of the window as long as its page is in it. */
+/** The head of a page keeps to the top of the window, and to its left edge while the page is in it. */
 function placeHeads(box: HTMLElement | null, map: BranchMap, view: View, window: Size): void {
   if (box === null) return;
   const { k } = view;
   const left = window.w / 2 - view.x * k;
-  const top = window.h / 2 - view.y * k;
   map.pages.forEach((page, i) => {
     const element = box.children[i] as HTMLElement | undefined;
     const title = element?.firstElementChild as HTMLElement | null | undefined;
     if (element === undefined || !title) return;
-    const [x, y, w, h] = [left + page.x * k, top + page.y * k, page.w * k, page.h * k];
-    const isSeen = x < window.w && x + w > 0 && y < window.h && y + h > 0;
-    element.style.visibility = isSeen || map.level === "far" ? "" : "hidden";
-    element.style.transform = `translate(${rem(x)}, ${rem(y)})`;
+    const [x, w] = [left + page.x * k, page.w * k];
+    const isSeen = x < window.w && x + w > 0;
+    element.style.visibility = isSeen ? "" : "hidden";
+    element.style.transform = `translate(${rem(x)}, 0)`;
     element.style.width = rem(w);
-    element.style.height = rem(h);
-    title.style.height = rem(page.head.h * k);
-    if (map.level === "far") return;
-    const stuck = Math.min(Math.max(0, -y), Math.max(0, h - page.head.h * k));
     const aside = Math.min(Math.max(0, -x), Math.max(0, w - 160));
-    title.style.transform = stuck === 0 ? "" : `translateY(${rem(stuck)})`;
     title.style.paddingLeft = rem(aside);
   });
 }
 
-function drawingsOf(
-  maps: Maps,
-  words: Words,
-  snapshot: TreeSnapshot,
-  colors: Paint,
-): Record<MapLevel, Drawing> | null {
-  // A browser without a canvas still has the names and the list.
-  if (typeof Path2D === "undefined") return null;
-  const kin = kinOf(snapshot);
-  const lengthOf = (card: MapCard): number => {
-    const ids = card.person === null ? (card.reference?.people ?? []) : [card.person];
-    const person = kin.person(ids[0] ?? "");
-    return person === undefined ? card.w : barOf(words.person(person), maps.far, measure);
-  };
-  const [far, closer, near] = levels.map((level) =>
-    drawingOf(maps[level], colors, level === "far" ? lengthOf : null),
-  );
-  return { far, closer, near } as Record<MapLevel, Drawing>;
+/** The frame of the window on the strip of the whole. */
+function placeMark(mark: HTMLElement | null, map: BranchMap, view: View, window: Size): void {
+  if (mark === null) return;
+  const { x, y, w, h } = windowOnWhole(view, map, window);
+  mark.style.left = `${x * 100}%`;
+  mark.style.top = `${y * 100}%`;
+  mark.style.width = `${w * 100}%`;
+  mark.style.height = `${h * 100}%`;
 }
 
 /** The inks of the theme as the canvas needs them. */

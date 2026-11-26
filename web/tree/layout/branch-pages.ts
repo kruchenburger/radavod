@@ -127,7 +127,7 @@ function couple(node: MapNode, entryOf: (row: MapRow) => PageEntry): PageEntry {
 }
 
 /** Members of a branch wherever they stand; the page of nobody's kin counts its own people. */
-function membersOf(snapshot: TreeSnapshot, model: MapModel): number[] {
+export function membersOf(snapshot: TreeSnapshot, model: MapModel): number[] {
   const members = new Map<string | null, number>();
   const seen = new Set<string>();
   for (const { id, branch } of snapshot.people) {

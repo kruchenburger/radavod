@@ -9,8 +9,7 @@ import { mapTracks, stability } from "../../../web/tree/layout/stability";
 import { measure, personOf, wordingOf } from "./family";
 
 const snapshot = snapshotOf(generateFamily(1, 300));
-const draw = (from: TreeSnapshot) =>
-  branchMap(from, { level: "closer", measure, headOf: ({ title }) => title.ru });
+const draw = (from: TreeSnapshot) => branchMap(from, { measure, headOf: ({ title }) => title.ru });
 
 /** The people within so many steps of kinship. */
 function near(from: TreeSnapshot, person: string, steps: number): Set<string> {
@@ -115,7 +114,6 @@ describe("after adding one person the map", () => {
       // Pages stand where they stood.
       const pages = after.pages.map(({ branch }) => branch);
       expect(pages).toEqual(before.pages.map(({ branch }) => branch));
-      expect(after.perRow).toBe(before.perRow);
     }
     expect(shares.length).toBeGreaterThan(50);
     expect(Math.min(...shares)).toBe(1);

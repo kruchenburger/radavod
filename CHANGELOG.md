@@ -31,6 +31,7 @@ The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), and
 - The view around a person is called the pedigree.
 - A middle dot separates the years, a note and the branch under a name, so a date written in words no longer runs into the text after it.
 - The list of everybody is now the branches page by page: every branch an outline of its families in plain lists, the pages side by side in the order the direct line goes through them, and the direct line drawn between them. On a phone a page fills the screen.
+- All branches are one wide canvas: every branch a page, side by side, the generations in rows across all of them, the direct line drawn between them. It opens on a person with names as large as in the tree, and a strip of the whole family over it shows where the window is and moves it. The map with its three levels is gone, and so is its wait: the canvas is laid out at once. Its old addresses open the canvas on the same person.
 - All branches have a second way: the fan of ancestors of a person or a couple, every branch a spoke of its colour. It opens on the couple where the branches meet; the centre can be chosen above it, and the pedigree leads to the fan of its person. The keys walk it, and a phone shows a quarter.
 
 ### Fixed

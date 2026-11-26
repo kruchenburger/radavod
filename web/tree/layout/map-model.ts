@@ -320,9 +320,9 @@ class MapBuilder {
   #lay(generations: Map<Unit, { group: number; generation: number }>): MapModel {
     const placeOf = (unit: Unit) => generations.get(unit) as { group: number; generation: number };
     const roots = this.#units.filter(({ above }) => above === null);
-    // The first generation a family has on a page is the first row there.
+    // Generations are rows across all pages: the first generation of a family is its first row.
     const firsts = new Map<string, number>();
-    const firstOf = (unit: Unit): string => `${unit.home} ${placeOf(unit).group}`;
+    const firstOf = (unit: Unit): string => String(placeOf(unit).group);
     for (const root of roots) {
       const { generation } = placeOf(root);
       firsts.set(firstOf(root), Math.min(firsts.get(firstOf(root)) ?? Infinity, generation));

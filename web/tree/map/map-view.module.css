@@ -1,8 +1,16 @@
+.frame {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  min-height: 0;
+}
+
 .window {
   position: relative;
   flex: 1;
   min-height: 0;
   overflow: hidden;
+  border-top: 1px solid var(--edge);
   cursor: grab;
   touch-action: none;
   user-select: none;
@@ -31,6 +39,7 @@
   position: absolute;
   color: inherit;
   text-decoration: none;
+  outline: none;
 }
 
 .person:hover > span > span {
@@ -38,10 +47,25 @@
   text-underline-offset: 3px;
 }
 
-.person:focus-visible {
-  z-index: 2;
-  background-color: var(--surface);
-  outline-width: 3px;
+/*
+ * The person the keys stand on: a tint of `hover` and a bar of `action` before the name, the mark
+ * of the tree. It lies under the text and the lines, so it covers, clips and moves nothing.
+ */
+.person:focus-visible::before {
+  content: "";
+  position: absolute;
+  inset: -0.25rem -0.375rem -0.25rem -0.5rem;
+  z-index: -1;
+  border-left: 3px solid var(--action);
+  border-radius: 3px;
+  background-color: var(--hover);
+}
+
+@media (forced-colors: active) {
+  .person:focus-visible {
+    outline: 2px solid CanvasText;
+    outline-offset: 2px;
+  }
 }
 
 .person[data-chosen] {
@@ -57,7 +81,7 @@
 
 .heads {
   position: absolute;
-  inset: 0;
+  inset: 0 0 auto;
   pointer-events: none;
 }
 
@@ -66,27 +90,15 @@
   top: 0;
   left: 0;
   overflow: hidden;
-  text-decoration: none;
-}
-
-.window[data-level="far"] .page {
-  overflow: visible;
-}
-
-a.page {
-  pointer-events: auto;
-}
-
-.page:focus-visible {
-  outline-width: 3px;
-  outline-offset: -3px;
 }
 
 .title {
   box-sizing: border-box;
   display: flex;
   align-items: flex-end;
+  min-height: 3.25rem;
   border-bottom: 2px solid currentColor;
+  background-color: var(--surface);
 }
 
 .title[data-double] {
@@ -95,7 +107,7 @@ a.page {
 
 .title > span {
   min-width: 0;
-  padding: 0 0.5rem 0.25rem;
+  padding: 0 1.125rem 0.5rem;
   overflow: hidden;
   line-height: 1.25;
   text-overflow: ellipsis;
@@ -103,35 +115,93 @@ a.page {
 }
 
 .title b {
-  font: 700 1.0625rem/1 var(--serif);
+  font: 700 1.5rem/1 var(--serif);
 }
 
-a.page:hover b {
-  text-decoration: underline;
-  text-underline-offset: 3px;
-}
-
-.title i {
+.title i,
+.branch i {
   color: var(--muted);
   font: 400 0.875rem/1 var(--sans);
 }
 
-.window:not([data-level="far"]) .title {
-  background-color: var(--surface);
+/* The strip of the whole family, with the frame of the window on it. */
+.whole {
+  padding: 0 1.75rem 0.5rem;
 }
 
-.window[data-level="closer"] .title > span {
-  padding: 0 1.125rem 0.625rem;
+.strip {
+  position: relative;
+  height: 4rem;
+  overflow: hidden;
+  cursor: pointer;
+  touch-action: none;
 }
 
-.window[data-level="closer"] .title b {
-  font-size: 1.5rem;
+.stripCanvas {
+  position: absolute;
+  inset: 1.5rem 0 0;
+  width: 100%;
+  height: calc(100% - 1.5rem);
 }
 
-.window[data-level="near"] .title > span {
-  padding: 0 1.375rem 0.75rem;
+.mark {
+  position: absolute;
+  box-sizing: border-box;
+  margin-top: 1.5rem;
+  max-height: calc(100% - 1.5rem);
+  border: 2px solid var(--ink);
+  pointer-events: none;
 }
 
-.window[data-level="near"] .title b {
-  font-size: 1.875rem;
+.branches {
+  position: absolute;
+  inset: 0 0 auto;
+  height: 1.5rem;
+}
+
+.branch {
+  position: absolute;
+  top: 0;
+  display: flex;
+  gap: 0.25rem;
+  align-items: baseline;
+  height: 1.5rem;
+  padding-left: 0.25rem;
+  overflow: hidden;
+  font: 700 0.9375rem/1.5rem var(--serif);
+  text-decoration: none;
+  white-space: nowrap;
+}
+
+.branch span {
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.branch:hover span {
+  text-decoration: underline;
+  text-underline-offset: 3px;
+}
+
+@media (max-width: 44.99em) {
+  .whole {
+    padding: 0 1rem 0.5rem;
+  }
+
+  .strip {
+    height: 4.25rem;
+  }
+
+  /* The names of the branches do not fit: the strip is a picture to drag, «По ветвям» lists them. */
+  .branches {
+    display: none;
+  }
+
+  .stripCanvas,
+  .mark {
+    top: 0;
+    margin-top: 0;
+    height: 100%;
+    max-height: 100%;
+  }
 }

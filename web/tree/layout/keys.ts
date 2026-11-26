@@ -48,18 +48,6 @@ export function listKeys(order: string[]): (key: string, arrow: Arrow) => string
   };
 }
 
-/** From page to page, by their numbers. */
-export function pageKeys({
-  pages,
-  perRow,
-}: BranchMap): (page: number, arrow: Arrow) => number | null {
-  const by: Record<Arrow, number> = { left: -1, right: 1, up: -perRow, down: perRow };
-  return (page, arrow) => {
-    const next = page + by[arrow];
-    return next in pages ? next : null;
-  };
-}
-
 function kinMoves(
   cards: Card[],
   links: Link[],

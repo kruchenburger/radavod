@@ -11,15 +11,14 @@ const places: [string, Place][] = [
   ],
   ["/sample/branches", branchesPlace()],
   [
-    "/sample/branches?level=near&person=p1&at=p7.-12.340&scale=1.25",
+    "/sample/branches?person=p1&at=p7.-12.340&scale=1.25",
     branchesPlace({
-      level: "near",
       person: "p1",
       at: { person: "p7", dx: -12, dy: 340 },
       scale: 1.25,
     }),
   ],
-  ["/sample/branches?level=closer&branch=b3", branchesPlace({ level: "closer", branch: "b3" })],
+  ["/sample/branches?branch=b3", branchesPlace({ branch: "b3" })],
   ["/sample/branches?as=fan", branchesPlace({ as: "fan" })],
   [
     "/sample/branches?as=fan&person=p1&with=p2",
@@ -53,9 +52,15 @@ it.each([
   ["scale=-2", {}],
   ["scale=1000", {}],
   ["scale=abc", {}],
-  ["level=near&other=1", { level: "near" as const }],
+  ["other=1", {}],
 ])("leaves out what it does not understand: %s", (search, place) => {
   expect(readPlace("/sample/branches", `?${search}`)).toEqual(branchesPlace(place));
+});
+
+it("opens an address of the old map on the canvas, on the same person and place", () => {
+  expect(readPlace("/sample/branches", "?level=near&person=p1&at=p7.-12.340")).toEqual(
+    branchesPlace({ person: "p1", at: { person: "p7", dx: -12, dy: 340 } }),
+  );
 });
 
 it("writes no more of a spot than it needs", () => {

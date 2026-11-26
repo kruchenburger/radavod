@@ -9,30 +9,6 @@ import { relativesOf } from "../../web/tree/layout/relatives";
 import { wordsOf } from "../../web/tree/words";
 import { familyOf } from "./layout/family";
 
-/** Answers as the worker of a browser does, or breaks as one that did not load. */
-const { FakeWorker } = vi.hoisted(() => {
-  class FakeWorker extends EventTarget {
-    static isMissing = false;
-
-    postMessage(data: unknown): void {
-      const sent = structuredClone(data);
-      queueMicrotask(async () => {
-        if (FakeWorker.isMissing) {
-          this.dispatchEvent(new Event("error"));
-          return;
-        }
-        const { handle } = await import("../../web/tree/layout.worker");
-        const reply = handle(sent as never);
-        this.dispatchEvent(new MessageEvent("message", { data: reply }));
-      });
-    }
-
-    terminate(): void {}
-  }
-  return { FakeWorker };
-});
-vi.mock("../../web/tree/layout.worker?worker", () => ({ default: FakeWorker }));
-
 const sample = sampleOf(generateFamily(1, 300));
 const { start } = sample;
 const name = (id: string, locale: "ru" | "en" = "ru"): string => {
@@ -58,7 +34,6 @@ let answers: Answers;
 let problems: ReturnType<typeof vi.spyOn>;
 
 beforeEach(() => {
-  FakeWorker.isMissing = false;
   problems = vi.spyOn(console, "error").mockClear();
   vi.spyOn(navigator, "languages", "get").mockReturnValue(["ru-RU"]);
   const health = { status: "ok", version: "1.2.3", tree: "ok", access: "ok" };
@@ -426,8 +401,7 @@ describe("around a person", () => {
     expect(own?.textContent).toContain(
       wordsOf(sample.snapshot, "ru").branch(kinOf(sample.snapshot).person(start)?.branch ?? null),
     );
-    press(own as HTMLElement);
-    expect(address()).toContain("/sample/branches?level=closer");
+    expect(own?.getAttribute("href")).toMatch(/^\/sample\/branches\?person=p\d+&branch=/);
   });
 });
 
@@ -451,7 +425,7 @@ describe("the card of a person", () => {
     expect(address()).toBe(`/sample/person/${parent}`);
     const href = (text: string) => screen.getByRole("link", { name: text }).getAttribute("href");
     expect(href("Показать в древе")).toBe(`/sample/tree/${parent}`);
-    expect(href("Показать среди ветвей")).toBe(`/sample/branches?level=near&person=${parent}`);
+    expect(href("Показать среди ветвей")).toBe(`/sample/branches?person=${parent}`);
   });
 
   it("leads back to the tree one came from", async () => {
@@ -707,79 +681,56 @@ describe("the search", () => {
 
 describe("all branches", () => {
   const window_ = () => screen.getByRole("group", { name: "Все ветви" });
-  const levels = () => screen.getByRole("navigation", { name: "Масштаб" });
+  const whole = () => screen.getByRole("navigation", { name: "Вся семья" });
+  const stop = () => window_().querySelector<HTMLElement>('a[tabindex="0"]') as HTMLElement;
 
-  it("says that it is laid out, then shows a page for every branch as a link", async () => {
-    answers["/sample/tree.json"] = () => Promise.resolve(Response.json(structuredClone(sample)));
+  it("open on the person the example begins with, names near the window as links", async () => {
     await open("/sample/branches");
-    expect(screen.getByText("Раскладываем ветви")).toBeTruthy();
-    await waitFor(() => expect(window_()).toBeTruthy());
-    const pages = within(window_()).getAllByRole("link");
-    // One more for people of no branch.
-    expect(pages).toHaveLength(11);
-    expect(pages.filter(({ tabIndex }) => tabIndex === 0)).toHaveLength(1);
-    const description = document.getElementById(window_().getAttribute("aria-describedby") ?? "");
-    expect(description?.textContent).toContain("Стрелки ведут по ветвям");
-  });
-
-  it("says why when it cannot be, and leads to the list", async () => {
-    FakeWorker.isMissing = true;
-    answers["/sample/tree.json"] = () => Promise.resolve(Response.json(structuredClone(sample)));
-    await open("/sample/branches");
-    expect((await screen.findByRole("alert")).textContent).toContain(
-      "Браузер не смог разложить ветви.",
-    );
-    press(screen.getByRole("button", { name: "По ветвям" }));
-    expect(address()).toBe(`/sample/list/${start}`);
-  });
-
-  it("comes closer when a page is pressed, and back leads back", async () => {
-    await open("/sample/branches");
-    await waitFor(() => expect(window_()).toBeTruthy());
-    press(within(window_()).getAllByRole("link")[2] as HTMLElement);
-    expect(address()).toContain("level=closer");
-    await waitFor(() => expect(window_().dataset["level"]).toBe("closer"));
-    expect(within(levels()).getByText("Ближе").getAttribute("aria-current")).toBe("true");
-    await waitFor(() => expect(address()).toContain("at="));
-    act(() => window.history.back());
-    await waitFor(() => expect(window_().dataset["level"]).toBe("far"));
-  });
-
-  it("has names as links near the window only, one of them in the order of the keys", async () => {
-    await open(`/sample/branches?level=near&person=${start}`);
-    await waitFor(() => expect(window_().dataset["level"]).toBe("near"));
+    await waitFor(() => expect(stop()).toBeTruthy());
     const people = within(window_()).getAllByRole("link");
     expect(people.length).toBeGreaterThan(5);
     expect(people.length).toBeLessThan(150);
-    const [stop, ...rest] = people.filter(({ tabIndex }) => tabIndex === 0);
-    expect(rest).toEqual([]);
-    expect(stop?.dataset["press"]).toBe(`p:${start}`);
-    expect(stop?.getAttribute("aria-current")).toBe("true");
-    expect(stop?.getAttribute("href")).toBe(`/sample/person/${start}`);
+    expect(people.filter(({ tabIndex }) => tabIndex === 0)).toHaveLength(1);
+    expect(stop().dataset["press"]).toBe(`p:${start}`);
+    expect(stop().getAttribute("aria-current")).toBe("true");
+    expect(stop().getAttribute("href")).toBe(`/sample/person/${start}`);
+    const description = document.getElementById(window_().getAttribute("aria-describedby") ?? "");
+    expect(description?.textContent).toContain("Стрелки ведут по родству");
   });
 
-  it("is walked by the arrows, and Esc goes away a step", async () => {
-    await open(`/sample/branches?level=near&person=${start}`);
-    await waitFor(() => expect(window_().dataset["level"]).toBe("near"));
-    const stop = window_().querySelector<HTMLElement>('a[tabindex="0"]') as HTMLElement;
-    stop.focus();
-    fireEvent.keyDown(stop, { key: "ArrowUp" });
-    await waitFor(() => expect(document.activeElement).not.toBe(stop));
+  it("open on the person in the address, an old address of the map too", async () => {
+    const father = relativesOf(sample.snapshot, start)?.parents[0]?.person ?? "";
+    await open(`/sample/branches?level=near&person=${father}`);
+    await waitFor(() => expect(stop().dataset["press"]).toBe(`p:${father}`));
+    await waitFor(() => expect(address()).toContain("at="));
+    expect(address()).not.toContain("level=");
+  });
+
+  it("have the whole family on a strip, every branch a link to its page", async () => {
+    await open("/sample/branches");
+    const branches = within(whole()).getAllByRole("link");
+    // One more for people of no branch.
+    expect(branches).toHaveLength(11);
+    press(branches[2] as HTMLElement);
+    expect(address()).toMatch(/[?&]branch=/);
+  });
+
+  it("are walked by the arrows, along kinship", async () => {
+    await open(`/sample/branches?person=${start}`);
+    await waitFor(() => expect(stop()).toBeTruthy());
+    const first = stop();
+    first.focus();
+    fireEvent.keyDown(first, { key: "ArrowUp" });
+    await waitFor(() => expect(document.activeElement).not.toBe(first));
     const parent = document.activeElement as HTMLElement;
     const parents = relativesOf(sample.snapshot, start)?.parents.map(({ person }) => `p:${person}`);
     expect(parents).toContain(parent.dataset["press"]);
-    fireEvent.keyDown(parent, { key: "Escape" });
-    await waitFor(() => expect(window_().dataset["level"]).toBe("closer"));
-    fireEvent.keyDown(window_(), { key: "Escape" });
-    await waitFor(() => expect(window_().dataset["level"]).toBe("far"));
   });
 
-  it("leads from a link to another level at the same place", async () => {
-    await open("/sample/branches?level=near&at=p1.0.0");
-    await waitFor(() => expect(window_().dataset["level"]).toBe("near"));
-    const href = within(levels()).getByText("Ближе").getAttribute("href");
-    expect(href).toContain("level=closer");
-    expect(href).toMatch(/at=p\d+/);
+  it("are one of two ways, the fan the other", async () => {
+    await open("/sample/branches");
+    const ways = screen.getByRole("navigation", { name: "Показать как" });
+    expect(within(ways).getByText("Полотно").getAttribute("aria-current")).toBe("true");
   });
 
   it("has no sheet to hide the mark behind before there is one", async () => {

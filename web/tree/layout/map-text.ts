@@ -1,33 +1,32 @@
 import type { TreePerson } from "../../../src/shared/tree";
 import { detailRuns } from "./around-text";
-import { type BranchMap, type MapCard, mapMetrics } from "./branch-map";
+import type { BranchMap, MapCard } from "./branch-map";
 import { flow, type Run } from "./text";
 import type { CardText, Line, Measure, TextStyle, Wording } from "./types";
 
 type MapTextOptions = {
-  map: Pick<BranchMap, "level" | "metrics" | "pages">;
+  map: Pick<BranchMap, "metrics" | "pages">;
   measure: Measure;
   wording: Wording;
   person: (id: string) => TreePerson | undefined;
 };
 
 /** Room for the sign of a union before a name, and the share of a card its name takes. */
-const ring = { far: 0, closer: 14, near: 16 };
-const nameShare = { far: 1, closer: 1, near: 23 / 42 };
+const ring = 16;
+const nameShare = 23 / 42;
 
 /**
- * Texts of one card. The map does not hold them: thousands of cards are never on the screen at
- * once. From far there is no text, see `barOf`.
+ * Texts of one card: the name, then the years and the branch when it is not that of the page. The
+ * canvas does not hold them: thousands of cards are never on the screen at once.
  */
 export function mapText(card: MapCard, options: MapTextOptions): Line[] {
-  const { level, metrics } = options.map;
-  if (level === "far") return [];
-  const indent = ring[level] * card.level;
-  const name = { lineHeight: metrics.line * nameShare[level], indent, lines: 1 };
+  const { metrics } = options.map;
+  const indent = ring * card.level;
+  const name = { lineHeight: metrics.line * nameShare, indent, lines: 1 };
   const size = { measure: options.measure, width: metrics.w, ...name };
   if (card.reference !== undefined) {
     const { title, detail } = options.wording.reference(card.reference);
-    const style: TextStyle = level === "near" ? "nearReference" : "closerReference";
+    const style: TextStyle = "nearReference";
     const runs: Run[] = [
       { text: title, part: "title", style },
       { text: detail, part: "detail", style },
@@ -37,32 +36,26 @@ export function mapText(card: MapCard, options: MapTextOptions): Line[] {
   const person = card.person === null ? undefined : options.person(card.person);
   if (person === undefined) return [];
   const text = options.wording.person(person);
-  const lines = flow(nameRuns(text, card, level), size);
-  if (level === "closer") return lines;
+  const lines = flow(nameRuns(text, card), size);
   const page = options.map.pages[card.page];
   const branch = person.branch !== null && person.branch === page?.branch ? "" : text.branch;
   const runs = detailRuns({ ...text, branch }, "nearDetail");
-  const below = metrics.line * nameShare.near;
+  const below = metrics.line * nameShare;
   return [...lines, ...flow(runs, { ...size, y: below, lineHeight: metrics.line - below })];
 }
 
-/** The length of the bar that stands for a name from far: as long as the name, within bounds. */
+/** The length of the bar that stands for a name on the strip of the whole: as long as the name. */
 export function barOf(
   text: CardText,
   { metrics }: Pick<BranchMap, "metrics">,
   measure: Measure,
 ): number {
-  const full = measure(`${text.given} ${text.surname}`, "closerName");
-  const share = full / mapMetrics.closer.w;
-  return metrics.w * Math.min(1, Math.max(0.42, share));
+  const full = measure(`${text.given} ${text.surname}`, "nearName");
+  return Math.min(metrics.w, Math.max(0.42 * metrics.w, full));
 }
 
-function nameRuns(
-  { given, surname }: CardText,
-  { direct }: MapCard,
-  level: "closer" | "near",
-): Run[] {
-  const style: TextStyle = `${level}Name${direct ? "Direct" : ""}`;
+function nameRuns({ given, surname }: CardText, { direct }: MapCard): Run[] {
+  const style: TextStyle = direct ? "nearNameDirect" : "nearName";
   return [
     { text: given, part: "given", style },
     { text: surname, part: "surname", style },
