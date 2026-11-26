@@ -50,7 +50,10 @@ export function Frame({ place, sample, isSheet = false, children }: FrameProps) 
         </div>
       </header>
       <main className={classes.main}>{children}</main>
-      {sample !== null && place.screen !== "branches" && <Foot person={person ?? sample.start} />}
+      {/* The map and the pages name the branches themselves. */}
+      {sample !== null && place.screen !== "branches" && place.screen !== "list" && (
+        <Foot person={person ?? sample.start} />
+      )}
     </div>
   );
 }

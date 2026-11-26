@@ -33,8 +33,7 @@ export const ru = {
   "view.views": "Виды древа",
   "view.around": "Родословная",
   "view.branches": "Все ветви",
-  "view.list": "Списком",
-  "view.tree": "Древом",
+  "view.list": "По ветвям",
 
   "search.label": "Имя или место",
   "search.close": "Закрыть поиск",
@@ -90,6 +89,8 @@ export const ru = {
   "tree.folded": "Потомки: {number}",
   "tree.partner": "Союз: {name}",
   "tree.about": "О человеке",
+  "pages.alone": "второй родитель неизвестен",
+  "pages.direct": "прямая линия",
   "tree.direct": "Прямая линия",
   "tree.adoption": "Усыновление, опека",
   "tree.version": "Другая версия",
@@ -158,5 +159,4 @@ export const ru = {
   "name.other": "другой язык",
 
   "list.branches": "Ветви",
-  "list.generation": "{number}-е поколение",
 } satisfies Record<string, Text>;

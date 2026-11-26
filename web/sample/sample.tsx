@@ -10,7 +10,7 @@ import { wordsOf } from "../tree/words";
 import { BranchesScreen } from "./branches-screen";
 import { DataContext, sampleQuery, useData } from "./data";
 import { Frame } from "./frame";
-import { ListScreen } from "./list-screen";
+import { PagesScreen } from "./pages-screen";
 import { PersonScreen } from "./person-screen";
 import { hrefOf, type Place, treePlace } from "./places";
 import { TreeScreen } from "./tree-screen";
@@ -93,7 +93,7 @@ function Screen({ place }: { place: Place }) {
     case "person":
       return <PersonScreen key={place.person} person={place.person} />;
     case "list":
-      return <ListScreen key={place.person} person={place.person} />;
+      return <PagesScreen person={place.person} />;
   }
 }
 

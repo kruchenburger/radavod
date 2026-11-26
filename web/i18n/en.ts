@@ -34,8 +34,7 @@ export const en = {
   "view.views": "Views of the tree",
   "view.around": "Pedigree",
   "view.branches": "All branches",
-  "view.list": "As a list",
-  "view.tree": "As a tree",
+  "view.list": "By branch",
 
   "search.label": "Name or place",
   "search.close": "Close the search",
@@ -77,6 +76,8 @@ export const en = {
   "tree.folded": "Descendants: {number}",
   "tree.partner": "Union: {name}",
   "tree.about": "About this person",
+  "pages.alone": "other parent unknown",
+  "pages.direct": "direct line",
   "tree.direct": "Direct line",
   "tree.adoption": "Adoption, guardianship",
   "tree.version": "Another version",
@@ -145,5 +146,4 @@ export const en = {
   "name.other": "another language",
 
   "list.branches": "Branches",
-  "list.generation": "Generation {number}",
 } satisfies Record<keyof typeof ru, Text>;

@@ -23,7 +23,7 @@ const screens = [
   ["all branches closer", `/sample/branches?level=closer&person=${start}`],
   ["all branches near", `/sample/branches?level=near&person=${start}`],
   ["a person", `/sample/person/${manyUnions}`],
-  ["the list", `/sample/list/${start}`],
+  ["the pages of branches", `/sample/list/${start}`],
 ] as const;
 
 /** Everything has come that will come. */
@@ -498,8 +498,8 @@ test.describe("all branches", () => {
       await expect(page.getByRole("alert")).toContainText(
         "The browser couldn't arrange the branches.",
       );
-      await page.getByRole("button", { name: "As a list" }).click();
-      await expect(page.getByRole("heading", { level: 1, name: nameOf(start) })).toBeVisible();
+      await page.getByRole("button", { name: "By branch" }).click();
+      await expect(page.getByRole("heading", { level: 1, name: "By branch" })).toBeVisible();
     });
   });
 });
@@ -511,6 +511,7 @@ test("everything to press on a phone is as large as a finger", async ({ page, is
     "/sample",
     `/sample/tree/${manyUnions}?siblings=open`,
     `/sample/person/${start}`,
+    `/sample/list/${start}`,
   ]) {
     await page.goto(path);
     await page.waitForTimeout(600);
@@ -545,12 +546,73 @@ test.describe("screens whose code does not come", () => {
   });
 });
 
-test("the list has everybody once", async ({ page }) => {
-  await page.goto(`/sample/list/${start}`);
-  await ready(page);
-  await expect(page.locator("details h4").first()).toBeAttached();
-  const links = page.locator("details a");
-  expect(await links.count()).toBe(snapshot.people.length);
+test.describe("the pages of branches", () => {
+  test("have everybody once", async ({ page }) => {
+    await page.goto(`/sample/list/${start}`);
+    await ready(page);
+    const names = page.locator('[data-key^="p:"] > a');
+    expect(await names.count()).toBe(snapshot.people.length);
+    await expect(page.locator('a[aria-current="true"]')).toHaveAttribute(
+      "href",
+      `/sample/list/${start}`,
+    );
+  });
+
+  test("are walked by the keys: a branch, then its people", async ({ page }) => {
+    await page.setViewportSize({ width: 1440, height: 800 });
+    await page.goto(`/sample/list/${start}`);
+    await ready(page);
+    await page.getByRole("navigation", { name: "Branches" }).getByRole("link").nth(1).focus();
+    await page.keyboard.press("Enter");
+    const second = page.locator("[data-page]").nth(1);
+    await expect(second.getByRole("heading", { level: 2 })).toBeFocused();
+    await page.keyboard.press("Tab");
+    const focused = page.locator("[data-page] a:focus");
+    await expect(focused).toBeInViewport();
+    expect(await page.evaluate(markOfFocus)).toEqual({
+      outline: "none",
+      content: '""',
+      tint: true,
+      bar: true,
+      under: "-1",
+    });
+    const href = (await focused.getAttribute("href")) ?? "";
+    await page.keyboard.press("Enter");
+    await expect(page).toHaveURL(href);
+    await expect(page.locator('a[aria-current="true"]')).toBeFocused();
+    await expect(page.locator('a[aria-current="true"]')).toBeInViewport();
+  });
+
+  test("draw the direct line between pages, over no text, on a wide window only", async ({
+    page,
+  }) => {
+    await page.setViewportSize({ width: 1440, height: 800 });
+    await page.goto(`/sample/list/${start}`);
+    await ready(page);
+    await expect(page.locator("[data-row] > svg path").first()).toBeAttached();
+    // No point of the line lies on a name, a reference or the sign of a union.
+    const crossed = await page.evaluate(`
+      (() => {
+        const texts = [...document.querySelectorAll("[data-page] [data-key] > *")]
+          .map((one) => one.getBoundingClientRect());
+        const hits = [];
+        for (const path of document.querySelectorAll("[data-row] > svg path")) {
+          const matrix = path.getScreenCTM();
+          for (let at = 0; at <= path.getTotalLength(); at += 2) {
+            const point = path.getPointAtLength(at).matrixTransform(matrix);
+            const on = texts.find((box) =>
+              point.x > box.left + 1 && point.x < box.right - 1 &&
+              point.y > box.top + 1 && point.y < box.bottom - 1);
+            if (on) hits.push([Math.round(point.x), Math.round(point.y)]);
+          }
+        }
+        return hits;
+      })()
+    `);
+    expect(crossed).toEqual([]);
+    await page.setViewportSize({ width: 390, height: 800 });
+    await expect(page.locator("[data-row] > svg path")).toHaveCount(0);
+  });
 });
 
 test("the card leads back to the place one came from", async ({ page }) => {

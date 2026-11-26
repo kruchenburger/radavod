@@ -5,7 +5,7 @@ import { around } from "../../../web/tree/layout/around";
 import { branchMap } from "../../../web/tree/layout/branch-map";
 import { cardIndex } from "../../../web/tree/layout/hit";
 import { type Arrow, aroundKeys, listKeys, mapKeys, pageKeys } from "../../../web/tree/layout/keys";
-import { peopleByPage, relativesOf } from "../../../web/tree/layout/relatives";
+import { relativesOf } from "../../../web/tree/layout/relatives";
 import { unreachable } from "./reach";
 import { type FamilySpec, familyOf, measure, wordingOf } from "./family";
 
@@ -357,15 +357,5 @@ describe("the list of relatives", () => {
 
   it("is null for nobody", () => {
     expect(relativesOf(snapshot, "nobody")).toBeNull();
-  });
-});
-
-describe("the list of everybody", () => {
-  it("goes page by page, generation by generation, and leaves out nobody", () => {
-    const list = peopleByPage(map);
-    expect(list.map(({ branch }) => branch)).toEqual(["A", "B"]);
-    expect(list[0]?.generations[0]).toEqual(["gf", "gm"]);
-    const all = list.flatMap(({ generations }) => generations.flat());
-    expect([...all].sort()).toEqual(snapshot.people.map(({ id }) => id).sort());
   });
 });
