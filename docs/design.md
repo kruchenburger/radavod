@@ -165,7 +165,32 @@ The drawing is one group with a name, a description of the keys under it, and re
 | Enter       | Closer, centred on the branch | Opens the person                                                                   |
 | Esc         |                               | One step out                                                                       |
 
-Focus moves the view with it. Beside the tree and the map a link opens **the same people as a list**: parents, siblings, unions and children of the chosen person, then every branch by generation, in plain headings and lists. The list is complete, so a screen reader never needs the drawing.
+Focus moves the view with it. Beside the tree and the map a link opens **the branches page by page**, the same people in plain headings and lists. It is complete, so a screen reader never needs the drawing.
+
+## Branch by branch
+
+Every branch is a page of its own, the pages side by side in one row that scrolls across; on the phone one page fills the window and the next is a swipe away. It is the way through the tree for a screen reader and a keyboard: headings and lists of lists, every name a link.
+
+```
+ Lozovens 14   Kalinens 25   Olkhuniches 29          (the branches, in their inks)
+
+ ┌───────────────────┐       ┌───────────────────────┐
+ │ Kalinens 25       │       │ Olkhuniches 29        │
+ │ Given Surname     │       │ Given Surname         │
+ │ ⚭ Given Surname   │       │ ⚭ Given Surname       │
+ │ ├ Given Surname   │       │ ┃ Given Surname       │
+ │ └ Given, see Olkh.├───┐   │ ┗ Given Surname       │
+ └───────────────────┘   └───┼─⚭ Given Surname       │
+                             └───────────────────────┘
+```
+
+- A page is `surface`, 372 px wide, with the head of the map: the name of the branch in its ink, the number of people, a 2 px rule. The pages stand 64 px apart. Above them the names of the branches in their inks lead to the pages; they keep to the top of the window.
+- Who stands where is the map's: a person once, on the page of the couple, and a reference in the birth family that leads to them. A couple whose parents are elsewhere has the reference to the parents above it.
+- An entry is the name and the years at the right end of its line, and the branch when it differs from the page. A partner stands under the person with ⚭; the children of a union stand one step (19 px) in under that partner, the children of the person alone under the person. Children stand by birth.
+- Lines: the trunk of a family runs down the left of its children and turns to each, `rule` 1.1 px. Down to the child on the direct line the trunk is `ink` 2.6 px and the names on the line are 700. A tie by adoption or guardianship turns in dashes, another version in dots.
+- **Between pages only the direct line is drawn**, on a window wider than a phone. It leaves its reference on the side of the page it goes to and always comes in from the left, where the outline is. Into the next page it crosses the gutter between them; within a page it runs in the gutter on the left; further it goes up to a rail over the pages, along it and down the gutter left of its page. Lines in one gutter keep 8 px apart. The pages stand in the order the direct line goes through them, beginning with the page of the person the line begins with, so that most of it crosses one gutter only.
+- The chosen person is set in `paper` on `ink`, and the pages open with that person in the window. Pressing a name chooses the person; pressing a reference chooses the person it names, on their page.
+- On the phone a name is a target 44 px high, and the line of a family turns at the middle of it.
 
 ## The person card
 

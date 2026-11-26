@@ -33,7 +33,7 @@ export const ru = {
   "view.views": "Виды древа",
   "view.around": "Родословная",
   "view.branches": "Все ветви",
-  "view.list": "Списком",
+  "view.list": "По ветвям",
   "view.tree": "Древом",
 
   "search.label": "Имя или место",
@@ -158,5 +158,4 @@ export const ru = {
   "name.other": "другой язык",
 
   "list.branches": "Ветви",
-  "list.generation": "{number}-е поколение",
 } satisfies Record<string, Text>;

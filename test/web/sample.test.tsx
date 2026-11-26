@@ -457,36 +457,38 @@ describe("siblings", () => {
   });
 });
 
-describe("the list", () => {
-  it("has the kin, and everybody once by branch and generation", async () => {
+describe("the pages of branches", () => {
+  it("have every branch as a page, everybody once, and the chosen one marked", async () => {
     await open(`/sample/list/${start}`);
-    await screen.findAllByText("1-е поколение");
-    const branches = screen.getByRole("heading", { name: "Ветви", level: 2 })
-      .parentElement as HTMLElement;
-    const ids = [...branches.querySelectorAll("a")].map((link) => link.getAttribute("href"));
-    expect(new Set(ids).size).toBe(300);
-    expect(ids).toHaveLength(300);
-    const own = branches.querySelector("details[open] h3");
-    expect(own?.textContent).toBe("Ольхуничи");
-    expect(branches.querySelectorAll("details[open]")).toHaveLength(1);
+    const pages = await screen.findAllByRole("heading", { level: 2 });
+    expect(pages).toHaveLength(11);
+    const names = [...document.querySelectorAll<HTMLAnchorElement>('[data-key^="p:"] > a')];
+    const hrefs = names.map((link) => link.getAttribute("href"));
+    expect(new Set(hrefs).size).toBe(300);
+    expect(hrefs).toHaveLength(300);
+    const chosen = names.filter((link) => link.getAttribute("aria-current") === "true");
+    expect(chosen.map((link) => link.getAttribute("href"))).toEqual([`/sample/list/${start}`]);
+    const branches = screen.getByRole("navigation", { name: "Ветви" });
+    expect(within(branches).getAllByRole("link")).toHaveLength(11);
   });
 
-  it("leads back to the tree, and from the tree here", async () => {
+  it("lead from a reference to the person on another page", async () => {
+    await open(`/sample/list/${start}`);
+    const reference = document.querySelector<HTMLAnchorElement>("[data-reference] a");
+    const href = reference?.getAttribute("href") ?? "";
+    press(reference as HTMLElement);
+    expect(address()).toBe(href);
+    const id = href.split("/").at(-1) ?? "";
+    const line = document.querySelector(`[data-key="p:${id}"] > a`);
+    expect(line?.getAttribute("aria-current")).toBe("true");
+  });
+
+  it("lead back to the tree, and from the tree here", async () => {
     await open("/sample");
-    press(screen.getByRole("link", { name: "Списком" }));
+    press(screen.getByRole("link", { name: "По ветвям" }));
     expect(address()).toBe(`/sample/list/${start}`);
     press(screen.getByRole("link", { name: "Древом" }));
     expect(address()).toBe(`/sample/tree/${start}`);
-  });
-
-  it("says so when the branches cannot be arranged", async () => {
-    FakeWorker.isMissing = true;
-    // A map that was laid out before is kept, so this one is of a tree nobody saw.
-    answers["/sample/tree.json"] = () => Promise.resolve(Response.json(structuredClone(sample)));
-    await open(`/sample/list/${start}`);
-    expect((await screen.findByRole("alert")).textContent).toBe(
-      "Браузер не смог разложить ветви. Обновите страницу.",
-    );
   });
 });
 
@@ -572,7 +574,7 @@ describe("all branches", () => {
     expect((await screen.findByRole("alert")).textContent).toContain(
       "Браузер не смог разложить ветви.",
     );
-    press(screen.getByRole("button", { name: "Списком" }));
+    press(screen.getByRole("button", { name: "По ветвям" }));
     expect(address()).toBe(`/sample/list/${start}`);
   });
 

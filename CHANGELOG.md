@@ -28,6 +28,7 @@ The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), and
 - The language is chosen with RU and EN, the same in either language. A first visit takes the first language of the browser that the site speaks; Belarusian and Ukrainian get Russian, anything else English. The theme follows the browser too until the visitor picks one.
 - The view around a person is called the pedigree.
 - A middle dot separates the years, a note and the branch under a name, so a date written in words no longer runs into the text after it.
+- The list of everybody is now the branches page by page: every branch an outline of its families in plain lists, the pages side by side in the order the direct line goes through them, and the direct line drawn between them. On a phone a page fills the screen.
 
 ### Fixed
 

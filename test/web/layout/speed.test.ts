@@ -1,6 +1,7 @@
 import { expect, it, vi } from "vitest";
 import { around } from "../../../web/tree/layout/around";
 import { branchMap } from "../../../web/tree/layout/branch-map";
+import { branchPages } from "../../../web/tree/layout/branch-pages";
 import { bigSnapshot, busiest } from "./big";
 import { measure, wordingOf } from "./family";
 
@@ -16,6 +17,16 @@ it.each([
   const snapshot = bigSnapshot(size);
   const start = performance.now();
   branchMap(snapshot, { level: "near", measure, headOf: ({ title }) => title.ru });
+  expect(performance.now() - start).toBeLessThan(bound);
+});
+
+it.each([
+  [300, 100],
+  [2000, 400],
+])("lays out the pages of %i people within %i ms", (size, bound) => {
+  const snapshot = { ...bigSnapshot(size) };
+  const start = performance.now();
+  branchPages(snapshot, null);
   expect(performance.now() - start).toBeLessThan(bound);
 });
 

@@ -68,8 +68,12 @@ const explained = ["direct", "adopted", "version"] as const;
 
 /** Explains the lines that are on the screen and no others. */
 export function Legend({ links }: { links: Link[] }) {
+  return <KindsLegend kinds={new Set(links.map(lineKind))} />;
+}
+
+/** The same for a screen that draws its lines otherwise. */
+export function KindsLegend({ kinds }: { kinds: Set<LineKind> }) {
   const { t } = useLanguage();
-  const kinds = new Set<LineKind>(links.map(lineKind));
   return explained
     .filter((kind) => kinds.has(kind))
     .map((kind) => (

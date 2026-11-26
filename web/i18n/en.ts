@@ -34,7 +34,7 @@ export const en = {
   "view.views": "Views of the tree",
   "view.around": "Pedigree",
   "view.branches": "All branches",
-  "view.list": "As a list",
+  "view.list": "Branch by branch",
   "view.tree": "As a tree",
 
   "search.label": "Name or place",
@@ -145,5 +145,4 @@ export const en = {
   "name.other": "another language",
 
   "list.branches": "Branches",
-  "list.generation": "Generation {number}",
 } satisfies Record<keyof typeof ru, Text>;

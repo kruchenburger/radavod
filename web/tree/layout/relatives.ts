@@ -1,7 +1,5 @@
 import type { TreeParentage, TreeSnapshot, TreeUnion } from "../../../src/shared/tree";
-import type { BranchMap } from "./branch-map";
 import { kinOf, type ParentSet, type Sibling } from "./kin";
-import { mapTracks } from "./stability";
 
 type Tie = Pick<TreeParentage, "kind" | "main" | "certainty">;
 
@@ -83,22 +81,4 @@ export function relativesOf(snapshot: TreeSnapshot, person: string): Relatives |
     if (kind === "guardianship") return null;
     return rest.find((one) => one.kind !== "guardianship")?.id ?? null;
   }
-}
-
-/** Everybody once, page by page and generation by generation, in the order they stand. */
-export function peopleByPage(
-  map: BranchMap,
-): { branch: string | null; people: number; generations: string[][] }[] {
-  const pageOf = new Map(map.cards.map(({ person, page, row }) => [person, { page, row }]));
-  const generations = map.pages.map((): string[][] => []);
-  for (const track of mapTracks(map)) {
-    const place = pageOf.get(track[0] ?? null);
-    const page = place === undefined ? undefined : generations[place.page];
-    if (page !== undefined && place !== undefined) page[place.row] = track;
-  }
-  return map.pages.map(({ branch, people }, i) => ({
-    branch,
-    people,
-    generations: (generations[i] ?? []).filter((row) => row.length > 0),
-  }));
 }
