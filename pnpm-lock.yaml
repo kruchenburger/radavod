@@ -215,6 +215,9 @@ importers:
       react-dom:
         specifier: ^19.3.1
         version: 19.3.1(react@19.3.1)
+      relatives-tree:
+        specifier: 3.2.2
+        version: 3.2.2
       zod:
         specifier: ^4.6.7
         version: 4.6.7
@@ -2161,6 +2164,9 @@ packages:
     resolution: {integrity: sha512-iETxpjK6YoRWJG5o6hXLwvjYAoW+FEZn9os0PD/b6AP6xQwsa/Y7lCVgIixBbUPMfhu+i2LtdeAqVTgGlQarfA==}
     hasBin: true
 
+  relatives-tree@3.2.2:
+    resolution: {integrity: sha512-8FCyESqICQLytqcEaXtEgeISFsDKjWEccUX+XqjZLLwEhVUU9WksTDAAcTV/+cXx3qDhFehfN9eOAy4VOAmJrg==}
+
   resolve@1.22.14:
     resolution: {integrity: sha512-1ZjYvR9sbkiwC5+9QHetqW5HmA2pHRMaoupD01t2HlYnV/vydC2zPwLixhsMieSWVZt0JJRg5LVIk0Ow1D/TrA==}
     engines: {node: '>= 0.4'}
@@ -4006,6 +4012,8 @@ snapshots:
   reflect-metadata@0.2.2: {}
 
   regexp-tree@0.1.27: {}
+
+  relatives-tree@3.2.2: {}
 
   resolve@1.22.14:
     dependencies:

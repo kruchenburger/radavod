@@ -1,0 +1,167 @@
+.said {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  margin: 0;
+  overflow: hidden;
+  clip-path: inset(50%);
+  white-space: nowrap;
+}
+
+.screen {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+  min-height: 0;
+}
+
+/* The tree scrolls in its window, the page stays. */
+.window {
+  flex: 1;
+  min-height: 0;
+  overflow: auto;
+  overscroll-behavior: contain;
+}
+
+.window:focus-visible {
+  outline: 2px solid var(--action);
+  outline-offset: -2px;
+}
+
+.canvas {
+  position: relative;
+  isolation: isolate;
+}
+
+.canvas > svg {
+  z-index: 0;
+}
+
+.card {
+  position: absolute;
+  top: 0;
+  left: 0;
+  z-index: 1;
+}
+
+/*
+ * A person is a box on the page: the rule of the branch on its left, the surname in the same ink.
+ * The direct line has a border of ink, the chosen person stands in ink.
+ */
+.name {
+  position: absolute;
+  inset: 0;
+  border: 1px solid var(--edge);
+  border-left: 3px solid var(--branch);
+  background-color: var(--paper);
+  color: inherit;
+  text-decoration: none;
+}
+
+.card[data-direct] > .name {
+  border-color: var(--ink);
+  border-left-color: var(--branch);
+}
+
+.card[data-focus] > .name {
+  border-color: var(--ink);
+  background-color: var(--ink);
+}
+
+.card[data-focus] > .name span {
+  color: var(--paper) !important;
+}
+
+a.name:hover {
+  background-color: var(--hover);
+}
+
+.card[data-focus] > a.name:hover {
+  background-color: var(--ink);
+}
+
+a.name:hover > span > span {
+  text-decoration: underline;
+  text-underline-offset: 3px;
+}
+
+/* The mark of the keys, as in the pedigree: a tint around the box and a bar in `action` before it. */
+.name:focus-visible {
+  outline: none;
+}
+
+.name:focus-visible::before {
+  content: "";
+  position: absolute;
+  inset: -0.375rem -0.375rem -0.375rem -0.625rem;
+  z-index: -1;
+  border-left: 3px solid var(--action);
+  border-radius: 3px;
+  background-color: var(--hover);
+}
+
+@media (forced-colors: active) {
+  .name:focus-visible {
+    outline: 2px solid CanvasText;
+    outline-offset: 2px;
+  }
+}
+
+.legend {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0.25rem 1.625rem;
+  padding: 0.5rem 1.75rem;
+  border-top: 1px solid var(--edge);
+  color: var(--muted);
+  font-size: 0.9375rem;
+}
+
+.legend a {
+  display: inline-flex;
+  align-items: center;
+  min-height: 1.75rem;
+  color: var(--action);
+  text-underline-offset: 3px;
+}
+
+@media (max-width: 44.99em) {
+  .legend {
+    padding: 0.25rem 1rem 0.5rem;
+    gap: 0 1.25rem;
+  }
+
+  .legend a {
+    min-height: 2.75rem;
+  }
+
+  .hint {
+    display: none;
+  }
+}
+
+@media (hover: none) {
+  .hint {
+    display: none;
+  }
+}
+
+/* A partner who stands elsewhere: a reference, and a way there. */
+.apart {
+  position: absolute;
+  z-index: 1;
+  color: var(--muted);
+  white-space: pre;
+  text-decoration: underline 1px;
+  text-underline-offset: 3px;
+}
+
+.apart:hover {
+  color: var(--ink);
+}
+
+.card[data-focus] > .apart {
+  color: var(--paper);
+}

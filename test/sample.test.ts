@@ -23,6 +23,8 @@ const screens = [
   "/sample/branches?level=near&at=p1_0_0",
   "/sample/person/p1",
   "/sample/list/p1",
+  "/sample/generations",
+  "/sample/generations/p1",
 ];
 
 it("is off unless an installation turns it on", async () => {

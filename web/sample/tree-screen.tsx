@@ -8,13 +8,14 @@ import { around, type AroundCard, type AroundLayout } from "../tree/layout/aroun
 import { type AroundMetrics, aroundMetrics } from "../tree/layout/around-text";
 import { aroundNarrow, type NarrowLayout } from "../tree/layout/around-narrow";
 import { kinOf } from "../tree/layout/kin";
-import { aroundKeys, type Arrow, listKeys } from "../tree/layout/keys";
+import { aroundKeys, listKeys } from "../tree/layout/keys";
 import { relativesOf } from "../tree/layout/relatives";
 import { personKey } from "../tree/layout/types";
 import { Legend, Lines } from "../tree/lines";
 import { Moving } from "../tree/moving";
 import { cssFont, measure, rem } from "../tree/type";
 import { wordsOf } from "../tree/words";
+import { arrows, holdCentre } from "./centre";
 import { useData } from "./data";
 import { rememberTree } from "./last-tree";
 import { branchesPlace, type Half, hrefOf, type TreePlace, treePlace } from "./places";
@@ -101,28 +102,6 @@ export function TreeScreen({ place }: { place: Centred }) {
     </section>
   );
 }
-
-/**
- * The keys work at once: the person in the centre takes the focus when the tree opens and after
- * every move, unless the visitor has put it somewhere else (the search, a link of the page).
- */
-function holdCentre(): void {
-  const active = document.activeElement;
-  const isFree =
-    active === null ||
-    active === document.body ||
-    (active instanceof HTMLElement && active.closest("[data-press]") !== null);
-  if (!isFree) return;
-  const centre = document.querySelector<HTMLElement>("[data-focus] > [data-press]");
-  if (centre === null || centre === active) return;
-  // No mark until a key is pressed, and none after a press of the mouse.
-  centre.focus({ preventScroll: true, focusVisible: isByKeys });
-}
-
-/** Whether the visitor last used the keys, not the mouse or a finger. */
-let isByKeys = false;
-window.addEventListener("keydown", () => (isByKeys = true), { capture: true });
-window.addEventListener("pointerdown", () => (isByKeys = false), { capture: true });
 
 /** An address names the partner, or the union of one nobody knows. */
 const keyOf = (id: string, isPerson: boolean): string =>
@@ -256,13 +235,6 @@ function Sheet({ layout, isWhole, place, words, relatives }: SheetProps) {
     };
   }
 }
-
-const arrows: Partial<Record<string, Arrow>> = {
-  ArrowUp: "up",
-  ArrowDown: "down",
-  ArrowLeft: "left",
-  ArrowRight: "right",
-};
 
 const columnHeads = {
   "-3": "tree.greatGrandparents",

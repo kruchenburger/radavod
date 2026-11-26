@@ -88,7 +88,7 @@ Every text a person reads is in `web/i18n/ru.ts` and `web/i18n/en.ts`, reached t
 
 ## Tree
 
-`src/shared/tree.ts` is the snapshot of the tree that the server sends. `web/tree/layout` turns it into places: `around` and `aroundNarrow` for the view around a person, `branchPages` for the pages by branch and `fanOf` for the fan, following `docs/design.md`. These are pure functions with no DOM, no clock and no texts; they judge nothing and draw what the snapshot says, fast enough to run on the main thread.
+`src/shared/tree.ts` is the snapshot of the tree that the server sends. `web/tree/layout` turns it into places: `around` and `aroundNarrow` for the view around a person, `generations` for the tree by generations, `branchPages` for the pages by branch and `fanOf` for the fan, following `docs/design.md`. `generations` asks relatives-tree only where each card stands and draws everything itself. These are pure functions with no DOM, no clock and no texts; they judge nothing and draw what the snapshot says, fast enough to run on the main thread.
 
 `web/sample` holds the screens of the example and `web/sample/places.ts` their addresses: a place, a person and a zoom are in the address, and nothing a person would lose with a link is kept elsewhere. `web/tree/type.ts` measures names in the fonts of the page; lengths of the layout go to styles through `rem`, so the tree grows with the text.
 

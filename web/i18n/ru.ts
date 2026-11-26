@@ -32,6 +32,7 @@ export const ru = {
 
   "view.views": "Виды древа",
   "view.around": "Родословная",
+  "view.generations": "Древо",
   "view.branches": "Все ветви",
   "view.list": "По ветвям",
 
@@ -71,6 +72,9 @@ export const ru = {
   "year.unread": "«{text}»",
 
   "tree.loading": "Открываем древо",
+  "generations.name": "Древо по поколениям, в центре {name}",
+  "generations.keys":
+    "Стрелки ведут к родителям, детям и вдоль ряда, Enter ставит человека в центр, Backspace возвращает назад.",
   "tree.name": "Древо, в центре {name}",
   "tree.apart": "Ещё союз: {name}",
   "tree.keys": "Стрелки ведут по древу, Enter ставит человека в центр, Backspace возвращает назад.",

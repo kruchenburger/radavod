@@ -16,6 +16,8 @@ const places: [string, Place][] = [
     "/sample/branches?as=fan&person=p1&with=p2",
     branchesPlace({ as: "fan", person: "p1", partner: "p2" }),
   ],
+  ["/sample/generations", { screen: "generations", person: null }],
+  ["/sample/generations/p1", { screen: "generations", person: "p1" }],
   ["/sample/person/p1", { screen: "person", person: "p1" }],
   ["/sample/list/p1", { screen: "list", person: "p1" }],
 ];
@@ -28,12 +30,16 @@ it.each(places)("%s is a place and back", (href, place) => {
   expect(parseSamplePath(pathname)).not.toBeNull();
 });
 
-it.each(["/", "/sample/people", "/sample/tree", "/sample/branches/b1", "/sampler"])(
-  "%s is no place",
-  (path) => {
-    expect(readPlace(path, "")).toBeNull();
-  },
-);
+it.each([
+  "/",
+  "/sample/people",
+  "/sample/tree",
+  "/sample/branches/b1",
+  "/sample/generations/",
+  "/sampler",
+])("%s is no place", (path) => {
+  expect(readPlace(path, "")).toBeNull();
+});
 
 it.each([
   ["level=other", {}],

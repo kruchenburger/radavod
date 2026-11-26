@@ -16,6 +16,17 @@ const nameOf = (id: string): string => {
 const father = snapshot.people.find(({ id }) => id === start)?.parents[0]?.parent ?? "";
 /** Three unions, so one of them is open; see examples/hard-cases.ts. */
 const manyUnions = "p28";
+const childrenOf = (id: string) =>
+  snapshot.people.filter(({ parents }) => parents.some(({ parent }) => parent === id));
+const unionsOf = (id: string) =>
+  snapshot.unions.filter(({ partners }) => partners.includes(id) && !partners.includes(null));
+/** Somebody with a parent and two partners, and the parent with the most children. */
+const twoUnions =
+  snapshot.people.find(({ id, parents }) => parents.length > 0 && unionsOf(id).length === 2)?.id ??
+  "";
+const manyChildren = [...snapshot.people].sort(
+  (a, b) => childrenOf(b.id).length - childrenOf(a.id).length,
+)[0]?.id;
 
 const screens = [
   ["around a person", "/sample"],
@@ -23,6 +34,7 @@ const screens = [
   ["a repeated ancestor", "/sample/tree/p162"],
   ["a person", `/sample/person/${manyUnions}`],
   ["the pages of branches", `/sample/list/${start}`],
+  ["the tree by generations", `/sample/generations/${twoUnions}`],
   ["the fan of ancestors", "/sample/branches?as=fan"],
 ] as const;
 
@@ -551,6 +563,136 @@ test.describe("the pages of branches", () => {
     expect(crossed).toEqual([]);
     await page.setViewportSize({ width: 390, height: 800 });
     await expect(page.locator("[data-row] > svg path")).toHaveCount(0);
+  });
+});
+
+test.describe("the tree by generations", () => {
+  const middleOf = async (page: Page) => {
+    const [box, window] = await Promise.all([
+      centre(page).boundingBox(),
+      page.locator("[data-focus]").locator("xpath=ancestor::*[@role='group']").boundingBox(),
+    ]);
+    return {
+      x: (box?.x ?? 0) + (box?.width ?? 0) / 2 - ((window?.x ?? 0) + (window?.width ?? 0) / 2),
+      y: (box?.y ?? 0) + (box?.height ?? 0) / 2 - ((window?.y ?? 0) + (window?.height ?? 0) / 2),
+    };
+  };
+
+  for (const [width, height] of [
+    [1440, 900],
+    [390, 844],
+  ] as const) {
+    for (const scheme of ["light", "dark"] as const) {
+      test(`stands the chosen person in the middle at ${width} px, ${scheme}`, async ({ page }) => {
+        await page.setViewportSize({ width, height });
+        await page.addInitScript((value) => localStorage.setItem("radavod.theme", value), scheme);
+        for (const person of [twoUnions, manyChildren]) {
+          await page.goto(`/sample/generations/${person}`);
+          await ready(page);
+          expect(await theme(page)).toBe(scheme);
+          await expect(centre(page)).toHaveAttribute("data-key", `p:${person}`);
+          const { x, y } = await middleOf(page);
+          // Within the bar of the scroll, which the box of the window counts.
+          expect(Math.abs(x)).toBeLessThan(10);
+          expect(Math.abs(y)).toBeLessThan(10);
+          await expect(centre(page)).toBeInViewport({ ratio: 1 });
+          // The tree scrolls in its window; the page does not.
+          await expectNoSideScroll(page);
+          const fonts: number[] = await page.evaluate(`[...document.querySelectorAll(
+            "[data-focus] span, [data-press] span")].map((one) => parseFloat(getComputedStyle(one).fontSize))`);
+          expect(Math.min(...fonts)).toBeGreaterThanOrEqual(14);
+        }
+      });
+    }
+  }
+
+  test("puts both partners beside the person, and the children of each under them", async ({
+    page,
+  }) => {
+    await page.goto(`/sample/generations/${twoUnions}`);
+    await ready(page);
+    const row = await page.evaluate(`(() => {
+      const top = document.querySelector("[data-focus]").getBoundingClientRect().top;
+      return [...document.querySelectorAll("[data-key]")]
+        .filter((card) => Math.abs(card.getBoundingClientRect().top - top) < 1)
+        .sort((a, b) => a.getBoundingClientRect().left - b.getBoundingClientRect().left)
+        .map((card) => card.dataset.key);
+    })()`);
+    const partners = unionsOf(twoUnions).map(({ partners }) =>
+      partners.find((one) => one !== twoUnions),
+    );
+    const at = (row as string[]).indexOf(`p:${twoUnions}`);
+    // One on either side, the person once.
+    const beside = [(row as string[])[at - 1], (row as string[])[at + 1]].sort();
+    expect(beside).toEqual(partners.map((one) => `p:${one}`).sort());
+    expect((row as string[]).filter((key) => key === `p:${twoUnions}`)).toHaveLength(1);
+    for (const { id } of childrenOf(twoUnions)) {
+      await expect(page.locator(`[data-key="p:${id}"]`)).toHaveCount(1);
+    }
+  });
+
+  test("hangs many children from one bar under their parents", async ({ page }) => {
+    await page.goto(`/sample/generations/${manyChildren}`);
+    await ready(page);
+    const children = childrenOf(manyChildren ?? "");
+    expect(children.length).toBeGreaterThan(5);
+    const tops = await Promise.all(
+      children.map(({ id }) =>
+        page.locator(`[data-key="p:${id}"]`).evaluate((card) => card.getBoundingClientRect().top),
+      ),
+    );
+    expect(new Set(tops.map(Math.round)).size).toBe(1);
+    const parent = await centre(page).evaluate((card) => card.getBoundingClientRect().bottom);
+    expect(tops[0]).toBeGreaterThan(parent);
+  });
+
+  test("is walked by the keys, with the mark of the tree, and Backspace goes back", async ({
+    page,
+  }) => {
+    await page.goto(`/sample/generations/${twoUnions}`);
+    await ready(page);
+    const pressed = () => page.evaluate("document.activeElement?.dataset?.press ?? null");
+    expect(await pressed()).toBe(`p:${twoUnions}`);
+    await page.keyboard.press("ArrowUp");
+    const parent = await pressed();
+    const parents = snapshot.people
+      .find(({ id }) => id === twoUnions)
+      ?.parents.map(({ parent: one }) => `p:${one}`);
+    expect(parents).toContain(parent);
+    expect(await page.evaluate(markOfFocus)).toEqual({
+      outline: "none",
+      content: '""',
+      tint: true,
+      bar: true,
+      under: "-1",
+    });
+    await page.keyboard.press("ArrowDown");
+    expect(await pressed()).toBe(`p:${twoUnions}`);
+    await page.keyboard.press("ArrowRight");
+    const right = await pressed();
+    expect(right).not.toBe(`p:${twoUnions}`);
+    await page.keyboard.press("ArrowLeft");
+    expect(await pressed()).toBe(`p:${twoUnions}`);
+    await page.keyboard.press("ArrowUp");
+    await page.keyboard.press("Enter");
+    await expect(page).toHaveURL(`/sample/generations/${String(parent).slice(2)}`);
+    await expect(centre(page)).toHaveAttribute("data-key", String(parent));
+    expect(await pressed()).toBe(parent);
+    await page.keyboard.press("Backspace");
+    await expect(page).toHaveURL(`/sample/generations/${twoUnions}`);
+    await expect(centre(page)).toHaveAttribute("data-key", `p:${twoUnions}`);
+    expect(await pressed()).toBe(`p:${twoUnions}`);
+  });
+
+  test("leads to the pedigree and to all branches of the same person", async ({ page }) => {
+    await page.goto(`/sample/generations/${twoUnions}`);
+    await ready(page);
+    const group = page.locator("section", { has: centre(page) });
+    await group.getByRole("link", { name: "Pedigree" }).click();
+    await expect(page).toHaveURL(`/sample/tree/${twoUnions}`);
+    await page.goBack();
+    await group.getByRole("link", { name: "All branches" }).click();
+    await expect(page).toHaveURL(`/sample/list/${twoUnions}`);
   });
 });
 

@@ -24,6 +24,7 @@ The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), and
 - The import of a family table: a keeper chooses a CSV file, sees everybody it adds, the unions, parents, births, deaths and sources, and every problem with its row, then adds it all to a tree without people as one entry of the edit history.
 - Guards for the architecture, the texts, licenses and a real family's data. The last one reads every commit of a pull request and, with the hook turned on, every commit before a push.
 - Checks on every pull request: browser tests, accessibility, secrets and known vulnerabilities.
+- The tree by generations («Древо»), a view of its own between the pedigree and all branches: ancestors three generations up, descendants two down, siblings and partners in the row of the person, a couple side by side with children hanging from one bar. The chosen person stands in the middle of the window, the arrows walk up, down and along a row, and it reads on a phone. The places come from relatives-tree (MIT).
 
 ### Changed
 

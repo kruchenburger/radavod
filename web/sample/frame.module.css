@@ -4,7 +4,8 @@
   min-height: 100dvh;
 }
 
-.frame[data-screen="branches"] {
+.frame[data-screen="branches"],
+.frame[data-screen="generations"] {
   height: 100dvh;
   min-height: 26rem;
   overflow: hidden;

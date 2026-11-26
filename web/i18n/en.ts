@@ -33,6 +33,7 @@ export const en = {
 
   "view.views": "Views of the tree",
   "view.around": "Pedigree",
+  "view.generations": "Tree",
   "view.branches": "All branches",
   "view.list": "By branch",
 
@@ -57,6 +58,9 @@ export const en = {
   "year.unread": "“{text}”",
 
   "tree.loading": "Opening the tree",
+  "generations.name": "Tree by generations with {name} in the center",
+  "generations.keys":
+    "Arrow keys move to parents, children and along a row, Enter puts a person in the center, Backspace goes back.",
   "tree.name": "Tree with {name} in the center",
   "tree.apart": "Also in a union with {name}",
   "tree.keys":

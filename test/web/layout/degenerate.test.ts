@@ -2,6 +2,7 @@ import { describe, expect, it } from "vitest";
 import { around } from "../../../web/tree/layout/around";
 import { aroundNarrow } from "../../../web/tree/layout/around-narrow";
 import { branchPages } from "../../../web/tree/layout/branch-pages";
+import { generations } from "../../../web/tree/layout/generations";
 import { type FamilySpec, familyOf, measure, wordingOf } from "./family";
 
 // Nobody has such a family. A drawing is slow and ugly then, and still a drawing.
@@ -48,6 +49,12 @@ describe.each(Object.entries(families))("%s", (_, spec) => {
 
   it("have a list", () => {
     const layout = aroundNarrow(snapshot, "p0", { ...options, width: 328 });
+    expect(Number.isFinite(layout.width + layout.height)).toBe(true);
+  }, 60_000);
+
+  it("have a tree by generations", () => {
+    const layout = generations(snapshot, "p0", options);
+    expect(layout.cards.length).toBeGreaterThan(0);
     expect(Number.isFinite(layout.width + layout.height)).toBe(true);
   }, 60_000);
 

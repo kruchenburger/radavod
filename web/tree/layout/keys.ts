@@ -1,4 +1,5 @@
 import type { AroundLayout } from "./around";
+import type { GenerationsLayout } from "./generations";
 import { listOf } from "./kin";
 import type { Card, Link } from "./types";
 
@@ -16,6 +17,30 @@ export function aroundKeys({ cards, links }: AroundLayout): Move {
     if (arrow === "left") return kin.parent(key);
     if (arrow === "right") return kin.child(key, cameFrom);
     return along(key, arrow === "up" ? -1 : 1);
+  };
+}
+
+/**
+ * Up to a parent, down to a child, left and right along a row. Of several parents or children the
+ * one on the direct line comes first, then the nearest; down leads back where up came from.
+ */
+export function generationsKeys({ cards, links, rows }: GenerationsLayout): Move {
+  const kin = kinMoves(cards, links);
+  const byKey = new Map(cards.map((card) => [card.key, card]));
+  const centreOf = (key: string): number => {
+    const card = byKey.get(key);
+    return card === undefined ? 0 : card.x + card.w / 2;
+  };
+  const nearest = (from: string, keys: string[]): string | null =>
+    [...keys].sort(
+      (a, b) => Math.abs(centreOf(a) - centreOf(from)) - Math.abs(centreOf(b) - centreOf(from)),
+    )[0] ?? null;
+  const along = rows.map(neighbors);
+  const rowOf = new Map(rows.flatMap((row, i) => row.map((key) => [key, i] as const)));
+  return (key, arrow, cameFrom) => {
+    if (arrow === "up") return kin.parent(key, nearest);
+    if (arrow === "down") return kin.child(key, cameFrom, nearest);
+    return along[rowOf.get(key) ?? -1]?.(key, arrow === "left" ? -1 : 1) ?? null;
   };
 }
 
@@ -44,16 +69,17 @@ function kinMoves(
       listOf(children, parent).push(link.child);
     }
   }
-  const best = (from: string, keys: string[] = []): string | null =>
-    keys.find((key) => byKey.get(key)?.direct === true) ??
-    keys.find((key) => isNear(from, key)) ??
-    keys[0] ??
-    null;
+  type Pick = (from: string, keys: string[]) => string | null;
+  const first: Pick = (from, keys) => keys.find((key) => isNear(from, key)) ?? keys[0] ?? null;
+  const best = (from: string, keys: string[] = [], pick: Pick = first): string | null =>
+    keys.find((key) => byKey.get(key)?.direct === true) ?? pick(from, keys);
   return {
-    parent: (key: string): string | null => best(key, parents.get(key)),
-    child: (key: string, cameFrom: string | null): string | null => {
+    parent: (key: string, pick?: Pick): string | null => best(key, parents.get(key), pick),
+    child: (key: string, cameFrom: string | null, pick?: Pick): string | null => {
       const own = children.get(key);
-      return cameFrom !== null && own?.includes(cameFrom) === true ? cameFrom : best(key, own);
+      return cameFrom !== null && own?.includes(cameFrom) === true
+        ? cameFrom
+        : best(key, own, pick);
     },
   };
 }
