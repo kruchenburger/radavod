@@ -1,4 +1,4 @@
-import { type AnchorHTMLAttributes, type MouseEvent, useSyncExternalStore } from "react";
+import { type AnchorHTMLAttributes, type MouseEvent, useEffect, useSyncExternalStore } from "react";
 
 /** The address is the state of the screen: what is in it survives back, forward, reload and a link. */
 export type Address = { path: string; search: string };
@@ -24,8 +24,11 @@ function subscribe(listener: () => void): () => void {
 
 /** Whether the last step was one back or forward, when the browser puts the page where it was. */
 let isReturn = false;
+/** A step back is on its way: until it lands, the state still names the step it leaves. */
+let isLeaving = false;
 window.addEventListener("popstate", () => {
   isReturn = true;
+  isLeaving = false;
 });
 
 export const cameBack = (): boolean => isReturn;
@@ -37,9 +40,49 @@ export function go(href: string, how: "push" | "replace" = "push"): void {
   const { pathname, search } = window.location;
   if (href === pathname + search) return;
   isReturn = false;
-  if (how === "push") window.history.pushState(null, "", href);
-  else window.history.replaceState(null, "", href);
+  if (how === "push")
+    window.history.pushState({ step: stepOf(window.history.state) + 1 }, "", href);
+  else window.history.replaceState(window.history.state, "", href);
   window.dispatchEvent(new Event(changed));
+}
+
+/**
+ * How many steps inside the app lie behind this entry of the history. An entry the app did not
+ * make, the first of a visit or one that came from another site, has none.
+ */
+function stepOf(state: unknown): number {
+  const step = typeof state === "object" && state !== null ? Reflect.get(state, "step") : 0;
+  return typeof step === "number" && Number.isInteger(step) && step > 0 ? step : 0;
+}
+
+/** One step back, never out of the site. Says whether there was a step to take. */
+export function goBack(): boolean {
+  if (isLeaving || stepOf(window.history.state) === 0) return false;
+  // A held key repeats faster than a step may land; a second one would leave the site.
+  isLeaving = true;
+  window.history.back();
+  return true;
+}
+
+/** Backspace is one step back, while nobody is typing. */
+export function onBackKey(event: KeyboardEvent): void {
+  if (event.key !== "Backspace" || event.defaultPrevented || event.isComposing) return;
+  if (event.ctrlKey || event.altKey || event.metaKey || event.shiftKey) return;
+  if (isTyping(event.target)) return;
+  if (goBack()) event.preventDefault();
+}
+
+const isTyping = (target: EventTarget | null): boolean =>
+  target instanceof Element &&
+  target.closest('input, textarea, select, [contenteditable]:not([contenteditable="false"])') !==
+    null;
+
+/** The one place that listens for the key, whatever the screen. */
+export function useBackKey(): void {
+  useEffect(() => {
+    window.addEventListener("keydown", onBackKey);
+    return () => window.removeEventListener("keydown", onBackKey);
+  }, []);
 }
 
 type LinkProps = Omit<AnchorHTMLAttributes<HTMLAnchorElement>, "href"> & {

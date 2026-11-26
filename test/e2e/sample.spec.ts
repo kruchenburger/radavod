@@ -232,6 +232,42 @@ test.describe("around a person", () => {
     await expect(page.getByRole("heading", { level: 1 })).toBeFocused();
   });
 
+  test("Backspace goes back one step at a time, and never off the site", async ({ page }) => {
+    const grandfather = snapshot.people.find(({ id }) => id === father)?.parents[0]?.parent ?? "";
+    await page.goto("/sample");
+    await ready(page);
+    await page.keyboard.press("Backspace");
+    await expect(page).toHaveURL("/sample");
+    await page.locator(`[data-press="p:${father}"]`).click();
+    await expect(page).toHaveURL(`/sample/tree/${father}`);
+    await page.locator(`[data-press="p:${grandfather}"]`).click();
+    await expect(page).toHaveURL(`/sample/tree/${grandfather}`);
+    await page.keyboard.press("Backspace");
+    await expect(page).toHaveURL(`/sample/tree/${father}`);
+    await expect(centre(page)).toHaveAttribute("data-key", `p:${father}`);
+    await page.keyboard.press("Backspace");
+    await expect(page).toHaveURL("/sample");
+    // The first page of the visit: nothing behind it inside the app.
+    await page.keyboard.press("Backspace");
+    await page.waitForTimeout(300);
+    await expect(page).toHaveURL("/sample");
+  });
+
+  test("Backspace in the search box only deletes", async ({ page }) => {
+    await page.goto("/sample");
+    await ready(page);
+    await page.locator(`[data-press="p:${father}"]`).click();
+    await expect(page).toHaveURL(`/sample/tree/${father}`);
+    const button = page.getByRole("button", { name: "Name or place" });
+    if (await button.isVisible()) await button.click();
+    const field = page.getByRole("combobox", { name: "Name or place" });
+    await field.fill("Ab");
+    await field.press("Backspace");
+    await expect(field).toHaveValue("A");
+    await page.waitForTimeout(300);
+    await expect(page).toHaveURL(`/sample/tree/${father}`);
+  });
+
   test("a press of the mouse shows no mark of the keys", async ({ page }) => {
     await page.goto("/sample");
     await ready(page);
