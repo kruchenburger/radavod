@@ -292,13 +292,24 @@ test.describe("around a person", () => {
   test("a press of the mouse shows no mark of the keys", async ({ page }) => {
     await page.goto("/sample");
     await ready(page);
+    const state = () =>
+      page.evaluate(
+        "[document.activeElement.dataset.press, getComputedStyle(document.activeElement, '::before').content]",
+      );
     await page.locator(`[data-press="p:${father}"]`).hover();
     await page.mouse.down();
-    const pressed = await page.evaluate(
-      "[document.activeElement.dataset.press, getComputedStyle(document.activeElement, '::before').content]",
-    );
+    const pressed = await state();
     await page.mouse.up();
     expect(pressed).toEqual([`p:${father}`, "none"]);
+    // The keys first, then the mouse: the centre that comes back takes the focus without a mark.
+    await expect(page).toHaveURL(`/sample/tree/${father}`);
+    const grandfather = snapshot.people.find(({ id }) => id === father)?.parents[0]?.parent ?? "";
+    await page.keyboard.press("ArrowLeft");
+    await page.locator(`[data-press="p:${grandfather}"]`).click();
+    await expect(page).toHaveURL(`/sample/tree/${grandfather}`);
+    await page.goBack();
+    await expect(centre(page)).toHaveAttribute("data-key", `p:${father}`);
+    expect(await state()).toEqual([`p:${father}`, "none"]);
   });
 
   test("the lines of kinship stay over the mark of focus", async ({ page }) => {
@@ -690,10 +701,10 @@ for (const [view, width] of [
       await ready(page);
       // The lines of the three braces, and none between the partners.
       await expect(page.locator("svg[data-late] path")).toHaveCount(6);
-      const husband = page.getByRole("link", { name: "also in a union with mother Example" });
+      const husband = page.getByRole("link", { name: "Also in a union with mother Example" });
       await expect(husband).toBeVisible();
       await expect(
-        page.getByRole("link", { name: "also in a union with husband Example" }),
+        page.getByRole("link", { name: "Also in a union with husband Example" }),
       ).toBeVisible();
       await expectNoSideScroll(page);
       await husband.click();

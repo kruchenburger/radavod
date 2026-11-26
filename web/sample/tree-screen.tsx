@@ -212,7 +212,9 @@ function Sheet({ layout, isWhole, place, words, relatives }: SheetProps) {
           corners={as === "wide" ? corners : narrowCorners}
           reach={(key) => {
             const card = byKey.get(key);
-            const text = Math.min(...(card?.lines ?? []).map(({ x }) => x));
+            // The partners named under a card stand at its edge, not where the name begins.
+            const own = (card?.lines ?? []).filter(({ part }) => part !== "apart");
+            const text = Math.min(...own.map(({ x }) => x));
             const ring = card?.isSpouse === true ? aroundMetrics.ring : 0;
             return Number.isFinite(text) ? text - ring - beforeText : 0;
           }}

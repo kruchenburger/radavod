@@ -65,8 +65,8 @@ export type Family = {
 
 export type ModelLink = Omit<ParentageLink, "points"> & { from: string[] };
 /**
- * A union whose partners stand apart, in other columns or far down the list, has no line: every
- * way from one to the other would cross the braces between them. Each partner names the other.
+ * A union of two people who do not stand together as a couple has no line: every way from one to
+ * the other would cross the braces between them. Each partner names the other.
  */
 export type ModelUnion = Omit<UnionLink, "points"> & { isTogether: boolean; isApart: boolean };
 export type ModelReference = Omit<ReferenceLink, "points">;
