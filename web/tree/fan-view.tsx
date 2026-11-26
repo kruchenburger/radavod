@@ -10,6 +10,7 @@ import {
   fanKeys,
   fanText,
   firstCell,
+  leastScale,
 } from "./layout/fan";
 import { kinOf } from "./layout/kin";
 import classes from "./fan-view.module.css";
@@ -51,6 +52,8 @@ export function FanView(props: FanViewProps) {
   const [size, setSize] = useState<{ w: number; h: number } | null>(null);
   const [current, setCurrent] = useState<string | null>(null);
   const [isAsked, setAsked] = useState(false);
+  /** The keys walked the fan, so a new centre keeps the focus on it. */
+  const isWalked = useRef(false);
   const move = useMemo(() => fanKeys(fan), [fan]);
   const kin = kinOf(snapshot);
   const isQuarter = fan.sides.length === 1 && fan.sides[0]?.from === Math.PI / 2;
@@ -71,13 +74,21 @@ export function FanView(props: FanViewProps) {
     observer.observe(element);
     return () => observer.disconnect();
   }, []);
-  // A quarter larger than the window opens at its centre, the corner where the person stands.
+  // A fan larger than the window opens at its centre, where the person stands: the base line,
+  // and on the phone the corner of the quarter.
   useEffect(() => {
     const element = box.current;
-    if (element === null || !isQuarter) return;
+    if (element === null) return;
     element.scrollTop = element.scrollHeight;
-    element.scrollLeft = 0;
-  }, [isQuarter, fan]);
+    if (isQuarter) element.scrollLeft = 0;
+  }, [isQuarter, fan, size]);
+  // Enter on a cell puts the person in the centre and the cell is gone: the focus goes to the
+  // first cell of the new fan, not to the top of the page.
+  useEffect(() => {
+    const element = box.current;
+    if (element === null || !isWalked.current || element.contains(document.activeElement)) return;
+    element.querySelector<SVGAElement>('[data-key][tabindex="0"]')?.focus();
+  }, [fan]);
   useEffect(() => {
     if (!isAsked || current === null) return;
     setAsked(false);
@@ -92,11 +103,10 @@ export function FanView(props: FanViewProps) {
   const view = isQuarter
     ? { x: -8, y: -outer, w: outer + 8, h: outer + below }
     : { x: -outer, y: -outer, w: 2 * outer, h: outer + below };
-  // Names stay as large as the tree has them, at least 14 px; the stage scrolls instead.
   const unit = Number.parseFloat(getComputedStyle(document.documentElement).fontSize) / 16 || 1;
-  // The whole fan where it fits; names never below 14 px, the stage scrolls instead.
+  // The whole fan where it fits; no text below 14 px, the stage scrolls instead.
   const fits = size === null ? 1 : Math.min(size.w / view.w, size.h > 0 ? size.h / view.h : 1);
-  const scale = Math.max(14 / 17, Math.min(1, fits / unit));
+  const scale = Math.max(leastScale, Math.min(1, fits / unit));
 
   const onKeyDown = (event: KeyboardEvent): void => {
     const arrow = arrows[event.key];
@@ -125,7 +135,7 @@ export function FanView(props: FanViewProps) {
           const person = kin.person(cell.person);
           if (person === undefined) return null;
           const text = words.person(person);
-          const lines = cell.repeat ? [] : fanText(cell, text, { measure, sets: fan.metrics.sets });
+          const lines = fanText(cell, text, { measure, sets: fan.metrics.sets });
           const said = [
             words.name(person),
             words.years(person),
@@ -143,12 +153,21 @@ export function FanView(props: FanViewProps) {
               data-direct={cell.direct || undefined}
               data-repeat={cell.repeat || undefined}
               tabIndex={cell.key === stop ? 0 : -1}
-              aria-label={said}
-              onFocus={() => setCurrent(cell.key)}
+              onFocus={({ target }) => {
+                setCurrent(cell.key);
+                if (target.matches(":focus-visible")) isWalked.current = true;
+              }}
             >
               <path className={classes.ground} d={sector(cell)} />
               <path className={classes.bar} d={arc(cell.inner + 1.5, cell.from, cell.to)} />
-              <CellText cell={cell} lines={lines} ink={words.ink(person.branch)} />
+              <CellText
+                cell={cell}
+                lines={lines}
+                ink={words.ink(person.branch)}
+                sets={fan.metrics.sets}
+              />
+              {/* The name of the link: the whole of what the cell may only begin to show. */}
+              <text className={classes.said}>{said}</text>
             </Link>
           );
         })}
@@ -207,10 +226,20 @@ function arc(radius: number, from: number, to: number): string {
 const degrees = (angle: number): number => (angle * 180) / Math.PI;
 
 /** Along the arc in the first ring; outward from the inner edge in the others. */
-function CellText({ cell, lines, ink }: { cell: FanCell; lines: FanLine[]; ink: string }) {
+function CellText({
+  cell,
+  lines,
+  ink,
+  sets,
+}: {
+  cell: FanCell;
+  lines: FanLine[];
+  ink: string;
+  sets: Fan["metrics"]["sets"];
+}) {
   if (lines.length === 0) return null;
   const middle = (cell.from + cell.to) / 2;
-  const isAlong = lines.length > 0 && cell.ring === 1 && cell.outer - cell.inner < 100;
+  const isAlong = sets[cell.ring - 1] === "along";
   let transform: string;
   let anchor: "middle" | "start" | "end";
   if (isAlong) {
@@ -231,7 +260,7 @@ function CellText({ cell, lines, ink }: { cell: FanCell; lines: FanLine[]; ink: 
           x="0"
           y={line.dy}
           dominantBaseline="central"
-          className={line.style === "detail" ? classes.years : undefined}
+          className={line.part === "years" ? classes.years : undefined}
         >
           <Inked line={line} ink={ink} />
         </tspan>
@@ -350,14 +379,16 @@ function Decades({
     <g aria-hidden="true">
       {rings.map((ring) => {
         const cells = fan.cells.filter((cell) => cell.ring === ring);
-        const years = cells
-          .map(({ person }) => kin.person(person)?.birth?.text.match(/\d{4}/)?.[0])
-          .filter((year): year is string => year !== undefined)
-          .map(Number)
-          .sort((a, b) => a - b);
-        const year = years[years.length >> 1];
-        if (year === undefined) return null;
-        const decade = Math.floor(year / 10) * 10;
+        // The decade most of the people of the ring were born in; the earlier of equal ones.
+        const counts = new Map<number, number>();
+        for (const { person, repeat } of cells) {
+          const year = kin.person(person)?.birth?.text.match(/\d{4}/)?.[0];
+          if (repeat || year === undefined) continue;
+          const decade = Math.floor(Number(year) / 10) * 10;
+          counts.set(decade, (counts.get(decade) ?? 0) + 1);
+        }
+        const [decade] = [...counts].sort(([a, one], [b, other]) => other - one || a - b)[0] ?? [];
+        if (decade === undefined) return null;
         const { inner, outer } = cells[0] as FanCell;
         const x = (inner + outer) / 2;
         return [isQuarter ? [x] : [-x, x]].flat().map((at) => (
@@ -384,9 +415,16 @@ function Centre({
   href: (person: string) => string;
   isQuarter: boolean;
 }) {
+  const { t } = useLanguage();
   const kin = kinOf(snapshot);
   const radius = fan.metrics.inner - 1;
   const isPair = fan.sides.length === 2;
+  /** The room on a line of the middle at this height, and a word cut to an initial if it is wider. */
+  const fit = (word: string, y: number): string => {
+    const chord = Math.sqrt(Math.max(0, radius * radius - y * y));
+    const room = isQuarter ? chord - 10 : isPair ? chord - 13 : 2 * chord - 8;
+    return word === "" || measure(word, "head") <= room ? word : `${[...word][0]}.`;
+  };
   return (
     <>
       {fan.sides.map((side, i) => {
@@ -402,12 +440,7 @@ function Centre({
               : [9, "start" as const];
         const [left, right] = [polar(radius, side.from)[0], polar(radius, side.to)[0]];
         return (
-          <Link
-            key={side.person}
-            className={classes.centre}
-            href={href(one.id)}
-            aria-label={words.name(one)}
-          >
+          <Link key={side.person} className={classes.centre} href={href(one.id)}>
             <path
               className={classes.ground}
               d={`M0,0L${polar(radius, side.from).join(",")}A${radius},${radius} 0 0 1 ${polar(radius, side.to).join(",")}Z`}
@@ -416,15 +449,24 @@ function Centre({
               className={classes.bar}
               d={`M${Math.min(left, right)},-1.5H${Math.max(left, right)}`}
             />
-            <text x={x} y={isQuarter ? -12 : -38} textAnchor={anchor}>
-              {given}
+            <text x={x} y={isQuarter ? -12 : -38} textAnchor={anchor} aria-hidden="true">
+              {fit(given, isQuarter ? 24 : 50)}
             </text>
             {/* In the quarter of the phone the middle has room for the given name only. */}
             {!isQuarter && (
-              <text x={x} y={-14} textAnchor={anchor} style={{ fill: words.ink(one.branch) }}>
-                {surname}
+              <text
+                x={x}
+                y={-14}
+                textAnchor={anchor}
+                style={{ fill: words.ink(one.branch) }}
+                aria-hidden="true"
+              >
+                {fit(surname, 26)}
               </text>
             )}
+            <text className={classes.said}>
+              {[words.name(one), ...(side.further ? [t("fan.further")] : [])].join(", ")}
+            </text>
           </Link>
         );
       })}

@@ -68,7 +68,14 @@
 
 .years {
   fill: var(--muted);
-  font: 400 14px var(--sans);
+  font: 400 16px var(--sans);
+}
+
+/* The name of a link for a screen reader, which the cell shows in part or not at all. */
+.said {
+  font-size: 1px;
+  opacity: 0;
+  pointer-events: none;
 }
 
 .cell[data-repeat] .ground {
@@ -106,12 +113,12 @@
 
 .decade {
   fill: var(--muted);
-  font: italic 400 15px var(--serif);
+  font: italic 400 16px var(--serif);
 }
 
 .centre text {
   fill: var(--ink);
-  font: 700 21px var(--serif);
+  font: 700 17px var(--serif);
 }
 
 .centre .ground {
@@ -126,9 +133,5 @@
 @media (max-width: 44.99em) {
   .stage {
     padding: 0 0.5rem;
-  }
-
-  .centre text {
-    font-size: 17px;
   }
 }

@@ -17,7 +17,7 @@ import { cssFont, measure, rem } from "../tree/type";
 import { wordsOf } from "../tree/words";
 import { useData } from "./data";
 import { rememberTree } from "./last-tree";
-import { type Half, hrefOf, type TreePlace, treePlace, branchesPlace } from "./places";
+import { branchesPlace, type Half, hrefOf, type TreePlace, treePlace } from "./places";
 import classes from "./tree-screen.module.css";
 
 type Centred = TreePlace & { person: string };

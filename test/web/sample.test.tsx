@@ -608,7 +608,7 @@ describe("the fan", () => {
 
   it("is a way of the map, and the pedigree leads to it", async () => {
     await open("/sample/branches");
-    const ways = screen.getByRole("navigation", { name: "Как показать" });
+    const ways = screen.getByRole("navigation", { name: "Показать как" });
     press(within(ways).getByRole("link", { name: "Веер" }));
     expect(address()).toBe("/sample/branches?as=fan");
     await open(`/sample/tree/${start}`);

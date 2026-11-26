@@ -10,6 +10,7 @@ import {
   fanOf,
   fanText,
   firstCell,
+  sharesOf,
 } from "../../../web/tree/layout/fan";
 import { bigSnapshot } from "./big";
 import { cases } from "./cases";
@@ -87,8 +88,8 @@ describe("the fan of ancestors", () => {
     const fan = fanOf(snapshot, ["x", "w"], wide);
     expectSound(fan);
     expect(fan.sides).toEqual([
-      { person: "x", from: Math.PI, to: Math.PI / 2 },
-      { person: "w", from: Math.PI / 2, to: 0 },
+      { person: "x", from: Math.PI, to: Math.PI / 2, further: false },
+      { person: "w", from: Math.PI / 2, to: 0, further: false },
     ]);
     const [f, m] = ["f", "m"].map((id) => fan.cells.find(({ person }) => person === id));
     expect(f?.from).toBeCloseTo(Math.PI);
@@ -129,6 +130,70 @@ describe("the fan of ancestors", () => {
     for (const { key } of repeats) expect(fan.cells.some(({ child }) => child === key)).toBe(false);
   });
 
+  it("keeps a parent with no ancestors beside one with many, at the least", () => {
+    const line = Array.from({ length: 6 }, (_, i) => i);
+    const deep = male(
+      familyOf({
+        people: [
+          { id: "x", parents: ["f", "m"] },
+          { id: "f", parents: ["f0", "fm0"] },
+          "m",
+          ...line.flatMap((i) => [
+            { id: `f${i}`, parents: [`f${i + 1}`, `fm${i + 1}`] },
+            { id: `fm${i}`, parents: [`m${i + 1}a`, `m${i + 1}b`] },
+            `m${i + 1}a`,
+            `m${i + 1}b`,
+          ]),
+        ],
+      }),
+      ["f", ...line.map((i) => `f${i}`)],
+    );
+    for (const options of [wide, { metrics: fanMetrics.narrow, isQuarter: true }]) {
+      const fan = fanOf(deep, ["x"], options);
+      expectSound(fan);
+      expect(fan.cells.filter(({ ring }) => ring === 1).map(({ person }) => person)).toEqual([
+        "f",
+        "m",
+      ]);
+    }
+  });
+
+  it("gives the least from the others and from the place of nobody, or nothing", () => {
+    expect(sharesOf([9, 1], 0, { span: 1, least: 0.2 })).toEqual([0.8, 0.2]);
+    const [a, b] = sharesOf([1], 0.6, { span: 1, least: 0.7 });
+    expect([a, b]).toEqual([0.7, undefined]);
+    expect(sharesOf([9, 1], 0, { span: 1, least: 0.6 })).toEqual([0.9, 0.1]);
+  });
+
+  it("stands a person met twice in full where they are nearer the centre", () => {
+    // g is a grandparent of the father's side and the father of the mother.
+    const twice = male(
+      familyOf({
+        people: [
+          { id: "x", parents: ["f", "m"] },
+          { id: "f", parents: ["ff", "fm"] },
+          { id: "ff", parents: ["g", "gw"] },
+          { id: "m", parents: ["g", "gw2"] },
+          { id: "g", parents: ["gg", "ggw"] },
+          "fm",
+          "gw",
+          "gw2",
+          "gg",
+          "ggw",
+        ],
+      }),
+      ["f", "ff", "g", "gg"],
+    );
+    const fan = fanOf(twice, ["x"], wide);
+    expectSound(fan);
+    const g = fan.cells.filter(({ person }) => person === "g");
+    expect(g.map(({ ring, repeat }) => [ring, repeat])).toEqual([
+      [2, false],
+      [3, true],
+    ]);
+    expect(fan.cells.some(({ person }) => person === "gg")).toBe(true);
+  });
+
   it("leaves out who is too narrow and too far, and their child says so", () => {
     const chain = Array.from({ length: 12 }, (_, i) => ({
       id: `p${i}`,
@@ -147,7 +212,7 @@ describe("the fan of ancestors", () => {
   it("gives one person a quarter on the phone", () => {
     const fan = fanOf(snapshot, ["x", "w"], { metrics: fanMetrics.narrow, isQuarter: true });
     expectSound(fan);
-    expect(fan.sides).toEqual([{ person: "x", from: Math.PI / 2, to: 0 }]);
+    expect(fan.sides).toEqual([{ person: "x", from: Math.PI / 2, to: 0, further: false }]);
   });
 
   it("marks the direct line, and none for somebody off it", () => {

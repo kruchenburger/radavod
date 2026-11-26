@@ -619,23 +619,30 @@ test.describe("the fan of ancestors", () => {
     await page.keyboard.press("Enter");
     await expect(page).toHaveURL(href);
     await expect(page.getByRole("group", { name: /^Ancestors of / })).toBeVisible();
+    // The keys go on from the new fan, not from the top of the page.
+    await expect(page.locator("[data-fan] [data-key]:focus")).toHaveCount(1);
   });
 
-  test("fits a wide window whole, names no smaller than 14 px", async ({ page }) => {
+  test("fits a wide window across with the centre in sight, no text below 14 px", async ({
+    page,
+  }) => {
     await page.setViewportSize({ width: 1440, height: 900 });
     await page.goto("/sample/branches?as=fan");
     await ready(page);
     const stage = page.locator("[data-fan]");
-    const fits = await stage.evaluate((element) => [
-      element.scrollWidth <= element.clientWidth,
-      element.scrollHeight <= element.clientHeight,
-    ]);
-    expect(fits).toEqual([true, true]);
-    const size = await page
-      .locator("[data-fan] text")
-      .first()
-      .evaluate((text) => text.getBoundingClientRect().height);
-    expect(size).toBeGreaterThan(12);
+    expect(await stage.evaluate((element) => element.scrollWidth <= element.clientWidth)).toBe(
+      true,
+    );
+    await expect(page.locator("[data-fan] svg a").last()).toBeInViewport();
+    // Every text is drawn at its size times the scale of the drawing.
+    const sizes: number[] = await page.evaluate(`(() => {
+      const svg = document.querySelector("[data-fan] svg");
+      const scale = svg.getBoundingClientRect().width / svg.viewBox.baseVal.width;
+      return [...svg.querySelectorAll("text tspan, text")]
+        .filter((one) => getComputedStyle(one).opacity !== "0" && one.textContent.trim() !== "")
+        .map((one) => parseFloat(getComputedStyle(one).fontSize) * scale);
+    })()`);
+    expect(Math.min(...sizes)).toBeGreaterThanOrEqual(13.9);
   });
 
   test("opens at its centre on the phone", async ({ page }) => {

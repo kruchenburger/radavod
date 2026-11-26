@@ -60,6 +60,7 @@ export function FanScreen({ place }: { place: BranchesPlace }) {
         <h1 ref={heading} tabIndex={-1}>
           {t("view.branches")}
         </h1>
+        <b className={classes.mark}>{t("sample.mark")}</b>
         <span className={classes.count}>
           {t("people.count", { count: snapshot.people.length })},{" "}
           {t("branches.count", { count: snapshot.branches.length })}
@@ -78,8 +79,17 @@ export function FanScreen({ place }: { place: BranchesPlace }) {
             key={`${one} ${other}`}
             href={at(one, other)}
             aria-current={one === person && other === partner ? "true" : undefined}
+            aria-label={
+              other === null ? undefined : t("fan.pair", { one: nameOf(one), other: nameOf(other) })
+            }
           >
-            {other === null ? nameOf(one) : `${nameOf(one)} ⚭ ${nameOf(other)}`}
+            {other === null ? (
+              nameOf(one)
+            ) : (
+              <span>
+                {nameOf(one)} <span aria-hidden="true">⚭</span> {nameOf(other)}
+              </span>
+            )}
           </Link>
         ))}
       </nav>
