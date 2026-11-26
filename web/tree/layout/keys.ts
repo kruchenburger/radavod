@@ -1,5 +1,4 @@
 import type { AroundLayout } from "./around";
-import type { BranchMap } from "./branch-map";
 import { listOf } from "./kin";
 import type { Card, Link } from "./types";
 
@@ -7,25 +6,6 @@ export type Arrow = "up" | "down" | "left" | "right";
 
 /** The card an arrow leads to from another one; `cameFrom` is the card visited before. */
 export type Move = (key: string, arrow: Arrow, cameFrom: string | null) => string | null;
-
-/**
- * Up to a parent, down to a child, left and right along the row of the page. At the end of a row
- * the walk goes on in the next one, and then on the next page, so left and right alone come to
- * everybody, wherever kinship leads.
- */
-export function mapKeys({ cards, links }: BranchMap): Move {
-  const pages = new Map(cards.map(({ key, page }) => [key, page]));
-  const kin = kinMoves(cards, links, (a, b) => pages.get(a) === pages.get(b));
-  const walk = cards
-    .filter(({ person }) => person !== null)
-    .sort((a, b) => a.page - b.page || a.row - b.row || a.x - b.x || a.y - b.y);
-  const along = neighbors(walk.map(({ key }) => key));
-  return (key, arrow, cameFrom) => {
-    if (arrow === "up") return kin.parent(key);
-    if (arrow === "down") return kin.child(key, cameFrom);
-    return along(key, arrow === "left" ? -1 : 1);
-  };
-}
 
 /** Left to a parent, right to a child, up and down the column and on into the next one. */
 export function aroundKeys({ cards, links }: AroundLayout): Move {

@@ -401,7 +401,7 @@ describe("around a person", () => {
     expect(own?.textContent).toContain(
       wordsOf(sample.snapshot, "ru").branch(kinOf(sample.snapshot).person(start)?.branch ?? null),
     );
-    expect(own?.getAttribute("href")).toMatch(/^\/sample\/branches\?person=p\d+&branch=/);
+    expect(own?.getAttribute("href")).toMatch(new RegExp(`^/sample/list/${start}#page-`));
   });
 });
 
@@ -495,7 +495,7 @@ describe("the pages of branches", () => {
     const href = across?.getAttribute("href") ?? "";
     press(across as HTMLElement);
     expect(address()).toBe(href);
-    const target = document.querySelector<HTMLAnchorElement>('a[aria-current="true"]');
+    const target = document.querySelector<HTMLAnchorElement>('[data-page] a[aria-current="true"]');
     expect(target?.getAttribute("href")).toBe(href);
     await waitFor(() => expect(document.activeElement).toBe(target));
   });
@@ -610,11 +610,11 @@ describe("the fan", () => {
     expect(keys?.textContent).toContain("Стрелки ведут по вееру");
   });
 
-  it("is a way of the map, and the pedigree leads to it", async () => {
-    await open("/sample/branches");
+  it("is a way of all branches, and the pedigree leads to it", async () => {
+    await open(`/sample/list/${start}`);
     const ways = screen.getByRole("navigation", { name: "Показать как" });
     press(within(ways).getByRole("link", { name: "Веер" }));
-    expect(address()).toBe("/sample/branches?as=fan");
+    expect(address()).toBe(`/sample/branches?as=fan&person=${start}`);
     await open(`/sample/tree/${start}`);
     press(screen.getByRole("link", { name: "Веер предков" }));
     expect(address()).toBe(`/sample/branches?as=fan&person=${start}`);
@@ -680,57 +680,27 @@ describe("the search", () => {
 });
 
 describe("all branches", () => {
-  const window_ = () => screen.getByRole("group", { name: "Все ветви" });
-  const whole = () => screen.getByRole("navigation", { name: "Ветви всей семьи" });
-  const stop = () => window_().querySelector<HTMLElement>('a[tabindex="0"]') as HTMLElement;
-
-  it("open on the person the example begins with, names near the window as links", async () => {
+  it("open as the pages by branch on the same person, from any old address", async () => {
     await open("/sample/branches");
-    await waitFor(() => expect(stop()).toBeTruthy());
-    const people = within(window_()).getAllByRole("link");
-    expect(people.length).toBeGreaterThan(5);
-    expect(people.length).toBeLessThan(150);
-    expect(people.filter(({ tabIndex }) => tabIndex === 0)).toHaveLength(1);
-    expect(stop().dataset["press"]).toBe(`p:${start}`);
-    expect(stop().getAttribute("aria-current")).toBe("true");
-    expect(stop().getAttribute("href")).toBe(`/sample/person/${start}`);
-    const description = document.getElementById(window_().getAttribute("aria-describedby") ?? "");
-    expect(description?.textContent).toContain("Стрелки ведут по родству");
-  });
-
-  it("open on the person in the address, an old address of the map too", async () => {
+    await waitFor(() => expect(address()).toBe(`/sample/list/${start}`));
     const father = relativesOf(sample.snapshot, start)?.parents[0]?.person ?? "";
-    await open(`/sample/branches?level=near&person=${father}`);
-    await waitFor(() => expect(stop().dataset["press"]).toBe(`p:${father}`));
-    await waitFor(() => expect(address()).toContain("at="));
-    expect(address()).not.toContain("level=");
+    await open(`/sample/branches?level=near&person=${father}&at=p1.0.0&scale=1.2`);
+    await waitFor(() => expect(address()).toBe(`/sample/list/${father}`));
+    const branch = sample.snapshot.branches[2]?.id ?? "";
+    await open(`/sample/branches?person=${father}&branch=${branch}`);
+    await waitFor(() => expect(address()).toBe(`/sample/list/${father}`));
+    expect(window.location.hash).toBe(`#page-${branch}`);
   });
 
-  it("have the whole family on a strip, every branch a link to its page", async () => {
-    await open("/sample/branches");
-    const branches = within(whole()).getAllByRole("link");
-    // One more for people of no branch.
-    expect(branches).toHaveLength(11);
-    press(branches[2] as HTMLElement);
-    expect(address()).toMatch(/[?&]branch=/);
-  });
-
-  it("are walked by the arrows, along kinship", async () => {
-    await open(`/sample/branches?person=${start}`);
-    await waitFor(() => expect(stop()).toBeTruthy());
-    const first = stop();
-    first.focus();
-    fireEvent.keyDown(first, { key: "ArrowUp" });
-    await waitFor(() => expect(document.activeElement).not.toBe(first));
-    const parent = document.activeElement as HTMLElement;
-    const parents = relativesOf(sample.snapshot, start)?.parents.map(({ person }) => `p:${person}`);
-    expect(parents).toContain(parent.dataset["press"]);
-  });
-
-  it("are one of two ways, the fan the other", async () => {
-    await open("/sample/branches");
+  it("are two ways, the pages first and then the fan", async () => {
+    await open(`/sample/list/${start}`);
     const ways = screen.getByRole("navigation", { name: "Показать как" });
-    expect(within(ways).getByText("Полотно").getAttribute("aria-current")).toBe("true");
+    const [pages, fan] = within(ways).getAllByRole("link");
+    expect(pages?.textContent).toBe("По ветвям");
+    expect(pages?.getAttribute("aria-current")).toBe("true");
+    expect(fan?.getAttribute("href")).toBe(`/sample/branches?as=fan&person=${start}`);
+    const views = screen.getByRole("navigation", { name: "Виды древа" });
+    expect(within(views).getByText("Все ветви").getAttribute("aria-current")).toBe("page");
   });
 
   it("has no sheet to hide the mark behind before there is one", async () => {
@@ -742,9 +712,9 @@ describe("all branches", () => {
     expect(screen.getByText("Пример")).toBeTruthy();
   });
 
-  it("is a sheet with a way back on the phone", async () => {
+  it("is a sheet with a way back on the phone, the fan", async () => {
     setWidth(360);
-    await open(`/sample/branches?person=${start}`);
+    await open(`/sample/branches?as=fan&person=${start}`);
     // jsdom knows no media queries, so the styles of the phone are not on.
     const back = document.querySelector("[aria-label='К древу']") as HTMLElement;
     expect(back.getAttribute("href")).toBe(`/sample/tree/${start}`);

@@ -7,7 +7,6 @@ import { go } from "../app/router";
 import { kinOf } from "../tree/layout/kin";
 import { loadFonts } from "../tree/type";
 import { wordsOf } from "../tree/words";
-import { BranchesScreen } from "./branches-screen";
 import { DataContext, sampleQuery, useData } from "./data";
 import { FanScreen } from "./fan-screen";
 import { Frame } from "./frame";
@@ -90,7 +89,11 @@ function Screen({ place }: { place: Place }) {
     case "tree":
       return <TreeScreen place={{ ...place, person: place.person ?? start }} />;
     case "branches":
-      return place.as === "fan" ? <FanScreen place={place} /> : <BranchesScreen place={place} />;
+      return place.as === "fan" ? (
+        <FanScreen place={place} />
+      ) : (
+        <ToPages person={place.person ?? start} branch={place.branch} />
+      );
     case "person":
       return <PersonScreen key={place.person} person={place.person} />;
     case "list":
@@ -113,4 +116,15 @@ function useFonts(snapshot: TreeSnapshot | undefined): boolean {
     };
   }, [snapshot]);
   return isReady;
+}
+
+/**
+ * All branches open as the pages by branch, on the same person and page. The old map and canvas
+ * had their addresses here; whoever kept one comes to the pages.
+ */
+function ToPages({ person, branch }: { person: string; branch: string | null }) {
+  useEffect(() => {
+    go(hrefOf({ screen: "list", person }) + (branch === null ? "" : `#page-${branch}`), "replace");
+  }, [person, branch]);
+  return null;
 }

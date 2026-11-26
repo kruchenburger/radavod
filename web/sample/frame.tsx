@@ -37,7 +37,12 @@ export function Frame({ place, sample, isSheet = false, children }: FrameProps) 
           <Link href={tree} aria-current={place.screen === "tree" ? "page" : undefined}>
             {t("view.around")}
           </Link>
-          <Link href={branches} aria-current={place.screen === "branches" ? "page" : undefined}>
+          <Link
+            href={branches}
+            aria-current={
+              place.screen === "branches" || place.screen === "list" ? "page" : undefined
+            }
+          >
             {t("view.branches")}
           </Link>
         </nav>

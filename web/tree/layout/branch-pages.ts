@@ -127,7 +127,7 @@ function couple(node: MapNode, entryOf: (row: MapRow) => PageEntry): PageEntry {
 }
 
 /** Members of a branch wherever they stand; the page of nobody's kin counts its own people. */
-export function membersOf(snapshot: TreeSnapshot, model: MapModel): number[] {
+function membersOf(snapshot: TreeSnapshot, model: MapModel): number[] {
   const members = new Map<string | null, number>();
   const seen = new Set<string>();
   for (const { id, branch } of snapshot.people) {
@@ -199,12 +199,8 @@ type Sizes = {
 };
 
 /**
- * Where the direct line runs between the pages by branch. The canvas has its own way
- * (`branch-map.ts`): its rows are the same on every page, so the line keeps to the gaps between
- * them; these pages are outlines of their own lengths, so the line goes over a rail above them.
- *
- * It leaves a reference on the side of the page it goes
- * to and enters the person always from the left, where the outline is. Into the next page it
+ * Where the direct line runs between the pages by branch. It leaves a reference on the side of the
+ * page it goes to and enters the person always from the left, where the outline is. Into the next page it
  * crosses the gutter between; within a page it runs in the gutter on the left; further it goes up
  * to the rail over the pages, along it, and down the gutter left of the page. No piece of it runs
  * over a page, except the stretch of its own row out of a reference and into a person.

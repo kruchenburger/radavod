@@ -3,13 +3,11 @@ import { generateFamily } from "../../../examples/generate.ts";
 import { snapshotOf } from "../../../examples/snapshot.ts";
 import type { TreePerson, TreeSnapshot } from "../../../src/shared/tree";
 import { around } from "../../../web/tree/layout/around";
-import { branchMap } from "../../../web/tree/layout/branch-map";
 import { kinOf } from "../../../web/tree/layout/kin";
-import { mapTracks, stability } from "../../../web/tree/layout/stability";
+import { stability } from "../../../web/tree/layout/stability";
 import { measure, personOf, wordingOf } from "./family";
 
 const snapshot = snapshotOf(generateFamily(1, 300));
-const draw = (from: TreeSnapshot) => branchMap(from, { measure, headOf: ({ title }) => title.ru });
 
 /** The people within so many steps of kinship. */
 function near(from: TreeSnapshot, person: string, steps: number): Set<string> {
@@ -99,24 +97,6 @@ describe("the measure", () => {
 
   it("is 1 for nothing at all", () => {
     expect(stability([], []).share).toBe(1);
-  });
-});
-
-describe("after adding one person the map", () => {
-  const before = draw(snapshot);
-
-  it.each(Object.entries(changes))("keeps the order of everybody else: %s", (_, change) => {
-    const shares: number[] = [];
-    for (const person of snapshot.people.filter((__, i) => i % 5 === 0)) {
-      const after = draw(change(person));
-      const except = near(snapshot, person.id, 2);
-      shares.push(stability(mapTracks(before), mapTracks(after), except).share);
-      // Pages stand where they stood.
-      const pages = after.pages.map(({ branch }) => branch);
-      expect(pages).toEqual(before.pages.map(({ branch }) => branch));
-    }
-    expect(shares.length).toBeGreaterThan(50);
-    expect(Math.min(...shares)).toBe(1);
   });
 });
 
