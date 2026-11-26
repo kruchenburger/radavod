@@ -30,7 +30,7 @@ export function PagesScreen({ person: chosen }: { person: string }) {
   const pages = useMemo(() => branchPages(snapshot, line), [snapshot, line]);
   const kinds = useMemo(() => kindsOf(pages), [pages]);
   const strip = useRef<HTMLDivElement>(null);
-  const { wires, rail } = useWires(strip, pages);
+  const wires = useWires(strip, pages);
   useChosen(strip, chosen);
 
   const pageOf = (branch: string | null): string => `page-${branch ?? "none"}`;
@@ -72,11 +72,7 @@ export function PagesScreen({ person: chosen }: { person: string }) {
         ))}
       </nav>
       <div ref={strip} className={classes.strip}>
-        <div
-          className={classes.row}
-          data-row
-          style={rail === null ? undefined : { paddingTop: rail }}
-        >
+        <div className={classes.row} data-row>
           {wires.length > 0 && (
             <svg className={classes.wires} aria-hidden="true">
               {wires.map((points, i) => (
@@ -297,7 +293,8 @@ function useChosen(strip: React.RefObject<HTMLDivElement | null>, chosen: string
       const row = strip.current;
       const page = line.closest<HTMLElement>("[data-page]");
       if (row != null && page != null) {
-        row.scrollLeft = page.offsetLeft - (row.clientWidth - page.offsetWidth) / 2;
+        const [box, own] = [row.getBoundingClientRect(), page.getBoundingClientRect()];
+        row.scrollLeft += own.left - box.left - (row.clientWidth - own.width) / 2;
       }
     } else {
       line.scrollIntoView?.({ block: "center", inline: "center" });
@@ -312,21 +309,19 @@ function useChosen(strip: React.RefObject<HTMLDivElement | null>, chosen: string
  * only the few ends of the line are measured, again whenever the text changes its size. On the
  * phone a page fills the window and the reference is the way across.
  */
-function useWires(
-  strip: React.RefObject<HTMLDivElement | null>,
-  pages: BranchPages,
-): { wires: Point[][]; rail: string | null } {
+function useWires(strip: React.RefObject<HTMLDivElement | null>, pages: BranchPages): Point[][] {
   const { locale } = useLanguage();
   const page = usePage();
   const isNarrow = isPhone(page);
-  const [drawn, setDrawn] = useState<{ wires: Point[][]; rail: string | null }>(none);
+  const [drawn, setDrawn] = useState<Point[][]>([]);
   useLayoutEffect(() => {
     const row = strip.current?.querySelector<HTMLElement>("[data-row]");
     if (row == null || isNarrow || typeof ResizeObserver === "undefined") {
-      setDrawn(none);
+      if (row != null) row.style.paddingTop = "";
+      setDrawn([]);
       return undefined;
     }
-    const draw = (): void => {
+    const draw = (isAgain = false): void => {
       const origin = row.getBoundingClientRect();
       const boxOf = (element: Element): { x: number; y: number; w: number; h: number } => {
         const box = element.getBoundingClientRect();
@@ -350,37 +345,37 @@ function useWires(
       const rem = Number.parseFloat(getComputedStyle(document.documentElement).fontSize) || 16;
       const sizes = { rail: 0.75 * rem, apart: 0.5 * rem };
       const wires = routeCrossings(sheets.map(boxOf), ends, sizes);
-      // The rail grows with its lanes; under the last one there is room of two lanes.
+      // The rail grows with its lanes, with room of two lanes under the last; counted in rem, so
+      // the value is exact and reads back as it was written.
       const lanes = wires.filter((points) => points.length > 4).length;
-      const top = sizes.rail + (lanes + 1) * sizes.apart;
-      const rail = top > 2.75 * rem ? `${top / rem}rem` : null;
-      if (rail !== null && row.style.paddingTop !== rail) {
-        // The pages move down: measured again where they stand.
+      const top = 0.75 + (lanes + 1) * 0.5;
+      const rail = top > 2.75 ? `${top}rem` : "";
+      if (row.style.paddingTop !== rail && !isAgain) {
+        // The pages move: measured again where they stand now, once.
         row.style.paddingTop = rail;
-        draw();
+        draw(true);
         return;
       }
-      setDrawn((old) => (same(old.wires, wires) && old.rail === rail ? old : { wires, rail }));
+      setDrawn((old) => (same(old, wires) ? old : wires));
     };
     let isLive = true;
     draw();
-    const observer = new ResizeObserver(draw);
+    const observer = new ResizeObserver(() => draw());
     observer.observe(row);
     for (const sheet of row.querySelectorAll("[data-page]")) observer.observe(sheet);
     const fonts = typeof document.fonts === "undefined" ? null : document.fonts;
-    fonts?.addEventListener("loadingdone", draw);
+    const redraw = (): void => draw();
+    fonts?.addEventListener("loadingdone", redraw);
     void fonts?.ready.then(() => {
       if (isLive) draw();
     });
     return () => {
       isLive = false;
       observer.disconnect();
-      fonts?.removeEventListener("loadingdone", draw);
+      fonts?.removeEventListener("loadingdone", redraw);
     };
   }, [strip, pages, isNarrow, locale]);
   return drawn;
 }
-
-const none = { wires: [], rail: null };
 
 const same = (a: Point[][], b: Point[][]): boolean => JSON.stringify(a) === JSON.stringify(b);
