@@ -191,6 +191,7 @@ Every branch is a page of its own, the pages side by side in one row that scroll
 - **Between pages only the direct line is drawn**, on a window wider than a phone. It leaves its reference on the side of the page it goes to and always comes in from the left, where the outline is. Into the next page it crosses the gutter between them; within a page it runs in the gutter on the left; further it goes up to a rail over the pages, along it and down the gutter left of its page. Lines in one gutter keep 8 px apart. The pages stand in the order the direct line goes through them, beginning with the page of the person the line begins with, so that most of it crosses one gutter only.
 - The chosen person is set in `paper` on `ink`, and the pages open with that person in the window. Pressing a name chooses the person; pressing a reference chooses the person it names, on their page.
 - On the phone a name is a target 44 px high, and the line of a family turns at the middle of it.
+- The names are links reached by Tab, not entries walked by the arrow keys, so the focus is the ring of a link (see States), not the tint of the tree.
 
 ## The person card
 
