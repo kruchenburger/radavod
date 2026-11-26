@@ -24,13 +24,21 @@ export function createT<K extends string>(catalogs: Record<Locale, Record<K, Tex
 
 export const t = createT<Key>({ ru, en });
 
-/** The first language of the browser that has a catalog, else Russian. */
+/** Languages without a catalog of their own that read Russian more easily than English. */
+const nearRussian = new Set(["be", "uk"]);
+
+/**
+ * The first language of the browser that the site speaks, as the theme follows the browser too.
+ * Belarusian and Ukrainian count as Russian; a browser that speaks none of them gets English.
+ */
 export function detectLocale(languages: readonly string[]): Locale {
   for (const language of languages) {
-    const found = locales.find((locale) => locale === language.toLowerCase().split("-")[0]);
+    const primary = language.toLowerCase().split("-")[0] ?? "";
+    if (nearRussian.has(primary)) return "ru";
+    const found = locales.find((locale) => locale === primary);
     if (found) return found;
   }
-  return "ru";
+  return "en";
 }
 
 const plurals = { ru: new Intl.PluralRules("ru"), en: new Intl.PluralRules("en") };

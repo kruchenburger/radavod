@@ -184,13 +184,29 @@ describe("every screen", () => {
   it("has the views, the language and the theme", async () => {
     await open("/sample");
     const views = screen.getByRole("navigation", { name: "Виды древа" });
-    expect(within(views).getByText("Вокруг человека").getAttribute("aria-current")).toBe("page");
+    expect(within(views).getByText("Родословная").getAttribute("aria-current")).toBe("page");
     press(screen.getByRole("button", { name: "Тема: Тёмная" }));
     expect(document.documentElement.getAttribute("data-mantine-color-scheme")).toBe("dark");
-    press(screen.getByRole("button", { name: "English" }));
-    expect(screen.getByText("Around a person")).toBeTruthy();
+    const languages = screen.getByRole("radiogroup", { name: "Язык" });
+    expect(within(languages).getByText("RU").closest("label")?.dataset["chosen"]).toBe("true");
+    expect((screen.getByRole("radio", { name: "RU, Русский" }) as HTMLInputElement).checked).toBe(
+      true,
+    );
+    press(screen.getByRole("radio", { name: "EN, English" }));
+    expect(screen.getByText("Pedigree")).toBeTruthy();
     expect(document.documentElement.lang).toBe("en");
     expect(address()).toBe("/sample");
+    // The same two marks in either language, the chosen one marked.
+    const again = screen.getByRole("radiogroup", { name: "Language" });
+    expect(
+      within(again)
+        .getAllByRole("radio")
+        .map((one) => one.getAttribute("aria-label")),
+    ).toEqual(["RU, Русский", "EN, English"]);
+    expect(within(again).getByText("EN").closest("label")?.dataset["chosen"]).toBe("true");
+    expect((screen.getByRole("radio", { name: "EN, English" }) as HTMLInputElement).checked).toBe(
+      true,
+    );
   });
 
   it("has a title of its own", async () => {

@@ -5,6 +5,7 @@ import { Link } from "../app/router";
 import { kinOf } from "../tree/layout/kin";
 import { peopleByPage } from "../tree/layout/relatives";
 import { useMaps } from "../tree/map/use-maps";
+import { apart } from "./apart";
 import { useData } from "./data";
 import { KinList, PersonLine } from "./kin-list";
 import classes from "./list-screen.module.css";
@@ -24,8 +25,12 @@ export function ListScreen({ person: id }: { person: string }) {
           {words.name(person)}
         </h1>
         <p>
-          <span>{words.years(person)}</span>{" "}
-          <b style={{ color: words.ink(person.branch) }}>{words.branch(person.branch)}</b>
+          {apart([
+            words.years(person),
+            <b key="branch" style={{ color: words.ink(person.branch) }}>
+              {words.branch(person.branch)}
+            </b>,
+          ])}
         </p>
         <Button component={Link} href={hrefOf(treePlace(id))} size="md" variant="outline">
           {t("view.tree")}

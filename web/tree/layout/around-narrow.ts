@@ -387,9 +387,13 @@ function focusText(text: CardText, box: TextBox): EntryText {
   );
   let y = Math.max(bottomOf(name), 2 * metrics.padY + metrics.focusName) + metrics.padY / 2;
   const lines = [...name];
-  for (const run of detailRuns(text)) {
-    const style = "focusDetail";
-    const own = flow([{ ...run, style }], { ...size(box, metrics.focusDetail), y });
+  // Each on a line of its own, so nothing stands between them.
+  const runs: Run[] = [
+    { text: text.years, part: "years", style: "focusDetail" },
+    { text: text.branch, part: "branch", style: "focusDetail" },
+  ];
+  for (const run of runs) {
+    const own = flow([run], { ...size(box, metrics.focusDetail), y });
     lines.push(...own);
     y = Math.max(y, bottomOf(own));
   }

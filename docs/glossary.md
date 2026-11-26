@@ -15,4 +15,5 @@ One thing has one name. Interface texts use the Russian and the English word, co
 | хранитель           | keeper    | The member who invites, changes roles, imports and erases. There may be several        | админ, владелец, owner                     |
 | редактор            | editor    | The member who edits the tree                                                          | модератор, contributor                     |
 | читатель            | reader    | The member who reads the tree                                                          | гость, viewer                              |
+| родословная         | pedigree  | The view of one person with ancestors and descendants; the tree is the whole family    | вокруг человека, family tree               |
 | корзина             | trash     | Where a removed person waits to be returned or erased                                  | архив, bin                                 |

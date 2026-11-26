@@ -4,6 +4,7 @@ import { useLanguage } from "../app/language";
 import { go } from "../app/router";
 import { isPhone, usePage } from "../app/use-page";
 import { type Found, searchOf } from "../tree/search";
+import { apart } from "./apart";
 import { useData } from "./data";
 import { hrefOf, treePlace } from "./places";
 import classes from "./search-box.module.css";
@@ -182,8 +183,12 @@ function Option({ id, found: { person, form }, isActive, onChoose }: OptionProps
         </span>
       )}
       <span className={classes.detail}>
-        {words.years(person)}{" "}
-        <b style={{ color: words.ink(person.branch) }}>{words.branch(person.branch)}</b>
+        {apart([
+          words.years(person),
+          <b key="branch" style={{ color: words.ink(person.branch) }}>
+            {words.branch(person.branch)}
+          </b>,
+        ])}
       </span>
     </li>
   );

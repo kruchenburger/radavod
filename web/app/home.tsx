@@ -1,4 +1,11 @@
-import { Button, SegmentedControl, Text, Title, useMantineColorScheme } from "@mantine/core";
+import {
+  Button,
+  SegmentedControl,
+  Text,
+  Title,
+  useComputedColorScheme,
+  useMantineColorScheme,
+} from "@mantine/core";
 import { useQuery } from "@tanstack/react-query";
 import { type ReactNode, useId } from "react";
 import { locales } from "../i18n/t";
@@ -14,7 +21,8 @@ const themes = ["light", "dark"] as const;
 
 export function Home() {
   const { t, locale, setLocale } = useLanguage();
-  const { colorScheme, setColorScheme } = useMantineColorScheme();
+  const { setColorScheme } = useMantineColorScheme();
+  const colorScheme = useComputedColorScheme("light");
   const heading = useArrival<HTMLHeadingElement>();
   return (
     <main className={classes.page}>
@@ -39,7 +47,7 @@ export function Home() {
           />
           <Choice
             label={t("settings.theme")}
-            value={colorScheme === "dark" ? "dark" : "light"}
+            value={colorScheme}
             onChange={setColorScheme}
             data={themes.map((value) => ({ value, label: t(`theme.${value}`) }))}
           />

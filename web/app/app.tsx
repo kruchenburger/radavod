@@ -14,7 +14,8 @@ export function App() {
       theme={theme}
       cssVariablesResolver={cssVariables}
       colorSchemeManager={colorSchemeManager}
-      defaultColorScheme="light"
+      // The browser's theme until the visitor picks one, as with the language.
+      defaultColorScheme="auto"
     >
       <QueryClientProvider client={queryClient}>
         <LanguageProvider>

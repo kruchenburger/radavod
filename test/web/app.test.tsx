@@ -27,10 +27,16 @@ it("starts in the language of the browser", () => {
   expect(document.documentElement.lang).toBe("en");
 });
 
-it("starts in Russian when the browser speaks neither", () => {
-  useBrowserLanguages("pl", "de");
+it("starts in Russian for a Belarusian or a Ukrainian browser", () => {
+  useBrowserLanguages("be", "en");
   render(<App />);
   expect(document.documentElement.lang).toBe("ru");
+});
+
+it("starts in English when the browser speaks neither", () => {
+  useBrowserLanguages("pl", "de");
+  render(<App />);
+  expect(document.documentElement.lang).toBe("en");
 });
 
 it("switches the language and remembers it", () => {
@@ -60,6 +66,23 @@ it("is light until told otherwise, and remembers", () => {
   unmount();
   render(<App />);
   expect(theme()).toBe("dark");
+  fireEvent.click(radio("Светлая"));
+  expect(theme()).toBe("light");
+});
+
+it("follows the theme of the browser until told otherwise", () => {
+  vi.spyOn(window, "matchMedia").mockImplementation(
+    (query) =>
+      ({
+        matches: query === "(prefers-color-scheme: dark)",
+        media: query,
+        addEventListener() {},
+        removeEventListener() {},
+      }) as unknown as MediaQueryList,
+  );
+  render(<App />);
+  expect(theme()).toBe("dark");
+  expect(radio("Тёмная").checked).toBe(true);
   fireEvent.click(radio("Светлая"));
   expect(theme()).toBe("light");
 });

@@ -1,4 +1,5 @@
 import { describe, expect, it } from "vitest";
+import { detailRuns } from "../../../web/tree/layout/around-text";
 import { cut, flow, nameLines } from "../../../web/tree/layout/text";
 import type { Measure } from "../../../web/tree/layout/types";
 
@@ -70,6 +71,32 @@ describe("flow", () => {
 
   it("has no lines for no words", () => {
     expect(flow([run(""), run("  ")], options)).toEqual([]);
+  });
+
+  it("never breaks at a no-break space", () => {
+    expect(told(flow([run("Ab Cdefgh\u00a0Ij")], options))).toEqual([
+      ["Ab", 0, 0],
+      ["Cdefgh\u00a0Ij", 0, 20],
+    ]);
+  });
+});
+
+describe("years and the branch", () => {
+  const text = { given: "Anna", surname: "Wolf", years: "before 1824–1893", branch: "no branch" };
+  const texts = (runs: { text: string }[]) => runs.map(({ text }) => text);
+
+  it("stand apart, the dot staying with the years when the branch goes down a line", () => {
+    expect(texts(detailRuns(text))).toEqual(["before 1824–1893\u00a0·", "no branch"]);
+    const lines = flow(detailRuns(text), { ...options, width: 120, lines: 3 });
+    expect(told(lines)).toEqual([
+      ["before", 0, 0],
+      ["1824–1893\u00a0·", 0, 20],
+      ["no branch", 0, 40],
+    ]);
+  });
+
+  it("have no dot when no branch is shown", () => {
+    expect(texts(detailRuns({ ...text, branch: "" }))).toEqual(["before 1824–1893", ""]);
   });
 });
 
