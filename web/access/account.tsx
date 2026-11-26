@@ -5,7 +5,7 @@ import { type AccountAnswer, accountAnswer, type SessionAnswer } from "../../src
 import { useLanguage } from "../app/language";
 import { go } from "../app/router";
 import { call, canUsePasskeys, makePasskey, type Refusal, sessionQuery } from "./api";
-import { isInApp, LabelInput, NoPasskeys } from "./entry";
+import { isInApp, LabelInput } from "./entry";
 import { asRefusal } from "./errors";
 import { SignedIn } from "./frame";
 import { Confirm, CredentialLine, Problem, Section, Title } from "./members";
@@ -59,7 +59,12 @@ function Details({ account, session }: { account: AccountAnswer; session: Sessio
           ))}
         </ul>
         {!canAddPasskey && <p className={classes.meta}>{t("account.addNeedsLink")}</p>}
-        {canAddPasskey && (canUsePasskeys() && !isInApp() ? <AddPasskey /> : <NoPasskeys />)}
+        {canAddPasskey &&
+          (canUsePasskeys() && !isInApp() ? (
+            <AddPasskey />
+          ) : (
+            <p className={classes.meta}>{t("account.noBrowser")}</p>
+          ))}
       </Section>
       <Section title={t("account.data")}>
         <p>{t("account.downloadAbout")}</p>
@@ -125,8 +130,9 @@ function Leave({ session }: { session: SessionAnswer }) {
   const leave = async (method: "POST" | "DELETE", path: string) => {
     setAsked(null);
     const done = await call(method, path);
-    // A session that is over already has left.
-    if (!done.ok && done.error.code !== "unauthorized") return setRefusal(done.error);
+    // A session that is over has signed out already; an account is deleted only when the server says so.
+    const isOut = method === "POST" && !done.ok && done.error.code === "unauthorized";
+    if (!done.ok && !isOut) return setRefusal(done.error);
     client.setQueryData(sessionQuery.queryKey, null);
     go("/", "replace");
   };

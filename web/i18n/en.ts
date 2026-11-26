@@ -255,6 +255,8 @@ export const en = {
   "account.data": "Your data",
   "account.fileName": "account.json",
   "account.add": "Add a passkey",
+  "account.noBrowser":
+    "This browser can't create passkeys. Open the site in Safari or Chrome, sign in and add the passkey there.",
   "account.added": "Passkey added",
   "account.download": "Download your account data",
   "account.downloadAbout": "Your name, role and passkeys, in one file.",

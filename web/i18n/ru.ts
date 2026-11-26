@@ -269,6 +269,8 @@ export const ru = {
   "account.data": "Ваши данные",
   "account.fileName": "учётная-запись.json",
   "account.add": "Добавить ключ доступа",
+  "account.noBrowser":
+    "Этот браузер не умеет создавать ключи доступа. Откройте сайт в Safari или Chrome, войдите и добавьте ключ там.",
   "account.added": "Ключ доступа добавлен",
   "account.download": "Скачать данные учётной записи",
   "account.downloadAbout": "Имя, роль и ключи доступа, одним файлом.",

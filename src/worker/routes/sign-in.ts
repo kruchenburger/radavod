@@ -132,8 +132,10 @@ export function signInRoutes(app: Hono<Api>): void {
     // Which passkey is unknown, which signature is wrong and which count went back look the same.
     if (credential === null || counter === null) return signInRefused(c);
     const done = await signedIn(c, credential.id, counter);
-    // A passkey turned off, of a member whose sign-in is off, or that counts back: one refusal.
-    return done.ok || done.status === 429 ? done : signInRefused(c);
+    // A passkey turned off, of a member whose sign-in is off, or that counts back: one refusal. A
+    // server that fails says so: a keeper must not make a recovery link for a passkey that is fine.
+    const isRefused = done.status >= 400 && done.status < 500 && done.status !== 429;
+    return isRefused ? signInRefused(c) : done;
   });
 
   // A reader whose passkey does not work binds this browser instead, once.
