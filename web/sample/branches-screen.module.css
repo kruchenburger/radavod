@@ -210,3 +210,13 @@
     padding: 0 1rem 0.5rem;
   }
 }
+
+/* Words for a screen reader that the screen shows otherwise. */
+.said {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  overflow: hidden;
+  clip-path: inset(50%);
+  white-space: nowrap;
+}

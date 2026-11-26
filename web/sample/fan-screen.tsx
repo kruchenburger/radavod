@@ -79,15 +79,17 @@ export function FanScreen({ place }: { place: BranchesPlace }) {
             key={`${one} ${other}`}
             href={at(one, other)}
             aria-current={one === person && other === partner ? "true" : undefined}
-            aria-label={
-              other === null ? undefined : t("fan.pair", { one: nameOf(one), other: nameOf(other) })
-            }
           >
             {other === null ? (
               nameOf(one)
             ) : (
               <span>
-                {nameOf(one)} <span aria-hidden="true">⚭</span> {nameOf(other)}
+                <span className={classes.said}>
+                  {t("fan.pair", { one: nameOf(one), other: nameOf(other) })}
+                </span>
+                <span aria-hidden="true">
+                  {nameOf(one)} ⚭ {nameOf(other)}
+                </span>
               </span>
             )}
           </Link>

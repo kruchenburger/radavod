@@ -52,8 +52,10 @@ export function FanView(props: FanViewProps) {
   const [size, setSize] = useState<{ w: number; h: number } | null>(null);
   const [current, setCurrent] = useState<string | null>(null);
   const [isAsked, setAsked] = useState(false);
-  /** The keys walked the fan, so a new centre keeps the focus on it. */
-  const isWalked = useRef(false);
+  /** Enter on a cell put its person in the centre: the new fan takes the focus once. */
+  const isEntered = useRef(false);
+  /** The person scrolled the stage: a change of its size leaves the place alone. */
+  const isScrolled = useRef(false);
   const move = useMemo(() => fanKeys(fan), [fan]);
   const kin = kinOf(snapshot);
   const isQuarter = fan.sides.length === 1 && fan.sides[0]?.from === Math.PI / 2;
@@ -77,8 +79,11 @@ export function FanView(props: FanViewProps) {
   // A fan larger than the window opens at its centre, where the person stands: the base line,
   // and on the phone the corner of the quarter.
   useEffect(() => {
+    isScrolled.current = false;
+  }, [fan]);
+  useEffect(() => {
     const element = box.current;
-    if (element === null) return;
+    if (element === null || isScrolled.current) return;
     element.scrollTop = element.scrollHeight;
     if (isQuarter) element.scrollLeft = 0;
   }, [isQuarter, fan, size]);
@@ -86,7 +91,9 @@ export function FanView(props: FanViewProps) {
   // first cell of the new fan, not to the top of the page.
   useEffect(() => {
     const element = box.current;
-    if (element === null || !isWalked.current || element.contains(document.activeElement)) return;
+    if (element === null || !isEntered.current) return;
+    isEntered.current = false;
+    if (element.contains(document.activeElement)) return;
     element.querySelector<SVGAElement>('[data-key][tabindex="0"]')?.focus();
   }, [fan]);
   useEffect(() => {
@@ -111,6 +118,7 @@ export function FanView(props: FanViewProps) {
   const onKeyDown = (event: KeyboardEvent): void => {
     const arrow = arrows[event.key];
     const key = (event.target as Element).closest("[data-key]")?.getAttribute("data-key");
+    if (event.key === "Enter" && key != null) isEntered.current = true;
     if (arrow === undefined || key == null) return;
     event.preventDefault();
     const next = move(key, arrow);
@@ -121,7 +129,17 @@ export function FanView(props: FanViewProps) {
 
   const bySpoke = spokesOf(fan, (id) => kin.person(id)?.branch ?? null);
   return (
-    <div ref={box} className={classes.stage} data-fan>
+    <div
+      ref={box}
+      className={classes.stage}
+      data-fan
+      onWheel={() => {
+        isScrolled.current = true;
+      }}
+      onTouchMove={() => {
+        isScrolled.current = true;
+      }}
+    >
       <svg
         className={classes.fan}
         viewBox={`${view.x} ${view.y} ${view.w} ${view.h}`}
@@ -153,10 +171,7 @@ export function FanView(props: FanViewProps) {
               data-direct={cell.direct || undefined}
               data-repeat={cell.repeat || undefined}
               tabIndex={cell.key === stop ? 0 : -1}
-              onFocus={({ target }) => {
-                setCurrent(cell.key);
-                if (target.matches(":focus-visible")) isWalked.current = true;
-              }}
+              onFocus={() => setCurrent(cell.key)}
             >
               <path className={classes.ground} d={sector(cell)} />
               <path className={classes.bar} d={arc(cell.inner + 1.5, cell.from, cell.to)} />
@@ -167,7 +182,9 @@ export function FanView(props: FanViewProps) {
                 sets={fan.metrics.sets}
               />
               {/* The name of the link: the whole of what the cell may only begin to show. */}
-              <text className={classes.said}>{said}</text>
+              <text className={classes.said} {...middleOf(cell)}>
+                {said}
+              </text>
             </Link>
           );
         })}
@@ -198,6 +215,12 @@ export function FanView(props: FanViewProps) {
       </svg>
     </div>
   );
+}
+
+/** The middle of a cell, where its hidden name stands so that the link is no larger than it. */
+function middleOf({ inner, outer, from, to }: FanCell): { x: number; y: number } {
+  const [x, y] = polar((inner + outer) / 2, (from + to) / 2);
+  return { x, y };
 }
 
 /** A hair inside the cell, so the stripes of two neighbours do not meet. */
