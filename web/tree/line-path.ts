@@ -1,14 +1,23 @@
-import type { Link, Point } from "./layout/types";
+import type { Link, ParentageLink, Point } from "./layout/types";
 
 export type LineKind = "thin" | "adopted" | "version" | "direct" | "reference";
 
 /** A shape for every kind of line, so that none depends on a color. */
 export function lineKind(link: Link): LineKind {
-  if (link.direct) return "direct";
-  if (link.type === "reference") return "reference";
-  if (link.type === "union") return "thin";
-  if (!link.main) return "version";
-  return link.kind === "adoption" || link.kind === "guardianship" ? "adopted" : "thin";
+  if (link.type === "reference") return link.direct ? "direct" : "reference";
+  if (link.type === "union") return link.direct ? "direct" : "thin";
+  return tieKind(link);
+}
+
+/** The kind of the line from parents to a child. */
+export function tieKind({
+  direct,
+  main,
+  kind,
+}: Pick<ParentageLink, "direct" | "main" | "kind">): LineKind {
+  if (direct) return "direct";
+  if (!main) return "version";
+  return kind === "adoption" || kind === "guardianship" ? "adopted" : "thin";
 }
 
 /** How a line looks, in SVG and on the canvas alike. */

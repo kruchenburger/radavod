@@ -498,8 +498,8 @@ test.describe("all branches", () => {
       await expect(page.getByRole("alert")).toContainText(
         "The browser couldn't arrange the branches.",
       );
-      await page.getByRole("button", { name: "Branch by branch" }).click();
-      await expect(page.getByRole("heading", { level: 1, name: "Branch by branch" })).toBeVisible();
+      await page.getByRole("button", { name: "By branch" }).click();
+      await expect(page.getByRole("heading", { level: 1, name: "By branch" })).toBeVisible();
     });
   });
 });

@@ -13,7 +13,7 @@ import {
 } from "../tree/layout/branch-pages";
 import { kinOf } from "../tree/layout/kin";
 import { personKey, type Point } from "../tree/layout/types";
-import { type LineKind, lineLooks, linePath } from "../tree/line-path";
+import { type LineKind, lineLooks, linePath, tieKind } from "../tree/line-path";
 import { KindsLegend } from "../tree/lines";
 import { useData } from "./data";
 import { hrefOf, treePlace } from "./places";
@@ -53,7 +53,7 @@ export function PagesScreen({ person: chosen }: { person: string }) {
           <KindsLegend kinds={kinds} />
         </span>
         <Button component={Link} href={hrefOf(treePlace(chosen))} size="md" variant="outline">
-          {t("view.tree")}
+          {t("view.around")}
         </Button>
       </header>
       <nav className={classes.tabs} aria-label={t("list.branches")}>
@@ -112,7 +112,7 @@ type EntryProps = { entry: PageEntry; page: string | null; chosen: string };
 function Entry({ entry, page, chosen, line }: EntryProps & { line?: "pass" | "in" | undefined }) {
   const { parents, partners, children } = entry;
   return (
-    <li data-line={line} data-kind={tieKind(entry.tie)}>
+    <li data-line={line} data-kind={turnOf(entry.tie)}>
       {parents !== null && <Line entry={parents} page={page} chosen={chosen} />}
       <Line entry={entry} page={page} chosen={chosen} />
       <Children entries={children} page={page} chosen={chosen} />
@@ -227,16 +227,16 @@ function Line({ entry, page, chosen, isPartner = false }: LineProps) {
             <b style={{ color: words.ink(person.branch) }}>{words.branch(person.branch)}</b>
           </>
         )}
-        {direct && <span className={classes.said}>, {t("tree.direct")}</span>}
+        {direct && <span className={classes.said}>, {t("pages.direct")}</span>}
       </span>
     </p>
   );
 }
 
-const tieKind = (tie: PageTie | null): LineKind | undefined => {
-  if (tie === null || tie.direct) return undefined;
-  if (!tie.main) return "version";
-  return tie.kind === "adoption" || tie.kind === "guardianship" ? "adopted" : undefined;
+/** How the line turns to an entry; the trunk itself tells the direct line. */
+const turnOf = (tie: PageTie | null): LineKind | undefined => {
+  const kind = tie === null ? "thin" : tieKind(tie);
+  return kind === "thin" || kind === "direct" ? undefined : kind;
 };
 
 /** The kinds of lines the pages have, for the legend. */
@@ -244,7 +244,7 @@ function kindsOf({ pages, crossings }: BranchPages): Set<LineKind> {
   const kinds = new Set<LineKind>(crossings.length > 0 ? ["direct"] : []);
   const walk = (entry: PageEntry): void => {
     if (entry.tie?.direct === true) kinds.add("direct");
-    const kind = tieKind(entry.tie);
+    const kind = turnOf(entry.tie);
     if (kind !== undefined) kinds.add(kind);
     [...entry.children, ...entry.partners].forEach(walk);
   };

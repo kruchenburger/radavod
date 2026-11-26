@@ -167,7 +167,7 @@ The drawing is one group with a name, a description of the keys under it, and re
 
 Focus moves the view with it. Beside the tree and the map a link opens **the branches page by page**, the same people in plain headings and lists. It is complete, so a screen reader never needs the drawing.
 
-## Branch by branch
+## By branch
 
 Every branch is a page of its own, the pages side by side in one row that scrolls across; on the phone one page fills the window and the next is a swipe away. It is the way through the tree for a screen reader and a keyboard: headings and lists of lists, every name a link.
 

@@ -487,7 +487,7 @@ describe("the pages of branches", () => {
     await open("/sample");
     press(screen.getByRole("link", { name: "По ветвям" }));
     expect(address()).toBe(`/sample/list/${start}`);
-    press(screen.getByRole("link", { name: "Древом" }));
+    press(screen.getAllByRole("link", { name: "Родословная" }).at(-1) as HTMLElement);
     expect(address()).toBe(`/sample/tree/${start}`);
   });
 });

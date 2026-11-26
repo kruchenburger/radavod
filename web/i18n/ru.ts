@@ -34,7 +34,6 @@ export const ru = {
   "view.around": "Родословная",
   "view.branches": "Все ветви",
   "view.list": "По ветвям",
-  "view.tree": "Древом",
 
   "search.label": "Имя или место",
   "search.close": "Закрыть поиск",
@@ -90,6 +89,7 @@ export const ru = {
   "tree.folded": "Потомки: {number}",
   "tree.partner": "Союз: {name}",
   "tree.about": "О человеке",
+  "pages.direct": "прямая линия",
   "tree.direct": "Прямая линия",
   "tree.adoption": "Усыновление, опека",
   "tree.version": "Другая версия",

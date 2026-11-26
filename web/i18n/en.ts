@@ -34,8 +34,7 @@ export const en = {
   "view.views": "Views of the tree",
   "view.around": "Pedigree",
   "view.branches": "All branches",
-  "view.list": "Branch by branch",
-  "view.tree": "As a tree",
+  "view.list": "By branch",
 
   "search.label": "Name or place",
   "search.close": "Close the search",
@@ -77,6 +76,7 @@ export const en = {
   "tree.folded": "Descendants: {number}",
   "tree.partner": "Union: {name}",
   "tree.about": "About this person",
+  "pages.direct": "direct line",
   "tree.direct": "Direct line",
   "tree.adoption": "Adoption, guardianship",
   "tree.version": "Another version",
