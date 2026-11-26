@@ -20,6 +20,11 @@ const places: [string, Place][] = [
     }),
   ],
   ["/sample/branches?level=closer&branch=b3", branchesPlace({ level: "closer", branch: "b3" })],
+  ["/sample/branches?as=fan", branchesPlace({ as: "fan" })],
+  [
+    "/sample/branches?as=fan&person=p1&with=p2",
+    branchesPlace({ as: "fan", person: "p1", partner: "p2" }),
+  ],
   ["/sample/person/p1", { screen: "person", person: "p1" }],
   ["/sample/list/p1", { screen: "list", person: "p1" }],
 ];

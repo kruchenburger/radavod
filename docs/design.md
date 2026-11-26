@@ -168,6 +168,28 @@ The drawing is one group with a name, a description of the keys under it, and re
 
 The person in the centre takes the focus when the tree opens and after every move, so the arrows and Backspace work at once; the focus stays where the visitor put it (the search, a link of the page). It shows no mark until a key is pressed. Focus moves the view with it. Beside the tree and the map a link opens **the branches page by page**, the same people in plain headings and lists. It is complete, so a screen reader never needs the drawing.
 
+## The fan of ancestors
+
+A way of all branches beside the map: the ancestors of one person, or of a couple, as rings of generations around the centre. Without a choice it shows the couple of the person the direct line begins with, where the branches meet. The two of a couple share the half circle, the first on the left; on the phone one of them has a quarter, the corner of the window.
+
+```
+                 Myatliks │          │ Lazdutises
+          ╲ ╲ ╲ ╲   ╲      │  ╱   ╱ ╱ ╱
+   Kalinens ╲ ╲ ╲ ╲ ╲  ring of great-grandparents ╱ ╱
+         ╲ ╲ ╲ ╲ ╲ ╲   ring of grandparents   ╱ ╱ ╱
+          ╲  ╲  ╲    parents along the arc   ╱  ╱
+           ╲  ╲  ╲  Given      ⚭    Given  ╱  ╱
+  ──────────────────  Surname      Surname  ─────────────────
+   1810s  1840s  1870s  1900s  1930s  1960s   1960s  1930s ...
+```
+
+- Rings: the parents along the arc, 58 px; grandparents to great-great-grandparents outward from the inner edge, 112 px each; two more rings of given names only, 70 px. On the phone every ring reads outward, 130 px, the last two 70 px. A person takes the angle of the known ends of their line, so nobody nobody knows takes room; a parent nobody knows keeps an empty share. Fathers stand on the outer side.
+- The words of a cell are the first form that fits: name and years, the name on two lines, the name, the given name with the initial of the surname, the given name; nothing is smaller than 14 px, the fan scrolls instead. A cell too narrow to read and to press (24 px along the middle of the ring, 44 px on the phone) is left out, and so are rings beyond the sixth: the child says that ancestors are not shown, and pressing the child puts them in the centre.
+- Parents meet over the outer edge of their child as a bracket, `rule` 1.6 px, `ink` 3 px on the direct line, where the names are 700. Every branch is a spoke: each of its people has a 4 px stripe in its ink on the outer edge of the cell, and its name stands beyond the outermost of them, in its ink. Under every ring stands the decade most of its people were born in.
+- A person met again (cousins who married) is named again in a `surface` cell and goes no further.
+- Above the fan, "in the centre" offers the person alone, the person with each partner and the partner alone, as words on a line. Pressing a person on the fan puts them in the centre; pressing the centre opens their pedigree. The pedigree has a link to the fan of its chosen person.
+- The keys walk it: up to a parent, the one on the direct line first; down to the child; left and right along the ring. Enter puts the person in the centre. One cell at a time is in the order of Tab.
+
 ## By branch
 
 Every branch is a page of its own, the pages side by side in one row that scrolls across; on the phone one page fills the window and the next is a swipe away. It is the way through the tree for a screen reader and a keyboard: headings and lists of lists, every name a link.
@@ -228,7 +250,7 @@ Under the strip a legend explains the cap, the dashes and the "?". Adoption is a
 ## States
 
 - Focus: 2 px `action` outline, 2 px away, 3 px on the map. Never removed, never clipped.
-- Focus on an entry of the tree, reached by the arrow keys on any width, and on a name or a reference of the pages by branch, reached by Tab: no outline. A tint of `hover` under the entry, 4 px beyond it above and below, 6 px to the right and 8 px to the left, corners of 3 px, with a 3 px bar of `action` on its left edge. It lies under the lines and the text, so it covers, clips and moves nothing, and the sheet keeps room for it beside the outer columns; the bar keeps 3:1 against `paper`, `surface` and `hover` in both themes. Only the keys show it (`:focus-visible`), never a press of the mouse. Where the system forces its own colours, the plain outline comes back. The map keeps its own.
+- Focus on an entry of the tree, reached by the arrow keys on any width, on a name or a reference of the pages by branch, reached by Tab, and on a cell of the fan: no outline. A tint of `hover` under the entry, 4 px beyond it above and below, 6 px to the right and 8 px to the left, corners of 3 px, with a 3 px bar of `action` on its left edge. A cell of the fan is the tint itself, with the bar on its inner edge; the centre has it on the base line. It lies under the lines and the text, so it covers, clips and moves nothing, and the sheet keeps room for it beside the outer columns; the bar keeps 3:1 against `paper`, `surface` and `hover` in both themes. Only the keys show it (`:focus-visible`), never a press of the mouse. Where the system forces its own colours, the plain outline comes back. The map keeps its own.
 - Backspace: one step back inside the app on every screen, the person before in the centre or the screen before, so the tree can be walked by the keys alone. Never while somebody types (a field, a list to choose from, editable text, a composition in progress), never with a modifier, never for a key a screen already took. On the first page of a visit, or one reached from another site, it does nothing: it never leaves the site. The hint under the tree names it.
 - Hover: `hover` under a control, an underline for a name.
 - Filled button for the one main action of a screen, outlined for the rest. Disabled is `muted` text and a sentence that says why.

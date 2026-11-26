@@ -26,6 +26,7 @@ const screens = [
   ["all branches near", `/sample/branches?level=near&person=${start}`],
   ["a person", `/sample/person/${manyUnions}`],
   ["the pages of branches", `/sample/list/${start}`],
+  ["the fan of ancestors", "/sample/branches?as=fan"],
 ] as const;
 
 /** Everything has come that will come. */
@@ -545,6 +546,7 @@ test("everything to press on a phone is as large as a finger", async ({ page, is
     `/sample/tree/${manyUnions}?siblings=open`,
     `/sample/person/${start}`,
     `/sample/list/${start}`,
+    "/sample/branches?as=fan",
   ]) {
     await page.goto(path);
     await page.waitForTimeout(600);
@@ -576,6 +578,71 @@ test.describe("screens whose code does not come", () => {
     await page.goto("/sample");
     await expect(page.getByRole("alert")).toContainText("The page didn't open.");
     await expect(page.getByRole("button", { name: "Reload" })).toBeVisible();
+  });
+});
+
+test.describe("the fan of ancestors", () => {
+  test("is walked by the keys, with the mark of the tree, and Enter puts one in the centre", async ({
+    page,
+  }) => {
+    await page.setViewportSize({ width: 1440, height: 900 });
+    await page.goto("/sample/branches?as=fan");
+    await ready(page);
+    const fan = page.locator("[data-fan] svg");
+    await expect(fan.locator("[data-key]").first()).toBeAttached();
+    await fan.locator('[data-key][tabindex="0"]').focus();
+    await page.keyboard.press("ArrowUp");
+    await page.keyboard.press("ArrowRight");
+    const focused = page.locator("[data-fan] [data-key]:focus");
+    await expect(focused).toBeInViewport();
+    const mark = await page.evaluate(`(() => {
+      const cell = document.activeElement;
+      const [ground, bar] = cell.querySelectorAll("path");
+      return {
+        outline: getComputedStyle(cell).outlineStyle,
+        tint: getComputedStyle(ground).fill,
+        bar: getComputedStyle(bar).stroke,
+      };
+    })()`);
+    const tokens: { hover: string; action: string } = await page.evaluate(`(() => {
+      const probe = document.createElement("i");
+      document.body.append(probe);
+      probe.style.color = "var(--hover)";
+      const hover = getComputedStyle(probe).color;
+      probe.style.color = "var(--action)";
+      const action = getComputedStyle(probe).color;
+      probe.remove();
+      return { hover, action };
+    })()`);
+    expect(mark).toEqual({ outline: "none", tint: tokens.hover, bar: tokens.action });
+    const href = (await focused.getAttribute("href")) ?? "";
+    await page.keyboard.press("Enter");
+    await expect(page).toHaveURL(href);
+    await expect(page.getByRole("group", { name: /^Ancestors of / })).toBeVisible();
+  });
+
+  test("fits a wide window whole, names no smaller than 14 px", async ({ page }) => {
+    await page.setViewportSize({ width: 1440, height: 900 });
+    await page.goto("/sample/branches?as=fan");
+    await ready(page);
+    const stage = page.locator("[data-fan]");
+    const fits = await stage.evaluate((element) => [
+      element.scrollWidth <= element.clientWidth,
+      element.scrollHeight <= element.clientHeight,
+    ]);
+    expect(fits).toEqual([true, true]);
+    const size = await page
+      .locator("[data-fan] text")
+      .first()
+      .evaluate((text) => text.getBoundingClientRect().height);
+    expect(size).toBeGreaterThan(12);
+  });
+
+  test("opens at its centre on the phone", async ({ page }) => {
+    await page.setViewportSize({ width: 390, height: 844 });
+    await page.goto("/sample/branches?as=fan");
+    await ready(page);
+    await expect(page.locator("[data-fan] svg a").last()).toBeInViewport();
   });
 });
 

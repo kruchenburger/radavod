@@ -17,7 +17,7 @@ import { cssFont, measure, rem } from "../tree/type";
 import { wordsOf } from "../tree/words";
 import { useData } from "./data";
 import { rememberTree } from "./last-tree";
-import { type Half, hrefOf, type TreePlace, treePlace } from "./places";
+import { type Half, hrefOf, type TreePlace, treePlace, branchesPlace } from "./places";
 import classes from "./tree-screen.module.css";
 
 type Centred = TreePlace & { person: string };
@@ -89,6 +89,7 @@ export function TreeScreen({ place }: { place: Centred }) {
       <div className={classes.legend}>
         <Legend links={layout.tree.links} />
         <Link href={hrefOf({ screen: "list", person: focus })}>{t("view.list")}</Link>
+        <Link href={hrefOf(branchesPlace({ as: "fan", person: focus }))}>{t("fan.open")}</Link>
         <span id={hint} className={classes.hint}>
           {t("tree.keys")}
         </span>

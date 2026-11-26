@@ -9,6 +9,7 @@ import { loadFonts } from "../tree/type";
 import { wordsOf } from "../tree/words";
 import { BranchesScreen } from "./branches-screen";
 import { DataContext, sampleQuery, useData } from "./data";
+import { FanScreen } from "./fan-screen";
 import { Frame } from "./frame";
 import { PagesScreen } from "./pages-screen";
 import { PersonScreen } from "./person-screen";
@@ -89,7 +90,7 @@ function Screen({ place }: { place: Place }) {
     case "tree":
       return <TreeScreen place={{ ...place, person: place.person ?? start }} />;
     case "branches":
-      return <BranchesScreen place={place} />;
+      return place.as === "fan" ? <FanScreen place={place} /> : <BranchesScreen place={place} />;
     case "person":
       return <PersonScreen key={place.person} person={place.person} />;
     case "list":

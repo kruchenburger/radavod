@@ -94,6 +94,18 @@ export const en = {
   "map.keysNear":
     "Up to a parent, down to a child, left and right along the row. Enter opens the person, Esc zooms out.",
   "map.press": "Press a branch to come closer.",
+  "map.modes": "Show as",
+  "map.asMap": "Map",
+  "map.asFan": "Fan",
+  "fan.open": "Fan of ancestors",
+  "fan.centre": "In the center",
+  "fan.label": "Ancestors of {names}",
+  "fan.keys":
+    "Arrow keys move around the fan: up to a parent, down to the child, left and right along the ring. Enter puts the person in the center.",
+  "fan.repeat": "already closer to the center",
+  "fan.further": "earlier ancestors not shown",
+  "fan.decade": "{year}s",
+  "fan.none": "No known ancestors of {name}",
   "map.noBranch": "No branch",
   "map.see": "{name}, see",
   "map.seeParents": "Parents, see",
