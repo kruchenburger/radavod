@@ -3,6 +3,9 @@ import { type Duplicate, type Missing, missing } from "../../../kernel/refusal";
 import type { Result } from "../../../kernel/result";
 import {
   addCredential,
+  addPasskey,
+  mayLinkBrowser,
+  provers,
   type Credential,
   type CredentialError,
   type NewCredential,
@@ -75,6 +78,14 @@ export type AccessError =
   | Expired
   | StaleCounter;
 
+/** A member as they see themselves. */
+export type Account = {
+  member: Omit<Member, "version">;
+  credentials: Omit<Credential, "publicKey" | "counter">[];
+  /** Only a passkey of the account can prove it to add one more. */
+  canAddPasskey: boolean;
+};
+
 /** The members as one of them sees them. */
 export type Roster = {
   members: (Pick<Member, "id" | "name" | "role"> &
@@ -116,10 +127,14 @@ export interface Access {
     now: number,
     fresh: { id: MemberId; name?: string | undefined },
   ): Result<NewMember, AccessError>;
+  /** The passkeys of an account that may prove it, to add one more. */
+  provers(id: MemberId): Result<string[], AccessError>;
+  /** A member's own account: who they are and what they sign in with, without keys. */
+  account(id: MemberId): Result<Account, AccessError>;
   /** The members as a member may see them: names for all, credentials and invitations for keepers. */
   roster(by: MemberId): Result<Roster, AccessError>;
-  /** What a live invitation is, without spending it. */
-  inspect(hash: string, now: number): Result<Invitation, AccessError>;
+  /** What a live invitation is, without spending it, and whether whom it lets in may link a browser. */
+  inspect(hash: string, now: number): Result<Invitation & { canLink: boolean }, AccessError>;
   /** Begins a step of signing in. */
   openChallenge(input: NewChallenge, now: number): void;
   /** Ends a step of signing in: it is answered once, whatever the answer. */
@@ -145,6 +160,13 @@ export interface Access {
     credential: NewCredential;
   }): Result<MemberId, AccessError>;
   addCredential(id: MemberId, credential: NewCredential, now: number): Result<Change, AccessError>;
+  /** One more passkey, proven by a passkey of the same account just now. */
+  addPasskey(
+    id: MemberId,
+    credential: NewCredential,
+    now: number,
+    proof: { credential: string; counter: number },
+  ): Result<Change, AccessError>;
   revokeCredential(by: MemberId, id: string, now: number): Result<Change, AccessError>;
   changeRole(by: MemberId, id: MemberId, role: Role, now: number): Result<Change, AccessError>;
   revoke(by: MemberId, id: MemberId, now: number): Result<Change, AccessError>;
@@ -204,6 +226,18 @@ export function accessOver(store: AccessStore): Access {
       const member = newcomerOf(store, live.value, fresh);
       return member === null ? missing("member") : { ok: true, value: member };
     },
+    provers: (id) => provers(store, id),
+    account(id) {
+      const self = allowed(store, id, "own-account");
+      if (!self.ok) return self;
+      const { version: _version, ...member } = self.value;
+      const credentials = store
+        .credentialsOf(id)
+        .filter((one) => isLive(one))
+        .map(({ publicKey: _key, counter: _counter, ...credential }) => credential);
+      const canAddPasskey = provers(store, id).ok;
+      return { ok: true, value: { member, credentials, canAddPasskey } };
+    },
     roster(by) {
       const reader = allowed(store, by, "see-members");
       if (!reader.ok) return reader;
@@ -221,13 +255,19 @@ export function accessOver(store: AccessStore): Access {
             ...one,
             credentials: store
               .credentialsOf(one.id)
+              .filter((credential) => isLive(credential))
               .map(({ publicKey: _key, counter: _counter, ...credential }) => credential),
           })),
           invitations: store.invitations().map(({ hash: _hash, ...one }) => one),
         },
       };
     },
-    inspect: (hash, now) => liveInvitation(store, hash, now),
+    inspect(hash, now) {
+      const live = liveInvitation(store, hash, now);
+      return live.ok
+        ? { ok: true, value: { ...live.value, canLink: mayLinkBrowser(live.value.role) } }
+        : live;
+    },
     openChallenge: (input, now) => store.save(openChallenge(input, now)),
     takeChallenge(hash, purpose, now) {
       const { change, taken } = takeChallenge(store, hash, purpose, now);
@@ -263,6 +303,8 @@ export function accessOver(store: AccessStore): Access {
       return done.ok ? { ok: true, value: redeemed.value.member } : done;
     },
     addCredential: (id, credential, now) => saved(addCredential(store, id, credential, now)),
+    addPasskey: (id, credential, now, proof) =>
+      saved(addPasskey(store, id, credential, now, proof)),
     revokeCredential: (by, id, now) => saved(revokeCredential(store, by, id, now)),
     changeRole: (by, id, role, now) => saved(changeRole(store, by, id, role, now)),
     revoke: (by, id, now) => saved(revokeMember(store, by, id, now)),

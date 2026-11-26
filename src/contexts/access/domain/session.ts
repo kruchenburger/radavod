@@ -2,7 +2,9 @@ import { writes } from "../../../kernel/change";
 import type { MemberId, PersonId } from "../../../kernel/id";
 import { type Duplicate, duplicate, type Missing, missing } from "../../../kernel/refusal";
 import type { Result } from "../../../kernel/result";
-import type { Credential } from "./credential";
+import { type Credential, countsOn, type StaleCounter } from "./credential";
+
+export type { StaleCounter };
 import { type AccessReader, type Change, isLive } from "./member";
 import type { Role } from "./rights";
 
@@ -13,10 +15,15 @@ const day = 86_400_000;
 /** Each use moves the end on: by 30 days after a passkey, by 180 after a bound device. */
 const lifetimes: Record<Credential["kind"], number> = { passkey: 30 * day, device: 180 * day };
 
-export type StaleCounter = { code: "stale-counter" };
-
 /** Who a session is. */
-export type Signed = { member: MemberId; role: Role; person: PersonId | null; expiresAt: number };
+export type Signed = {
+  member: MemberId;
+  role: Role;
+  person: PersonId | null;
+  expiresAt: number;
+  /** What signed in: a reader's linked browser cannot come back without a new link. */
+  via: Credential["kind"];
+};
 
 export function signIn(
   reader: AccessReader,
@@ -34,13 +41,8 @@ export function signIn(
   if (!isLive(credential) || !isLive(reader.member(credential.member))) {
     return missing(input.credential);
   }
-  // A passkey that counts its uses never counts back: a lower count is a copy of it, or a replay.
   const { counter } = input;
-  if (
-    counter !== undefined &&
-    (credential.counter ?? 0) > 0 &&
-    counter <= (credential.counter ?? 0)
-  ) {
+  if (counter !== undefined && !countsOn(credential, counter)) {
     return { ok: false, error: { code: "stale-counter" } };
   }
   const session: Session = {
@@ -80,7 +82,7 @@ export function slide(
   const moved = end - session.expiresAt >= day ? { ...session, expiresAt: end } : session;
   const { id, role, person } = member;
   return {
-    signed: { member: id, role, person, expiresAt: moved.expiresAt },
+    signed: { member: id, role, person, expiresAt: moved.expiresAt, via: credential.kind },
     change: writes("session", hash, session, moved),
   };
 }

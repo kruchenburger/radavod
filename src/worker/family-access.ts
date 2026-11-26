@@ -8,6 +8,7 @@ import {
   type Invitation,
   type NewChallenge,
   type Purpose,
+  type Account,
   type Roster,
   type Expected,
   type StaleVersion,
@@ -76,6 +77,10 @@ export class FamilyAccess extends DurableObject<Env> {
     return this.#access().credential(id);
   }
 
+  account(id: MemberId): Result<Account, AccessError> {
+    return this.#access().account(id);
+  }
+
   roster(by: MemberId): Result<Roster, AccessError> {
     return this.#access().roster(by);
   }
@@ -97,7 +102,7 @@ export class FamilyAccess extends DurableObject<Env> {
   }
 
   /** What a live invitation is, without spending it. */
-  inspect(hash: string, now: number): Result<Invitation, AccessError> {
+  inspect(hash: string, now: number): Result<Invitation & { canLink: boolean }, AccessError> {
     return this.#access().inspect(hash, now);
   }
 
@@ -154,8 +159,17 @@ export class FamilyAccess extends DurableObject<Env> {
     return this.#run({}, (access) => access.redeem(input));
   }
 
-  addCredential(id: MemberId, credential: NewCredential, now: number): Promise<Done> {
-    return this.#change({}, (access) => access.addCredential(id, credential, now));
+  addPasskey(
+    id: MemberId,
+    credential: NewCredential,
+    now: number,
+    proof: { credential: string; counter: number },
+  ): Promise<Done> {
+    return this.#change({}, (access) => access.addPasskey(id, credential, now, proof));
+  }
+
+  provers(id: MemberId): Result<string[], AccessError> {
+    return this.#access().provers(id);
   }
 
   revokeCredential(by: MemberId, id: string, now: number): Promise<Done> {

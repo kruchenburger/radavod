@@ -218,6 +218,8 @@ Under the strip a legend explains the cap, the dashes and the "?". Adoption is a
 ## Other screens
 
 - **Start, sign-in, invitation**: two halves. Left, on `surface`, the blank pedigree: lines without names, braces, the direct line. Right, the words and one filled button. Nothing about the family is shown before a sign-in except what the invitation itself says.
+- **Members and account**: under the frame, one column of type, as the list of a family book. A member is a name in Alegreya and a role in `muted`; a keeper sees their passkeys and linked browser under each, and the buttons for what a keeper does. A destructive step shows its cost beside the button that takes it and asks once more. A link to send is shown once, in a field to copy.
+- **Invitation**: once the link has said the name of the family, it stands at the tip of the direct line of the blank pedigree, in Alegreya italic, as if just written in.
 - **Empty family**: the blank pedigree without a fill, then two ways: the first person (a name, or the mark that it is unknown) and a file.
 - **Icon**: a small blank pedigree on `paper`, square: a thin line and a thick one joined by a brace to a thick line. In a dark browser it uses the dark tokens. It is `/favicon.svg`; `/favicon.ico` redirects there.
 - **Example**: where the installation allows it, the start page opens an invented family. A row above the header carries the mark in an outlined label, one sentence and a link to leave. The row is on every screen of the example; in the sheet of the map on the phone the mark stands beside the heading.

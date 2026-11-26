@@ -130,7 +130,7 @@ it.each([
 
 it("does not wait for a silent server forever", () => {
   render(<App />);
-  const [, options] = vi.mocked(fetch).mock.calls[0] ?? [];
+  const [, options] = vi.mocked(fetch).mock.calls.find(([url]) => url === "/health") ?? [];
   expect(options?.signal).toBeInstanceOf(AbortSignal);
   expect(timeout).toHaveBeenCalledWith(10_000);
 });

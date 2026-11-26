@@ -1,5 +1,6 @@
 import { useQuery } from "@tanstack/react-query";
 import { lazy, Suspense, useMemo } from "react";
+import { ACCESS_PAGES } from "../../src/shared/access";
 import { readPlace } from "../sample/places";
 import { Boundary } from "./boundary";
 import { configQuery } from "./config";
@@ -10,6 +11,10 @@ import { go } from "./router";
 
 // Most people open the start page only.
 const Sample = lazy(async () => ({ default: (await import("../sample/sample")).Sample }));
+const Access = lazy(async () => ({ default: (await import("../access/screens")).AccessScreen }));
+
+/** The addresses of signing in and of the members; their screens load only there. */
+const accessPaths = new Set<string>(ACCESS_PAGES);
 
 type PagesProps = { path: string; search: string };
 
@@ -18,6 +23,15 @@ export function Pages({ path, search }: PagesProps) {
   const { t } = useLanguage();
   const { data, isError } = useQuery(configQuery);
   const place = useMemo(() => readPlace(path, search), [path, search]);
+  if (accessPaths.has(path)) {
+    return (
+      <Boundary fallback={<Failed />}>
+        <Suspense fallback={<Waiting />}>
+          <Access path={path as never} />
+        </Suspense>
+      </Boundary>
+    );
+  }
   const waiting = (
     <main className={classes.page}>
       <Message text={t("tree.loading")} />
@@ -51,5 +65,27 @@ export function Pages({ path, search }: PagesProps) {
         <Sample place={place} />
       </Suspense>
     </Boundary>
+  );
+}
+
+function Waiting() {
+  const { t } = useLanguage();
+  return (
+    <main className={classes.page}>
+      <Message text={t("page.loading")} />
+    </main>
+  );
+}
+
+function Failed() {
+  const { t } = useLanguage();
+  return (
+    <main className={classes.page}>
+      <Message
+        text={t("page.failed")}
+        action={{ label: t("page.reload"), onClick: () => window.location.reload() }}
+        isProblem
+      />
+    </main>
   );
 }

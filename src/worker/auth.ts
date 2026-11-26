@@ -22,6 +22,8 @@ const open = new Set([
   "POST /api/passkey/login/options",
   "POST /api/passkey/login/verify",
   "POST /api/device/bind",
+  // Who is signed in: nobody is an answer too, so the app asks it whenever it opens.
+  "GET /api/session",
 ]);
 
 export function accessOf(c: ApiContext) {
@@ -41,18 +43,25 @@ export const gate: MiddlewareHandler<Api> = async (c, next) => {
   if (open.has(`${method} ${c.req.path}`)) {
     return isChange && !isOurs ? c.json({ error: "origin" }, 403) : next();
   }
-  const token = tokenOf(c.req.header("cookie"));
-  if (token === null) return c.json({ error: "unauthorized" }, 401);
+  if (tokenOf(c.req.header("cookie")) === null) return c.json({ error: "unauthorized" }, 401);
   if (isChange && !isOurs) return c.json({ error: "origin" }, 403);
-  const signed = await accessOf(c).session(await hashOf(token), Date.now());
-  if (signed === null) {
+  const found = await signedOf(c);
+  if (found === null) {
     c.header("set-cookie", clearedCookie());
     return c.json({ error: "unauthorized" }, 401);
   }
-  c.set("signed", signed);
-  c.set("token", token);
+  c.set("signed", found.signed);
+  c.set("token", found.token);
   await next();
 };
+
+/** The session of a request, if its cookie still has one. */
+export async function signedOf(c: ApiContext): Promise<{ signed: Signed; token: string } | null> {
+  const token = tokenOf(c.req.header("cookie"));
+  if (token === null) return null;
+  const signed = await accessOf(c).session(await hashOf(token), Date.now());
+  return signed === null ? null : { signed, token };
+}
 
 /** A route for those whose role may do an action, by the table of rights and nothing else. */
 export function allow(action: Action): MiddlewareHandler<Api> {
@@ -116,9 +125,9 @@ export const badRequest = (c: ApiContext) => c.json({ error: "bad-request" }, 40
 export async function sessionAnswerOf(c: ApiContext, signed: Signed): Promise<SessionAnswer> {
   const access = accessOf(c);
   const [members, family] = await Promise.all([access.members(), access.family()]);
-  const { member, role, person } = signed;
+  const { member, role, person, via } = signed;
   const name = members.find(({ id }) => id === member)?.name ?? "";
-  return { member, name, role, person, family };
+  return { member, name, role, person, family, via };
 }
 
 /** The country Cloudflare says a request came from, if any. */
@@ -140,6 +149,7 @@ const statuses: Record<string, 400 | 401 | 403 | 404 | 409 | 410 | 429> = {
   "passkey-required": 409,
   "one-device": 409,
   "rate-limited": 429,
+  "step-over": 410,
 };
 
 /** A refusal as an answer: its code, and when a limit lets the next try in. */

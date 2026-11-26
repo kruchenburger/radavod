@@ -69,8 +69,8 @@ export function signInRoutes(app: Hono<Api>): void {
     const access = accessOf(c);
     const found = await access.inspect(await hashOf(input.secret), Date.now());
     if (!found.ok) return refused(c, found.error);
-    const { kind, role } = found.value;
-    const answer: InvitationAnswer = { kind, role, family: await access.family() };
+    const { kind, role, canLink } = found.value;
+    const answer: InvitationAnswer = { kind, role, family: await access.family(), canLink };
     return c.json(answer);
   });
 
@@ -85,8 +85,7 @@ export function signInRoutes(app: Hono<Api>): void {
     });
     if (!member.ok) return nobody(c, member.error);
     // A family set up before it had a name is called by its domain.
-    const family = (await access.family()) ?? c.env.RP_ID ?? "";
-    return registration(c, family, member.value, (flow, challenge) => ({
+    return registration(c, null, member.value, (flow, challenge) => ({
       hash: flow,
       challenge,
       purpose: "register",
@@ -133,7 +132,10 @@ export function signInRoutes(app: Hono<Api>): void {
     // Which passkey is unknown, which signature is wrong and which count went back look the same.
     if (credential === null || counter === null) return signInRefused(c);
     const done = await signedIn(c, credential.id, counter);
-    return done.status === 401 ? signInRefused(c) : done;
+    // A passkey turned off, of a member whose sign-in is off, or that counts back: one refusal. A
+    // server that fails says so: a keeper must not make a recovery link for a passkey that is fine.
+    const isRefused = done.status >= 400 && done.status < 500 && done.status !== 429;
+    return isRefused ? signInRefused(c) : done;
   });
 
   // A reader whose passkey does not work binds this browser instead, once.

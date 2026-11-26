@@ -33,6 +33,20 @@ export type NewCredential = Pick<Credential, "id" | "kind" | "label" | "publicKe
 export type OneDevice = { code: "one-device" };
 export type CredentialError = PasskeyRequired | OneDevice | Duplicate;
 
+/** Only a reader may sign in with a linked browser; an editor and a keeper sign in by passkey. */
+export function mayLinkBrowser(role: Member["role"]): boolean {
+  return role === "reader";
+}
+
+/** The passkeys of an account that may prove it, to add one more; none, and a passkey cannot be added. */
+export function provers(reader: AccessReader, id: MemberId): Result<string[], PasskeyRequired> {
+  const passkeys = reader
+    .credentialsOf(id)
+    .filter((one) => isLive(one) && one.kind === "passkey")
+    .map((one) => one.id);
+  return passkeys.length === 0 ? passkeyRequired : { ok: true, value: passkeys };
+}
+
 /**
  * A credential a member may have: an editor and a keeper sign in by passkey, a reader may also bind one
  * device.
@@ -45,7 +59,7 @@ export function credentialFor(
 ): Result<Change, CredentialError> {
   if (reader.credential(credential.id) !== null) return duplicate;
   if (credential.kind === "device") {
-    if (member.role !== "reader") return passkeyRequired;
+    if (!mayLinkBrowser(member.role)) return passkeyRequired;
     const devices = reader
       .credentialsOf(member.id)
       .filter((one) => isLive(one) && one.kind === "device");
@@ -94,4 +108,36 @@ export function revokeCredential(
         .flatMap((one) => writes("session", one.hash, one, null)),
     ],
   };
+}
+
+/** A passkey that counts its uses never counts back: a lower count is a copy of it, or a replay. */
+export function countsOn(credential: Credential, counter: number): boolean {
+  const stored = credential.counter ?? 0;
+  return stored === 0 || counter > stored;
+}
+
+export type StaleCounter = { code: "stale-counter" };
+
+/**
+ * One more passkey for one's own account, proven by a passkey of the same account just now: a session
+ * alone, or a linked browser, does not make a passkey that outlives it.
+ */
+export function addPasskey(
+  reader: AccessReader,
+  id: MemberId,
+  credential: NewCredential,
+  now: number,
+  proof: { credential: string; counter: number },
+): Result<Change, CredentialError | Forbidden | PasskeyRequired | StaleCounter> {
+  const allowed = provers(reader, id);
+  if (!allowed.ok) return allowed;
+  const by = reader.credential(proof.credential);
+  if (by === null || !allowed.value.includes(by.id) || credential.kind !== "passkey") {
+    return passkeyRequired;
+  }
+  if (!countsOn(by, proof.counter)) return { ok: false, error: { code: "stale-counter" } };
+  const added = addCredential(reader, id, credential, now);
+  if (!added.ok) return added;
+  const used = { ...by, lastUsedAt: now, counter: proof.counter };
+  return { ok: true, value: [...writes("credential", by.id, by, used), ...added.value] };
 }

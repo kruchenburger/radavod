@@ -473,3 +473,65 @@ describe("a passkey that signs in", () => {
     );
   });
 });
+
+describe("one more passkey", () => {
+  it("is proven by a live passkey of the same account, whose count goes on", () => {
+    const { access } = family();
+    joined(access, "bob", "editor");
+    const make = passkey("bob-2");
+    // Another member's passkey proves nothing of this account.
+    expect(
+      access.addPasskey(member("bob"), make, start, { credential: "ann-1", counter: 1 }),
+    ).toEqual(refused("passkey-required"));
+    expect(
+      access.addPasskey(member("bob"), make, start, { credential: "bob-1", counter: 3 }).ok,
+    ).toBe(true);
+    expect(access.credentialsOf(member("bob")).find(({ id }) => id === "bob-1")?.counter).toBe(3);
+    // The same count again is a copy of the passkey, or a replay.
+    expect(
+      access.addPasskey(member("bob"), passkey("bob-3"), start, {
+        credential: "bob-1",
+        counter: 3,
+      }),
+    ).toEqual(refused("stale-counter"));
+    expect(access.revokeCredential(member("bob"), "bob-1", start).ok).toBe(true);
+    expect(
+      access.addPasskey(member("bob"), passkey("bob-4"), start, {
+        credential: "bob-1",
+        counter: 9,
+      }),
+    ).toEqual(refused("passkey-required"));
+  });
+
+  it("is never made by a browser a reader linked", () => {
+    const { access } = family();
+    joined(access, "eve", "reader", device("eve-d"));
+    expect(access.provers(member("eve"))).toEqual(refused("passkey-required"));
+    expect(
+      access.addPasskey(member("eve"), passkey("eve-p"), start, {
+        credential: "eve-d",
+        counter: 1,
+      }),
+    ).toEqual(refused("passkey-required"));
+    expect(access.account(member("eve"))).toMatchObject({
+      ok: true,
+      value: { canAddPasskey: false },
+    });
+  });
+
+  it("counts on from nothing, and never back", () => {
+    const { access } = family();
+    expect(access.signIn({ hash: "s0", credential: "ann-1", now: start, counter: 0 }).ok).toBe(
+      true,
+    );
+    expect(access.signIn({ hash: "s1", credential: "ann-1", now: start, counter: 0 }).ok).toBe(
+      true,
+    );
+    expect(access.signIn({ hash: "s2", credential: "ann-1", now: start, counter: 2 }).ok).toBe(
+      true,
+    );
+    expect(access.signIn({ hash: "s3", credential: "ann-1", now: start, counter: 1 })).toEqual(
+      refused("stale-counter"),
+    );
+  });
+});

@@ -31,18 +31,25 @@ export const notConfigured = (c: ApiContext) => c.json({ error: "not-configured"
 /** Begins making a passkey for a member: the options for the browser and the token of the step. */
 export async function registration(
   c: ApiContext,
-  /** What the passkey dialog of a phone calls the site: the family. */
-  family: string,
+  /** What the passkey dialog of a phone calls the site: the family, once it has a name. */
+  family: string | null,
   member: { id: MemberId; name: string },
   step: (
     hash: string,
     challenge: string,
   ) => Parameters<ReturnType<typeof accessOf>["openChallenge"]>[0],
+  /** Passkeys of the account that must sign the same challenge before a new one is made. */
+  proving?: string[],
 ) {
   const site = siteOf(c);
   if (site === null) return notConfigured(c);
+  // One challenge for both: the proof and the new passkey answer the same step.
+  const challenge = crypto.getRandomValues(new Uint8Array(32));
   const options = await generateRegistrationOptions({
-    rpName: family,
+    challenge,
+    rpName: family ?? (await accessOf(c).family()) ?? site.rpID,
+    // A passkey the phone already keeps for this account is not made twice.
+    excludeCredentials: (proving ?? []).map((id) => ({ id })),
     rpID: site.rpID,
     userName: member.name,
     userDisplayName: member.name,
@@ -56,7 +63,14 @@ export async function registration(
     Date.now(),
   );
   if (!opened.ok) return refused(c, opened.error);
-  return c.json({ flow, options });
+  if (proving === undefined) return c.json({ flow, options });
+  const proof = await generateAuthenticationOptions({
+    rpID: site.rpID,
+    challenge,
+    userVerification: "required",
+    allowCredentials: proving.map((id) => ({ id })),
+  });
+  return c.json({ flow, options, proof });
 }
 
 /** The passkey a browser made, if it answered the challenge of its step. */
@@ -141,7 +155,9 @@ export async function signedBy(
 
 /** Takes the challenge of a step: answered once, whatever the answer. */
 export async function taken<P extends Purpose>(c: ApiContext, flow: string, purpose: P) {
-  return accessOf(c).takeChallenge(await hashOf(flow), purpose, Date.now());
+  const step = await accessOf(c).takeChallenge(await hashOf(flow), purpose, Date.now());
+  // A step that is gone or ran over is one thing for the person: press the button again.
+  return step.ok ? step : ({ ok: false, error: { code: "step-over" } } as const);
 }
 
 /** Signs a credential in: a session, its cookie, and who it is. */
