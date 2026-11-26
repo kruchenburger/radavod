@@ -23,6 +23,8 @@ export type PageEntry = {
   parents: PageEntry | null;
   partners: PageEntry[];
   children: PageEntry[];
+  /** Children of a partner whose other parent nobody knows: not children of the couple. */
+  alone: PageEntry[];
 };
 
 export type BranchPage = {
@@ -57,6 +59,7 @@ export function branchPages(snapshot: TreeSnapshot, lineOf: string | null): Bran
         parents: null,
         partners: [],
         children: [],
+        alone: [],
       };
       if (row.reference !== undefined) entry.reference = row.reference;
       entries.set(row.key, entry);
@@ -69,13 +72,15 @@ export function branchPages(snapshot: TreeSnapshot, lineOf: string | null): Bran
     if (node.isList) continue;
     heads.set(node, couple(node, entryOf));
   }
-  for (const { from, to, kind, main, direct, certainty } of model.links) {
+  for (const { from, to, parents, kind, main, direct, certainty } of model.links) {
     const owner = from.node.rows[from.row];
     const child = to.node.rows[to.row];
     if (owner === undefined || child === undefined) continue;
     const entry = to.node.isList ? entryOf(child) : (heads.get(to.node) as PageEntry);
     entry.tie = { kind, main, direct, certainty };
-    entryOf(owner).children.push(entry);
+    // A family of one parent leaves from the row of that parent, which is a partner's own.
+    const isAlone = owner.isSpouse && owner.person !== null && parents.length === 1;
+    (isAlone ? entryOf(owner).alone : entryOf(owner).children).push(entry);
   }
 
   const people = membersOf(snapshot, model);

@@ -9,6 +9,8 @@ import {
   routeCrossings,
 } from "../../../web/tree/layout/branch-pages";
 import type { Point } from "../../../web/tree/layout/types";
+import { mapModelOf } from "../../../web/tree/layout/map-model";
+import type { TreeSnapshot } from "../../../src/shared/tree";
 import { bigSnapshot } from "./big";
 import { cases } from "./cases";
 import { type FamilySpec, familyOf } from "./family";
@@ -23,6 +25,7 @@ function entries({ pages }: BranchPages): (PageEntry & { page: string | null })[
     if (entry.parents !== null) all.push({ ...entry.parents, page });
     all.push({ ...entry, page });
     entry.children.forEach((child) => walk(child, page));
+    entry.alone.forEach((child) => walk(child, page));
     entry.partners.forEach((partner) => walk(partner, page));
   };
   for (const { branch, entries: own } of pages) own.forEach((entry) => walk(entry, branch));
@@ -35,16 +38,25 @@ const people = (pages: BranchPages): string[] =>
 const find = (pages: BranchPages, id: string) =>
   entries(pages).find(({ person }) => person === id) as PageEntry & { page: string | null };
 
-/** Everybody stands once; whoever stands elsewhere has a reference that names them. */
-function expectWhole(pages: BranchPages, ids: string[]): void {
+/**
+ * Everybody stands once, and every row of the map, a reference too, is an entry once: nothing is
+ * lost and nothing doubled. The ends of the direct line are entries.
+ */
+function expectWhole(snapshot: TreeSnapshot, lineOf: string | null = null): BranchPages {
+  const pages = branchPages(snapshot, lineOf);
   const shown = people(pages);
   expect(shown.length).toBe(new Set(shown).size);
-  expect([...shown].sort()).toEqual([...new Set(ids)].sort());
-  const keys = new Set(entries(pages).map(({ key }) => key));
+  expect([...shown].sort()).toEqual([...new Set(snapshot.people.map(({ id }) => id))].sort());
+  const keys = entries(pages).map(({ key }) => key);
+  const rows = mapModelOf(snapshot, lineOf).nodes.flatMap(({ rows: own }) =>
+    own.map(({ key }) => key),
+  );
+  expect([...keys].sort()).toEqual([...rows].sort());
   for (const { reference, to } of pages.crossings) {
-    expect(keys.has(reference)).toBe(true);
-    expect(keys.has(to)).toBe(true);
+    expect(keys).toContain(reference);
+    expect(keys).toContain(to);
   }
+  return pages;
 }
 
 const family: FamilySpec = {
@@ -76,10 +88,23 @@ describe("pages of branches", () => {
       ["B", 2],
       ["C", 0],
     ]);
-    expectWhole(
-      pages,
-      familyOf(family).people.map(({ id }) => id),
-    );
+    expectWhole(familyOf({ ...family, branches: ["A", "B", "C"] }));
+  });
+
+  it("keep the children of a partner alone apart from those of the couple", () => {
+    const pages = pagesOf({
+      people: [
+        { id: "a", branch: "A" },
+        "wife",
+        { id: "both", branch: "A", parents: ["a", "wife"], born: 2 },
+        { id: "hers", parents: ["wife"], born: 1 },
+      ],
+      unions: [["a", "wife"]],
+      branches: ["A"],
+    });
+    const wife = find(pages, "a").partners[0];
+    expect(wife?.children.map(({ person }) => person)).toEqual(["both"]);
+    expect(wife?.alone.map(({ person }) => person)).toEqual(["hers"]);
   });
 
   it("put a partner under the person and the children of a union under the partner", () => {
@@ -125,21 +150,16 @@ describe("pages of branches", () => {
   });
 
   it.each(Object.entries(cases))("manage %s", (_, spec) => {
-    const ids = familyOf(spec).people.map(({ id }) => id);
-    expectWhole(pagesOf(spec), ids);
-    for (const id of ids.slice(-2)) expectWhole(pagesOf(spec, id), ids);
+    const snapshot = familyOf(spec);
+    expectWhole(snapshot);
+    for (const { id } of snapshot.people.slice(-2)) expectWhole(snapshot, id);
   });
 
   it("put the pages of the invented family in the order of the direct line", () => {
     for (const seed of [1, 2, 3]) {
       const invented = generateFamily(seed, 300);
       const line = invented.unions.find(({ id }) => id === invented.lastCouple)?.partners[0];
-      const snapshot = snapshotOf(invented);
-      const pages = branchPages(snapshot, line ?? null);
-      expectWhole(
-        pages,
-        snapshot.people.map(({ id }) => id),
-      );
+      const pages = expectWhole(snapshotOf(invented), line ?? null);
       const order = pages.pages.map(({ branch }) => branch);
       const pageOf = new Map(entries(pages).map(({ key, page }) => [key, order.indexOf(page)]));
       const apart = pages.crossings.map(({ reference, to }) =>
@@ -153,11 +173,7 @@ describe("pages of branches", () => {
   });
 
   it("have two thousand people once", () => {
-    const snapshot = bigSnapshot(2000);
-    expectWhole(
-      branchPages(snapshot, null),
-      snapshot.people.map(({ id }) => id),
-    );
+    expectWhole(bigSnapshot(2000));
   });
 });
 
@@ -166,19 +182,51 @@ describe("the direct line between pages", () => {
   const spot = (page: number, x: number, y: number): PageSpot => ({ page, x, y, w: 80, h: 20 });
   const sizes = { rail: 12, apart: 8 };
 
-  /** A piece across a page that is not the stretch out of the reference or into the person. */
+  type Box = { x: number; y: number; w: number; h: number };
+  const meets = (box: Box, [ax, ay]: Point, [bx, by]: Point): boolean =>
+    Math.min(ax, bx) < box.x + box.w &&
+    Math.max(ax, bx) > box.x &&
+    Math.min(ay, by) < box.y + box.h &&
+    Math.max(ay, by) > box.y;
+
+  /**
+   * Whether the line runs over anything it must not: it never enters the text it leaves or the
+   * text it comes to, and it crosses a page only on the row of its own two ends.
+   */
   function overPages(points: Point[], from: PageSpot, to: PageSpot): boolean {
-    return points.slice(1).some(([x, y], i) => {
-      const [px, py] = points[i] as Point;
-      const isOwnRow = (py === y && y === from.y + 10) || (py === y && y === to.y + 10);
-      if (isOwnRow && (i === 0 || i === points.length - 2)) return false;
-      return sheets.some((sheet) => {
-        const [left, right] = [Math.min(px, x), Math.max(px, x)];
-        const inside = left < sheet.x + sheet.w && right > sheet.x;
-        return inside && Math.max(py, y) > 40;
-      });
+    return points.slice(1).some((end, i) => {
+      const start = points[i] as Point;
+      if (meets(from, start, end) || meets(to, start, end)) return true;
+      const isFirst = i === 0 && start[1] === end[1] && end[1] === from.y + from.h / 2;
+      const isLast = i === points.length - 2 && start[1] === end[1] && end[1] === to.y + to.h / 2;
+      if (isFirst || isLast) return false;
+      return sheets.some((sheet) => meets({ ...sheet, y: 40, h: 2000 }, start, end));
     });
   }
+
+  it("never enters the text it leaves or the text it comes to", () => {
+    const [from, to] = [spot(0, 40, 300), spot(1, 460, 120)];
+    expect(
+      overPages(
+        [
+          [30, 310],
+          [130, 310],
+        ],
+        from,
+        to,
+      ),
+    ).toBe(true);
+    expect(
+      overPages(
+        [
+          [600, 130],
+          [470, 130],
+        ],
+        from,
+        to,
+      ),
+    ).toBe(true);
+  });
 
   it("crosses the gutter into the next page and comes in from the left", () => {
     const [from, to] = [spot(0, 40, 300), spot(1, 460, 120)];

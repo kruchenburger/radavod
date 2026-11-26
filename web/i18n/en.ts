@@ -76,6 +76,7 @@ export const en = {
   "tree.folded": "Descendants: {number}",
   "tree.partner": "Union: {name}",
   "tree.about": "About this person",
+  "pages.alone": "other parent unknown",
   "pages.direct": "direct line",
   "tree.direct": "Direct line",
   "tree.adoption": "Adoption, guardianship",

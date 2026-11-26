@@ -89,6 +89,7 @@ export const ru = {
   "tree.folded": "Потомки: {number}",
   "tree.partner": "Союз: {name}",
   "tree.about": "О человеке",
+  "pages.alone": "второй родитель неизвестен",
   "pages.direct": "прямая линия",
   "tree.direct": "Прямая линия",
   "tree.adoption": "Усыновление, опека",

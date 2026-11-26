@@ -472,15 +472,21 @@ describe("the pages of branches", () => {
     expect(within(branches).getAllByRole("link")).toHaveLength(11);
   });
 
-  it("lead from a reference to the person on another page", async () => {
+  it("lead from a reference to the person on another page, and the focus goes there", async () => {
     await open(`/sample/list/${start}`);
-    const reference = document.querySelector<HTMLAnchorElement>("[data-reference] a");
-    const href = reference?.getAttribute("href") ?? "";
-    press(reference as HTMLElement);
+    await screen.findAllByRole("heading", { level: 2 });
+    const pageOf = (element: Element | null) => element?.closest("[data-page]");
+    const lineOf = (link: HTMLAnchorElement) =>
+      document.querySelector(`[data-key="p:${link.getAttribute("href")?.split("/").at(-1)}"]`);
+    const references = [...document.querySelectorAll<HTMLAnchorElement>("[data-reference] a")];
+    const across = references.find((link) => pageOf(lineOf(link)) !== pageOf(link));
+    expect(across).toBeDefined();
+    const href = across?.getAttribute("href") ?? "";
+    press(across as HTMLElement);
     expect(address()).toBe(href);
-    const id = href.split("/").at(-1) ?? "";
-    const line = document.querySelector(`[data-key="p:${id}"] > a`);
-    expect(line?.getAttribute("aria-current")).toBe("true");
+    const target = document.querySelector<HTMLAnchorElement>('a[aria-current="true"]');
+    expect(target?.getAttribute("href")).toBe(href);
+    await waitFor(() => expect(document.activeElement).toBe(target));
   });
 
   it("lead back to the tree, and from the tree here", async () => {

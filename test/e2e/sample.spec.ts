@@ -578,11 +578,33 @@ test.describe("the pages of branches", () => {
     await expect(page.locator('a[aria-current="true"]')).toBeInViewport();
   });
 
-  test("draw the direct line between pages on a wide window only", async ({ page }) => {
+  test("draw the direct line between pages, over no text, on a wide window only", async ({
+    page,
+  }) => {
     await page.setViewportSize({ width: 1440, height: 800 });
     await page.goto(`/sample/list/${start}`);
     await ready(page);
     await expect(page.locator("[data-row] > svg path").first()).toBeAttached();
+    // No point of the line lies on a name, a reference or the sign of a union.
+    const crossed = await page.evaluate(`
+      (() => {
+        const texts = [...document.querySelectorAll("[data-page] [data-key] > *")]
+          .map((one) => one.getBoundingClientRect());
+        const hits = [];
+        for (const path of document.querySelectorAll("[data-row] > svg path")) {
+          const matrix = path.getScreenCTM();
+          for (let at = 0; at <= path.getTotalLength(); at += 2) {
+            const point = path.getPointAtLength(at).matrixTransform(matrix);
+            const on = texts.find((box) =>
+              point.x > box.left + 1 && point.x < box.right - 1 &&
+              point.y > box.top + 1 && point.y < box.bottom - 1);
+            if (on) hits.push([Math.round(point.x), Math.round(point.y)]);
+          }
+        }
+        return hits;
+      })()
+    `);
+    expect(crossed).toEqual([]);
     await page.setViewportSize({ width: 390, height: 800 });
     await expect(page.locator("[data-row] > svg path")).toHaveCount(0);
   });
