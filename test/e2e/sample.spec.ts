@@ -270,7 +270,7 @@ test.describe("around a person", () => {
     await expect(page).toHaveURL(`/sample/tree/${father}`);
   });
 
-  test("the keys work at once, with no mark until one is pressed", async ({ page }) => {
+  test("the keys work at once, with no mark until one is pressed", async ({ page, isMobile }) => {
     await page.goto("/sample");
     await ready(page);
     const pressed = () => page.evaluate("document.activeElement?.dataset?.press ?? null");
@@ -278,7 +278,8 @@ test.describe("around a person", () => {
     expect(
       await page.evaluate("getComputedStyle(document.activeElement, '::before').content"),
     ).toBe("none");
-    await page.keyboard.press("ArrowLeft");
+    // On the phone the people are a list, walked up and down.
+    await page.keyboard.press(isMobile ? "ArrowUp" : "ArrowLeft");
     expect(await pressed()).not.toBe(`p:${start}`);
     const parent = await pressed();
     await page.keyboard.press("Enter");
