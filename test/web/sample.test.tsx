@@ -45,8 +45,8 @@ const hard = {
   threeUnions: "p28",
   repeated: "p162",
   adopted: "p165",
-  versions: "p179",
-  unnamed: "p191",
+  versions: "p180",
+  unnamed: "p192",
 };
 
 type Answers = Partial<
@@ -352,6 +352,35 @@ describe("around a person", () => {
     expect(parents).toContain(parent.dataset["press"]);
     fireEvent.keyDown(parent, { key: "ArrowRight" });
     expect((document.activeElement as HTMLElement).dataset["press"]).toBe(`p:${start}`);
+  });
+
+  it("gives the person in the centre the focus at once, and after every move", async () => {
+    await open("/sample");
+    const pressed = () => (document.activeElement as HTMLElement).dataset["press"];
+    expect(pressed()).toBe(`p:${start}`);
+    fireEvent.keyDown(document.activeElement as HTMLElement, { key: "ArrowLeft" });
+    const parent = pressed();
+    fireEvent.keyDown(document.activeElement as HTMLElement, { key: "Enter" });
+    press(document.activeElement as HTMLElement);
+    expect(centre().dataset["key"]).toBe(parent);
+    expect(pressed()).toBe(parent);
+    act(() => {
+      window.history.back();
+    });
+    await waitFor(() => expect(centre().dataset["key"]).toBe(`p:${start}`));
+    expect(pressed()).toBe(`p:${start}`);
+  });
+
+  it("leaves the focus where the visitor put it", async () => {
+    await open("/sample");
+    const field = screen.getByRole("combobox", { name: "Имя или место" });
+    field.focus();
+    act(() => {
+      window.history.pushState(null, "", `/sample/tree/${hard.threeUnions}`);
+      window.dispatchEvent(new PopStateEvent("popstate"));
+    });
+    expect(centre().dataset["key"]).toBe(`p:${hard.threeUnions}`);
+    expect(document.activeElement).toBe(field);
   });
 
   it("shows one half between 720 and 1400 px", async () => {

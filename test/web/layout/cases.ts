@@ -125,6 +125,24 @@ export const cases: Record<string, FamilySpec> = {
     ],
     branches: ["A"],
   },
+  "a man married to the mother of his wife": {
+    people: [
+      { id: "gf", branch: "A" },
+      "gm",
+      "father",
+      { id: "mother", branch: "A", parents: ["gf", "gm"] },
+      { id: "wife", branch: "A", parents: ["father", "mother"] },
+      "husband",
+      { id: "x", branch: "A", parents: ["husband", "wife"] },
+    ],
+    unions: [
+      ["gf", "gm"],
+      ["father", "mother"],
+      ["husband", "wife"],
+      ["husband", "mother"],
+    ],
+    branches: ["A"],
+  },
   "a man and two sisters": {
     people: [
       { id: "x", branch: "A" },

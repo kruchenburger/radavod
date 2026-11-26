@@ -10,7 +10,15 @@ import {
   type Reach,
   type UpNode,
 } from "./around-model";
-import { bottomOf, detailRuns, type EntryText, nameRuns, type TextOptions } from "./around-text";
+import {
+  apartOf,
+  bottomOf,
+  detailRuns,
+  type EntryText,
+  nameRuns,
+  type TextOptions,
+  withApart,
+} from "./around-text";
 import { extent } from "./extent";
 import { kinOf, listOf } from "./kin";
 import { spread, step, Track } from "./lanes";
@@ -147,13 +155,19 @@ export function aroundNarrow(
   }
 
   const kin = kinOf(snapshot);
+  const apart = apartOf(snapshot, model, options.wording);
   const cards: AroundCard[] = [];
   let y = 0;
   for (const { entry, level } of items) {
     const x = leftOf(level);
     const person = entry.person === null ? undefined : kin.person(entry.person);
     const text = person === undefined ? null : options.wording.person(person);
-    const own = textOf(entry, text, { ...options, metrics, width: right - x });
+    const box = { ...options, metrics, width: right - x };
+    const own = withApart(textOf(entry, text, box), apart.get(entry.key) ?? [], {
+      ...box,
+      x: 0,
+      lineHeight: metrics.name,
+    });
     const most = Math.max(
       ...(["left", "right"] as const).map((side) => sides.get(`${side} ${entry.key}`)?.length ?? 0),
     );
@@ -202,8 +216,8 @@ export function aroundNarrow(
     ];
     links.push({ ...link, points });
   }
-  for (const { isTogether, ...union } of model.unions) {
-    if (isTogether) links.push({ ...union, points: [] });
+  for (const { isTogether, isApart, ...union } of model.unions) {
+    if (isTogether || isApart) links.push({ ...union, points: [] });
   }
   return {
     cards,
@@ -298,8 +312,8 @@ function sortLines(model: Model, items: Item[]): { rails: Rail[]; wires: Wire[] 
     const level = levels.get(as === "down" ? target : source) ?? 1;
     rails.push({ link, level, source, target, as });
   }
-  for (const { isTogether, ...union } of model.unions) {
-    if (isTogether) continue;
+  for (const { isTogether, isApart, ...union } of model.unions) {
+    if (isTogether || isApart) continue;
     const [source, target] = union.partners;
     wires.push({ link: { ...union, points: [] }, family: union.family, source, target });
   }

@@ -89,8 +89,8 @@ export function drawLines(
     link.points = path.map(([px, py]): Point => [px, py + shift]);
   }
   const links = wires.map(({ link }) => link);
-  for (const { isTogether, ...union } of model.unions) {
-    if (isTogether) links.push({ ...union, points: [] });
+  for (const { isTogether, isApart, ...union } of model.unions) {
+    if (isTogether || isApart) links.push({ ...union, points: [] });
   }
   return { links, columns, width: x, height: lower + shift, shift };
 }
@@ -121,8 +121,8 @@ function wiresOf(
       isByMargin: false,
     });
   }
-  for (const { isTogether, ...union } of model.unions) {
-    if (isTogether) continue;
+  for (const { isTogether, isApart, ...union } of model.unions) {
+    if (isTogether || isApart) continue;
     const [a, b] = union.partners;
     drafts.push({
       link: { ...union, points: [] },

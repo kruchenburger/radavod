@@ -50,6 +50,8 @@ export type Findings = {
   badReferences: string[];
   mistold: string[];
   crowded: string[];
+  /** A brace whose stem another family's line meets reads as a brace of somebody else. */
+  stemsMet: string[];
 };
 
 /** How far a line may stop from a card it belongs to. */
@@ -75,6 +77,7 @@ export function check(drawing: Drawing, rules: Rules): Findings {
     badReferences: [],
     mistold: [],
     crowded: [],
+    stemsMet: [],
   };
   const byKey = new Map(cards.map((card) => [card.key, card]));
   checkNumbers(drawing, found);
@@ -88,6 +91,7 @@ export function check(drawing: Drawing, rules: Rules): Findings {
   checkReferences(byKey, links, found);
   checkTold(byKey, links, rules, found);
   checkCrowded(links, rules, found);
+  checkStems(links, found);
   return found;
 }
 
@@ -144,9 +148,19 @@ function checkPaths(
   cards: Card[],
   byKey: Map<string, Card>,
   links: Link[],
-  { isList = false }: Rules,
+  { isList = false, lines }: Rules,
   found: Findings,
 ): void {
+  // Partners who stand apart have no line; each must name the other, and lead there.
+  const names = (key: string, other: string): boolean => {
+    const card = byKey.get(key);
+    const person = byKey.get(other)?.person;
+    return (
+      card !== undefined &&
+      lines !== undefined &&
+      lines(card).some((line) => line.part === "apart" && line.to === person)
+    );
+  };
   const grid = new Grid<Card>();
   for (const card of cards) grid.add(card, card);
   const unions = new Set(
@@ -157,9 +171,11 @@ function checkPaths(
     const [first] = points;
     const last = points.at(-1);
     if (first === undefined || last === undefined) {
+      const [a, b] = link.type === "union" ? [link.partners[0], link.at ?? link.partners[1]] : [];
       const isNear =
-        link.type === "union" &&
-        standTogether([link.partners[0], link.at ?? link.partners[1]], byKey, links, isList);
+        a !== undefined &&
+        b !== undefined &&
+        (standTogether([a, b], byKey, links, isList) || (names(a, b) && names(b, a)));
       if (!isNear) found.loose.push(nameOf(link));
       continue;
     }
@@ -490,6 +506,40 @@ function checkMerged(links: Link[], found: Findings): void {
         if (apart < 1.5 && along > 0.5) found.merged.push(`${piece.name} and ${other.name}`);
       }
       grid.add(piece, piece);
+    }
+  }
+}
+
+/** No line of a union touches the upright part of a line from parents to a child. */
+function checkStems(links: Link[], found: Findings): void {
+  type Piece = Box & { family: string; name: string };
+  const stems = new Grid<Piece>();
+  for (const link of links) {
+    if (link.type !== "parentage") continue;
+    for (const [a, b] of pieces(link.points)) {
+      const box = boxOf(a, b);
+      if (box.w < 0.01 && box.h > 0.01) {
+        stems.add({ ...box, family: link.family, name: nameOf(link) }, box);
+      }
+    }
+  }
+  const told = new Set<string>();
+  for (const link of links) {
+    for (const [a, b] of pieces(link.points)) {
+      const box = boxOf(a, b);
+      for (const stem of stems.near(box, 0.5)) {
+        // A line of a union that meets a brace reads as a part of it.
+        if (link.type !== "union" || stem.family === link.family) continue;
+        // A place of an unknown partner stands by the partner, but for families that loop.
+        if (!link.partners.every((key) => key.startsWith("p:"))) continue;
+        const meets =
+          gap(box.x, box.w, stem.x, 0) <= 0.5 && gap(box.y, box.h, stem.y, stem.h) <= 0.5;
+        const name = `${stem.name} by ${nameOf(link)}`;
+        if (meets && !told.has(name)) {
+          told.add(name);
+          found.stemsMet.push(name);
+        }
+      }
     }
   }
 }

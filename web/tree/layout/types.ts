@@ -41,11 +41,22 @@ export type Reference = {
 
 export type Wording = {
   person: (person: TreePerson) => CardText;
+  /** Under a partner, of the other one in a union that stands apart. */
+  apart: (other: TreePerson) => string;
   unknown: (place: UnknownPlace) => string;
   reference: (reference: Reference) => { title: string; detail: string };
 };
 
-export type Part = "given" | "surname" | "years" | "branch" | "unknown" | "title" | "detail";
+export type Part =
+  | "given"
+  | "surname"
+  | "years"
+  | "branch"
+  | "unknown"
+  | "title"
+  | "detail"
+  /** Names a partner who stands elsewhere, and leads there. */
+  | "apart";
 
 /** A piece of text, its box counted from the corner of its card. */
 export type Line = {
@@ -56,6 +67,8 @@ export type Line = {
   y: number;
   w: number;
   h: number;
+  /** The person a line of the part "apart" leads to. */
+  to?: string;
 };
 
 export type Box = { x: number; y: number; w: number; h: number };

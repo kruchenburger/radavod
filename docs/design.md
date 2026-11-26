@@ -107,6 +107,7 @@ A single row: the name of the family in Alegreya italic, the two views as words 
 - **Pressing a name** puts the person in the centre, pressing the centre opens the card. The "+" beside the chosen person adds a parent, a spouse or a child.
 - **Unknown parent**: a place in italic `muted` with a "+". If both are unknown, one place for the two.
 - **Repeated ancestor**: the couple is set once, at the first place. At the second a reference says that these are the same parents and gives their given names, and a line runs along the left margin to the couple. On the phone the line runs along the right margin.
+- **Partners who stand apart**: a union whose partners stand in other places (a man married to a daughter and later to her mother) has no line, since any way from one to the other crosses the braces between them. Under each partner a reference in italic `muted` names the other and puts that person in the centre. A line of a union never meets the stem of a brace.
 - **Several unions**: all spouses stand in the strip, in order of time. Up to two, every union is open. From three on one is open, the rest show the children as one line each with the number of descendants. Every union has a vertical lane of its own, 6 px apart, so children are never ambiguous.
 - **Siblings** are a word with a number in the strip. Unfolded, the older ones stand above the person and the younger below, joined by a thin line; spouses and children of siblings stay folded.
 - **Long names**: columns never widen. A name breaks between given name and surname, a double surname after the hyphen; the entry grows down.
@@ -165,7 +166,7 @@ The drawing is one group with a name, a description of the keys under it, and re
 | Enter       | Closer, centred on the branch | Opens the person                                                                   |
 | Esc         |                               | One step out                                                                       |
 
-Focus moves the view with it. Beside the tree and the map a link opens **the branches page by page**, the same people in plain headings and lists. It is complete, so a screen reader never needs the drawing.
+The person in the centre takes the focus when the tree opens and after every move, so the arrows and Backspace work at once; the focus stays where the visitor put it (the search, a link of the page). It shows no mark until a key is pressed. Focus moves the view with it. Beside the tree and the map a link opens **the branches page by page**, the same people in plain headings and lists. It is complete, so a screen reader never needs the drawing.
 
 ## By branch
 

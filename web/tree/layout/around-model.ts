@@ -64,7 +64,11 @@ export type Family = {
 };
 
 export type ModelLink = Omit<ParentageLink, "points"> & { from: string[] };
-export type ModelUnion = Omit<UnionLink, "points"> & { isTogether: boolean };
+/**
+ * A union whose partners stand apart, in other columns or far down the list, has no line: every
+ * way from one to the other would cross the braces between them. Each partner names the other.
+ */
+export type ModelUnion = Omit<UnionLink, "points"> & { isTogether: boolean; isApart: boolean };
 export type ModelReference = Omit<ReferenceLink, "points">;
 
 export type Reach = {
@@ -457,6 +461,7 @@ class Builder {
       { id, kind, certainty }: Kin["couples"][number]["union"],
       partners: [string, string],
     ): void => {
+      const isTogether = this.#couples.has(familyOf(partners));
       unions.push({
         type: "union",
         union: id,
@@ -465,7 +470,9 @@ class Builder {
         certainty,
         family: `u:${id}`,
         direct: false,
-        isTogether: this.#couples.has(familyOf(partners)),
+        isTogether,
+        isApart:
+          !isTogether && partners.every((key) => (this.#entries.get(key)?.person ?? null) !== null),
       });
     };
     for (const { union, a, b } of this.#kin.couples) {

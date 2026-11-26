@@ -59,7 +59,6 @@ export function hardCases(family: ExampleFamily) {
         partnerPairs(id).some((pair) => kin.related(...pair) && !isLineal(pair)),
       ),
     ),
-    descendantOfSpouse: ids(people.filter(({ id }) => partnerPairs(id).some(isLineal))),
     parentVersions: ids(
       people.filter(({ id }) => {
         const links = parentages.filter(({ child, kind }) => child === id && kind === "blood");
