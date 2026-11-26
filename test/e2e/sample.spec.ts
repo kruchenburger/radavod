@@ -209,14 +209,68 @@ test.describe("around a person", () => {
     for (const key of ["ArrowLeft", "ArrowLeft", "ArrowLeft"]) await page.keyboard.press(key);
     const focused = page.locator("[data-press]:focus");
     await expect(focused).toBeInViewport({ ratio: 1 });
-    const outline = await page.evaluate("getComputedStyle(document.activeElement).outlineStyle");
-    expect(outline).toBe("solid");
+    // A tint with an `action` bar, under the lines and the text: no ring, and nothing moves.
+    const mark = () => page.evaluate(markOfFocus);
+    expect(await mark()).toEqual({
+      outline: "none",
+      content: '""',
+      tint: true,
+      bar: true,
+      under: "-1",
+    });
+    const box = await focused.boundingBox();
+    await page.evaluate(
+      "document.documentElement.setAttribute('data-mantine-color-scheme', 'dark')",
+    );
+    expect(await mark()).toMatchObject({ tint: true, bar: true });
+    expect(await focused.boundingBox()).toEqual(box);
     const key = await focused.getAttribute("data-press");
     await page.keyboard.press("Enter");
     await expect(centre(page)).toHaveAttribute("data-key", key ?? "");
     await page.keyboard.press("Enter");
     await expect(page).toHaveURL(/\/sample\/person\//);
     await expect(page.getByRole("heading", { level: 1 })).toBeFocused();
+  });
+
+  test("a press of the mouse shows no mark of the keys", async ({ page }) => {
+    await page.goto("/sample");
+    await ready(page);
+    await page.locator(`[data-press="p:${father}"]`).hover();
+    await page.mouse.down();
+    const pressed = await page.evaluate(
+      "[document.activeElement.dataset.press, getComputedStyle(document.activeElement, '::before').content]",
+    );
+    await page.mouse.up();
+    expect(pressed).toEqual([`p:${father}`, "none"]);
+  });
+
+  test("the lines of kinship stay over the mark of focus", async ({ page }) => {
+    await page.setViewportSize({ width: 1440, height: 700 });
+    await page.goto("/sample");
+    await ready(page);
+    await page.locator(`[data-press="p:${start}"]`).focus();
+    await page.keyboard.press("ArrowLeft");
+    // Points of the lines that pass over the tint of the entry: each must be seen, not hidden.
+    const seen = await page.evaluate<boolean[]>(`(() => {
+      const entry = document.activeElement.getBoundingClientRect();
+      const svg = document.querySelector("svg[data-late]");
+      const matrix = svg.getScreenCTM();
+      // The lines let presses through; for this look they are hit like anything else.
+      svg.style.pointerEvents = "visiblePainted";
+      const found = [];
+      for (const path of svg.querySelectorAll("path")) {
+        const length = path.getTotalLength();
+        for (let at = 0; at <= length; at += 2) {
+          const { x, y } = path.getPointAtLength(at).matrixTransform(matrix);
+          const inside = x >= entry.left - 8 && x <= entry.left && y > entry.top && y < entry.bottom;
+          if (inside) found.push(document.elementFromPoint(x, y)?.closest("svg") === svg);
+        }
+      }
+      svg.style.pointerEvents = "";
+      return found;
+    })()`);
+    expect(seen.length).toBeGreaterThan(0);
+    expect(seen.every(Boolean)).toBe(true);
   });
 });
 
@@ -473,3 +527,25 @@ test("the card leads back to the place one came from", async ({ page }) => {
   await page.getByRole("link", { name: "Back to the tree" }).click();
   await expect(page).toHaveURL(`/sample/tree/${father}`);
 });
+
+/** How the entry with the focus is marked, its two colours compared with the tokens. */
+const markOfFocus = `(() => {
+  const element = document.activeElement;
+  const before = getComputedStyle(element, "::before");
+  const root = getComputedStyle(document.documentElement);
+  const colorOf = (value) => {
+    const probe = document.createElement("i");
+    probe.style.color = value;
+    document.body.append(probe);
+    const color = getComputedStyle(probe).color;
+    probe.remove();
+    return color;
+  };
+  return {
+    outline: getComputedStyle(element).outlineStyle,
+    content: before.content,
+    tint: before.backgroundColor === colorOf(root.getPropertyValue("--hover")),
+    bar: before.borderLeftColor === colorOf(root.getPropertyValue("--action")),
+    under: before.zIndex,
+  };
+})()`;
