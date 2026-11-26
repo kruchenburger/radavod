@@ -328,13 +328,14 @@ export function growTree(random: Random, size: number): Tree {
     bear(marry(widower, wife));
     bear(marry(widower, sister));
 
-    // A widow marries a younger man; after she dies he marries her daughter.
+    // A widow marries a younger man, who after her death marries again. Never her daughter: that
+    // happens, and the layout manages it (test/web/layout/cases.ts), but here it reads as a mistake.
     const widow = find({ generation: 2, branch: 3, sex: "female" });
-    const daughter = bear(marry(widow), { sex: "female" });
+    bear(marry(widow), { sex: "female" });
     const young = spouseFor(widow, widow.birth + 33);
     couple(young, widow, Math.max(endUnions(widow) + 1, young.birth + 22), "marriage");
     young.settled = true;
-    bear(marry(young, daughter));
+    bear(marry(young), { sex: "female" });
 
     // Two versions of a father: the second one is a neighbor of his generation.
     const disputed = bear(marry(find({ generation: 3, branch: 4, sex: "male" })));

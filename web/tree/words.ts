@@ -63,12 +63,17 @@ export function wordsOf(
       branch: branch(one.branch),
     };
   };
+  const apart: Wording["apart"] = (other) => {
+    const { given, surname } = nameOf(other.name);
+    return t(locale, "tree.apart", { name: `${given} ${surname}`.trim() });
+  };
   const unknown: Wording["unknown"] = (place) => {
     if (place.of === "partner") return t(locale, "person.unnamed");
     return t(locale, place.parentages.length > 1 ? "tree.parentsUnknown" : "tree.parentUnknown");
   };
   const onMap: Wording = {
     person,
+    apart,
     unknown,
     reference: ({ as, people, page: at }: Reference) => ({
       title:
@@ -81,6 +86,7 @@ export function wordsOf(
   return {
     onMap,
     person,
+    apart,
     unknown,
     reference: ({ people }) => ({
       title: t(locale, people.length > 1 ? "tree.sameParents" : "tree.sameParent"),

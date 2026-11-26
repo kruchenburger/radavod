@@ -38,21 +38,24 @@ export function CardLines(props: CardLinesProps) {
             <UnionIcon />
           </span>
         )}
-        {lines.map((line, i) => (
-          <span
-            key={i}
-            className={classes[line.part]}
-            data-chosen={line.style === "focusDetail" || undefined}
-            data-unnamed={(isUnnamed && line.part === "given") || undefined}
-            style={{
-              ...boxOf(line),
-              font: cssFont(line.style, line.h),
-              ...(isInked(line) && own !== undefined ? { color: own } : {}),
-            }}
-          >
-            {line.text}
-          </span>
-        ))}
+        {lines.map((line, i) =>
+          // A partner who stands apart is a link of its own, beside this one.
+          line.part === "apart" ? null : (
+            <span
+              key={i}
+              className={classes[line.part]}
+              data-chosen={line.style === "focusDetail" || undefined}
+              data-unnamed={(isUnnamed && line.part === "given") || undefined}
+              style={{
+                ...boxOf(line),
+                font: cssFont(line.style, line.h),
+                ...(isInked(line) && own !== undefined ? { color: own } : {}),
+              }}
+            >
+              {line.text}
+            </span>
+          ),
+        )}
       </span>
     </>
   );

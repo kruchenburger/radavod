@@ -72,6 +72,7 @@ export const ru = {
 
   "tree.loading": "Открываем древо",
   "tree.name": "Древо, в центре {name}",
+  "tree.apart": "Ещё союз: {name}",
   "tree.keys": "Стрелки ведут по древу, Enter ставит человека в центр, Backspace возвращает назад.",
   "tree.grandparents": "Деды и бабушки",
   "tree.greatGrandparents": "Прадеды и прабабушки",

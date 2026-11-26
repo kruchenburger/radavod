@@ -132,6 +132,19 @@ a.name:hover > span > span {
   text-underline-offset: 3px;
 }
 
+/* A partner in a union that stands apart: a reference, and a way there. */
+.apart {
+  position: absolute;
+  color: var(--muted);
+  white-space: pre;
+  text-decoration: underline 1px;
+  text-underline-offset: 3px;
+}
+
+.apart:hover {
+  color: var(--ink);
+}
+
 .folded {
   position: absolute;
   top: 0.25rem;

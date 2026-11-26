@@ -26,6 +26,7 @@ export function wordingOf(snapshot: TreeSnapshot): Wording {
       years: [person.birth?.text ?? "", person.death?.text ?? ""].join("–"),
       branch: branches.get(person.branch ?? "") ?? "",
     }),
+    apart: (other) => `also ${other.name?.given ?? ""}`,
     unknown: ({ of }) => `unknown ${of}`,
     reference: ({ as, page }) => ({
       title: `see the ${as}`,

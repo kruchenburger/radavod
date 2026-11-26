@@ -34,3 +34,5 @@ The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), and
 ### Fixed
 
 - The site has an icon, and `/favicon.ico` no longer returns 404.
+- A union whose partners stand apart no longer draws a line that runs into the braces between them; each partner names the other instead. The invented family no longer marries anybody to a parent of a partner.
+- The arrow keys work as soon as the tree opens: the person in the centre takes the focus.

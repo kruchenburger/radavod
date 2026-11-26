@@ -208,7 +208,6 @@ describe("the hard cases", () => {
       repeatedAncestor: true,
       adoption: true,
       relativeOfSpouse: true,
-      descendantOfSpouse: true,
       parentVersions: true,
       unparsedDate: true,
       noBranch: true,
@@ -216,6 +215,18 @@ describe("the hard cases", () => {
       unnamed: true,
       noKin: true,
     });
+  });
+
+  it("never marry anybody to a parent or a child of a partner", () => {
+    // It happens in families, and the layout manages it (test/web/layout/cases.ts); in the example
+    // it would read as a mistake.
+    const lineal = family.people.filter(({ id }) => {
+      const partners = [...new Set(kin.partners(id))];
+      return partners.some((a, i) =>
+        partners.slice(i + 1).some((b) => kin.ancestors(a).has(b) || kin.ancestors(b).has(a)),
+      );
+    });
+    expect(lineal.map(({ id }) => id)).toEqual([]);
   });
 
   it("are not found where they are not", () => {

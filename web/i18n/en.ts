@@ -58,6 +58,7 @@ export const en = {
 
   "tree.loading": "Opening the tree",
   "tree.name": "Tree with {name} in the center",
+  "tree.apart": "Also in a union with {name}",
   "tree.keys":
     "Arrow keys move through the tree, Enter puts a person in the center, Backspace goes back.",
   "tree.grandparents": "Grandparents",

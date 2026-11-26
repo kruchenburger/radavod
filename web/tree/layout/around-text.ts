@@ -1,6 +1,6 @@
 import type { TreeSnapshot } from "../../../src/shared/tree";
 import type { Entry, Model } from "./around-model";
-import { kinOf } from "./kin";
+import { kinOf, listOf } from "./kin";
 import { step } from "./lanes";
 import { flow, nameLines, type Run } from "./text";
 import type { CardText, Line, Measure, TextStyle, Wording } from "./types";
@@ -79,11 +79,16 @@ export function textsOf(
 ): Map<string, EntryText> {
   const kin = kinOf(snapshot);
   const ports = portsOf(model);
+  const apart = apartOf(snapshot, model, options.wording);
   const texts = new Map<string, EntryText>();
   for (const entry of model.entries.values()) {
     const person = entry.person === null ? undefined : kin.person(entry.person);
     const text = person === undefined ? null : options.wording.person(person);
-    const { lines, h } = textOf(entry, text, options);
+    const { lines, h } = withApart(textOf(entry, text, options), apart.get(entry.key) ?? [], {
+      ...options,
+      ...boxOf(entry, options.metrics),
+      lineHeight: options.metrics.name,
+    });
     const room = entry.role === "partner" && model.open !== null ? options.metrics.children : 0;
     const most = ports.get(entry.key) ?? 0;
     texts.set(entry.key, { lines, h: Math.max(h + room, (most + 2) * step) });
@@ -104,8 +109,8 @@ function portsOf({ links, unions, references }: Model): Map<string, number> {
     for (const key of from) add("out", key, family);
     add("in", child, family);
   }
-  for (const { partners, isTogether, family } of unions) {
-    if (!isTogether) for (const key of partners) add("out", key, family);
+  for (const { partners, isTogether, isApart, family } of unions) {
+    if (!isTogether && !isApart) for (const key of partners) add("out", key, family);
   }
   for (const { reference, to, family } of references) {
     for (const key of [reference, to[0] ?? ""]) add("in", key, family);
@@ -124,14 +129,7 @@ function textOf(
   options: TextOptions<AroundMetrics>,
 ): EntryText {
   const { metrics } = options;
-  const isInStrip = entry.generation === 0;
-  const indent = isInStrip ? metrics.padX + (entry.role === "sibling" ? metrics.siblings : 0) : 0;
-  const box = {
-    ...options,
-    x: indent,
-    width: (isInStrip ? metrics.strip - metrics.padX : metrics.column - 4) - indent,
-    top: isInStrip ? 2 * metrics.padY : metrics.padY,
-  };
+  const box = { ...options, ...boxOf(entry, metrics) };
   if (entry.role === "focus" && text !== null) return focusText(text, box);
   if (entry.unknown !== undefined || entry.reference !== undefined) return placeText(entry, box);
   if (text === null) return { lines: [], h: metrics.name + 2 * metrics.padY };
@@ -157,6 +155,65 @@ function textOf(
 }
 
 type TextBox = TextOptions<AroundMetrics> & { x: number; width: number; top: number };
+
+/** Where the text of an entry stands in its card. */
+function boxOf(entry: Entry, metrics: AroundMetrics): { x: number; width: number; top: number } {
+  const isInStrip = entry.generation === 0;
+  const indent = isInStrip ? metrics.padX + (entry.role === "sibling" ? metrics.siblings : 0) : 0;
+  return {
+    x: indent,
+    width: (isInStrip ? metrics.strip - metrics.padX : metrics.column - 4) - indent,
+    top: isInStrip ? 2 * metrics.padY : metrics.padY,
+  };
+}
+
+/** For each card, the partners in unions that stand apart: their words and who they are. */
+export function apartOf(
+  snapshot: TreeSnapshot,
+  model: Model,
+  wording: Wording,
+): Map<string, { text: string; to: string }[]> {
+  const kin = kinOf(snapshot);
+  const apart = new Map<string, { text: string; to: string }[]>();
+  for (const { partners, isApart } of model.unions) {
+    if (!isApart) continue;
+    const [a, b] = partners;
+    for (const [own, other] of [
+      [a, b],
+      [b, a],
+    ] as const) {
+      const to = model.entries.get(other)?.person ?? null;
+      const person = to === null ? undefined : kin.person(to);
+      if (to !== null && person !== undefined) {
+        listOf(apart, own).push({ text: wording.apart(person), to });
+      }
+    }
+  }
+  return apart;
+}
+
+/**
+ * The partners who stand apart, each on a line of its own under everything else. The card grows
+ * by as much, so what it keeps at its foot (the buttons of the chosen person) stays there.
+ */
+export function withApart(
+  text: EntryText,
+  apart: { text: string; to: string }[],
+  box: { measure: Measure; x: number; width: number; lineHeight: number },
+): EntryText {
+  if (apart.length === 0) return text;
+  const lines = [...text.lines];
+  const top = bottomOf(text.lines);
+  let y = top;
+  for (const { text: words, to } of apart) {
+    const run: Run = { text: words, part: "apart", style: "reference" };
+    // One line, so that it is one link; the screen tells the whole of it to a reader.
+    const own = flow([run], { ...box, y, lines: 1 });
+    lines.push(...own.map((line) => ({ ...line, to })));
+    y = Math.max(y, bottomOf(own));
+  }
+  return { lines, h: text.h + y - top };
+}
 
 const size = ({ measure, width, x, top }: TextBox, lineHeight: number) => ({
   measure,

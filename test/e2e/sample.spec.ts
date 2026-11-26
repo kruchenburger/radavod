@@ -1,6 +1,8 @@
 import { readFileSync } from "node:fs";
 import type { Locator, Page } from "@playwright/test";
 import type { TreeSample } from "../../src/shared/tree.ts";
+import { cases } from "../web/layout/cases.ts";
+import { type FamilySpec, familyOf } from "../web/layout/family.ts";
 import { expect, expectAccessible, expectNoSideScroll, test, theme } from "./page.ts";
 
 test.use({ isQuiet: true });
@@ -268,16 +270,47 @@ test.describe("around a person", () => {
     await expect(page).toHaveURL(`/sample/tree/${father}`);
   });
 
+  test("the keys work at once, with no mark until one is pressed", async ({ page, isMobile }) => {
+    await page.goto("/sample");
+    await ready(page);
+    const pressed = () => page.evaluate("document.activeElement?.dataset?.press ?? null");
+    expect(await pressed()).toBe(`p:${start}`);
+    expect(
+      await page.evaluate("getComputedStyle(document.activeElement, '::before').content"),
+    ).toBe("none");
+    // On the phone the people are a list, walked up and down.
+    await page.keyboard.press(isMobile ? "ArrowUp" : "ArrowLeft");
+    expect(await pressed()).not.toBe(`p:${start}`);
+    const parent = await pressed();
+    await page.keyboard.press("Enter");
+    await expect(centre(page)).toHaveAttribute("data-key", String(parent));
+    expect(await pressed()).toBe(parent);
+    await page.keyboard.press("Backspace");
+    await expect(centre(page)).toHaveAttribute("data-key", `p:${start}`);
+    expect(await pressed()).toBe(`p:${start}`);
+  });
+
   test("a press of the mouse shows no mark of the keys", async ({ page }) => {
     await page.goto("/sample");
     await ready(page);
+    const state = () =>
+      page.evaluate(
+        "[document.activeElement.dataset.press, getComputedStyle(document.activeElement, '::before').content]",
+      );
     await page.locator(`[data-press="p:${father}"]`).hover();
     await page.mouse.down();
-    const pressed = await page.evaluate(
-      "[document.activeElement.dataset.press, getComputedStyle(document.activeElement, '::before').content]",
-    );
+    const pressed = await state();
     await page.mouse.up();
     expect(pressed).toEqual([`p:${father}`, "none"]);
+    // The keys first, then the mouse: the centre that comes back takes the focus without a mark.
+    await expect(page).toHaveURL(`/sample/tree/${father}`);
+    const grandfather = snapshot.people.find(({ id }) => id === father)?.parents[0]?.parent ?? "";
+    await page.keyboard.press("ArrowLeft");
+    await page.locator(`[data-press="p:${grandfather}"]`).click();
+    await expect(page).toHaveURL(`/sample/tree/${grandfather}`);
+    await page.goBack();
+    await expect(centre(page)).toHaveAttribute("data-key", `p:${father}`);
+    expect(await state()).toEqual([`p:${father}`, "none"]);
   });
 
   test("the lines of kinship stay over the mark of focus", async ({ page }) => {
@@ -647,3 +680,36 @@ const markOfFocus = `(() => {
     under: before.zIndex,
   };
 })()`;
+
+// A man married first to a daughter, then to her mother: no way from one to the other misses
+// the braces between them, so each names the other instead of a line.
+const apart = {
+  snapshot: familyOf(cases["a man married to the mother of his wife"] as FamilySpec),
+  start: "x",
+  line: "x",
+};
+
+for (const [view, width] of [
+  ["wide", 1440],
+  ["phone", 393],
+] as const) {
+  for (const colorScheme of ["light", "dark"] as const) {
+    test(`partners who stand apart name each other, ${view}, ${colorScheme}`, async ({ page }) => {
+      await page.route("**/sample/tree.json", (route) => route.fulfill({ json: apart }));
+      await page.emulateMedia({ colorScheme });
+      await page.setViewportSize({ width, height: 900 });
+      await page.goto("/sample/tree/x");
+      await ready(page);
+      // The lines of the three braces, and none between the partners.
+      await expect(page.locator("svg[data-late] path")).toHaveCount(6);
+      const husband = page.getByRole("link", { name: "Also in a union with mother Example" });
+      await expect(husband).toBeVisible();
+      await expect(
+        page.getByRole("link", { name: "Also in a union with husband Example" }),
+      ).toBeVisible();
+      await expectNoSideScroll(page);
+      await husband.click();
+      await expect(page).toHaveURL("/sample/tree/mother");
+    });
+  }
+}
