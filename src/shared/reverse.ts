@@ -8,7 +8,7 @@ export type Patch = { aggregate: string; path: string; before: unknown; after: u
 export type State = { readonly [aggregate: string]: unknown };
 
 import { isOfLists } from "../kernel/change";
-import { ERASED } from "../kernel/id";
+import { ERASED, ERASED_IN_WORDS } from "../kernel/id";
 
 export { ERASED, isOfLists };
 
@@ -86,9 +86,7 @@ export function withoutErased(aggregate: string, value: unknown): unknown {
     case "person":
       return {
         ...fields,
-        parents: thingsOf(fields.parents).map((link) =>
-          link.parent === ERASED ? { ...link, parent: "unknown", union: null } : link,
-        ),
+        parents: linksWithoutErased(fields.parents),
         childOrder: withoutMark(fields.childOrder),
       };
     case "union":
@@ -100,6 +98,26 @@ export function withoutErased(aggregate: string, value: unknown): unknown {
     default:
       return value;
   }
+}
+
+/**
+ * Links to somebody erased since are to a parent nobody knows. A link named by that parent carries the
+ * mark in its name, and is named as a link to nobody known is, by a number when that is taken.
+ */
+function linksWithoutErased(links: unknown): Thing[] {
+  const all = thingsOf(links);
+  const isMarked = (id: string) => id === ERASED || id.includes(ERASED_IN_WORDS);
+  const taken = new Set(all.map(({ id }) => id).filter((id) => !isMarked(id)));
+  return all.map((link) => {
+    if (link.parent !== ERASED) return link;
+    let { id } = link;
+    if (isMarked(id)) {
+      id = "unknown";
+      for (let n = 2; taken.has(id); n++) id = `unknown-${n}`;
+      taken.add(id);
+    }
+    return { ...link, id, parent: "unknown", union: null };
+  });
 }
 
 function unionWithoutErased(union: Fields): Fields | null {

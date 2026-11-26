@@ -8,7 +8,7 @@ import {
   type Trashed,
   wholeNames,
 } from "../contexts/history";
-import type { PersonWritten } from "../contexts/kinship";
+import type { Parentage, PersonWritten } from "../contexts/kinship";
 import { factOf, type LifeEvent } from "../contexts/life";
 import type { EventId, MemberId, PersonId } from "../kernel/id";
 import type { NameForm } from "../kernel/name-form";
@@ -82,6 +82,14 @@ export function eraseHere(
       const trashed = c.history.trash.get(id);
       if (trashed !== null) {
         c.history.trash.put(id, null);
+        // A link of a child to them never comes back, and neither do its citations.
+        for (const { child, parentage } of trashed.children) {
+          const fact = `parentage:${(parentage as Parentage).id}`;
+          for (const one of c.evidence.citationsOf(child).filter((it) => it.fact.fact === fact)) {
+            const taken = c.evidence.uncite(one.fact, one.id);
+            if (!taken.ok) return taken;
+          }
+        }
         // What goes over to others does not name the one who goes, in words either.
         for (const event of trashed.events as LifeEvent[]) {
           handOver(c, trashed, event, newId, (value) => withoutNames(value, words) as typeof value);
@@ -200,8 +208,9 @@ function handOver(
   for (const citation of citations) c.evidence.cite(citation);
 }
 
-/** Somebody in the trash without any link to an erased person. */
+/** Somebody in the trash without any link to an erased person, nor a citation of one. */
 function untied(trashed: Trashed, id: PersonId): Trashed {
-  const marked = scrubbed(trashed, id, wordsOf([])) as Trashed;
+  const citations = (trashed.citations as Citation[]).filter(({ fact }) => !fact.fact.includes(id));
+  const marked = scrubbed({ ...trashed, citations }, id, wordsOf([])) as Trashed;
   return withoutErased(`trash/${trashed.id}`, marked) as Trashed;
 }

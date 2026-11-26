@@ -89,10 +89,21 @@ export function withoutPerson(patches: readonly Patch[], id: PersonId, words: Wo
     .filter(({ aggregate }) => !isOf(aggregate, id))
     .map(({ aggregate, path, before, after }) => ({
       aggregate,
-      path,
+      path: pathWithout(path, id),
       before: scrubbed(before, id, words),
       after: scrubbed(after, id, words),
     }));
+}
+
+/**
+ * A path with the same mark as the values it leads to: a thing in a list is named by its identifier,
+ * and a link of a child is named by the parent ("parents/<id>", "parents/<id>-2").
+ */
+export function pathWithout(path: string, id: PersonId): string {
+  return path
+    .split("/")
+    .map((step) => (step === id ? erased : step.replaceAll(id, ERASED_IN_WORDS)))
+    .join("/");
 }
 
 /** A value with a mark in the place of a person and of the whole names. */

@@ -58,7 +58,7 @@ Scenarios take inputs by the strict schemas of `src/shared/scenarios.ts`. A fact
 
 The journal is never thinned, and any version can be rebuilt from it: `src/shared/reverse.ts` takes patches back, for the server and the browser. Undo, a return to a version and starting over put authored values back through `putBack` of each context, which works out the mirrors and refuses the impossible. A checkpoint is for speed and may be thrown away. A person in the trash lies in `history_trash` with every link, and a restore runs the ordinary commands, so its preview is the restore itself, not kept.
 
-An erasure is remembered in `FamilyAccess` first, then takes the person out of the tree, the trash and the whole journal in one transaction (`src/scenarios/erase.ts`). In the journal "erased" stands where others were tied to them. A new table or text that can name a person must be covered by `test/storage/erase.test.ts`, which looks into every raw row of both objects.
+An erasure is remembered in `FamilyAccess` first, then takes the person out of the tree, the trash and the whole journal in one transaction (`src/scenarios/erase.ts`). In the journal "erased" stands where others were tied to them, in values and in the paths that name a link by them; citations of their links go with them, and after an erasure only `access_erased` holds their identifier. A new table or text that can name a person must be covered by `test/storage/erase.test.ts`, which looks into every raw row of both objects.
 
 ## Table import
 

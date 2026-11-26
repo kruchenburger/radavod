@@ -74,6 +74,20 @@ describe("a past with somebody erased", () => {
     });
   });
 
+  it("names a link that was named by the erased as a link to nobody known", () => {
+    const person = {
+      parents: [
+        { id: "erased", parent: "erased", union: null },
+        { id: "unknown", parent: "unknown", union: null },
+        { id: "[erased]-2", parent: "erased", union: null },
+      ],
+      childOrder: [],
+    };
+    expect(withoutErased("person/x", person)).toMatchObject({
+      parents: [{ id: "unknown-2" }, { id: "unknown" }, { id: "unknown-3" }],
+    });
+  });
+
   it("has a union with whoever is left, and none of nobody", () => {
     const union = (...partners: string[]) =>
       withoutErased("union/u", { partners, kind: "civil" }) as { partners: string[] } | null;
