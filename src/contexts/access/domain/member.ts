@@ -2,6 +2,7 @@ import { type Write, writes } from "../../../kernel/change";
 import type { MemberId, PersonId } from "../../../kernel/id";
 import { type Missing, missing } from "../../../kernel/refusal";
 import type { Result } from "../../../kernel/result";
+import type { Challenge } from "./challenge";
 import type { Credential } from "./credential";
 import type { Invitation } from "./invitation";
 import { type Action, can, type Role } from "./rights";
@@ -26,7 +27,12 @@ export type Change = (
   | Write<"credential", string, Credential>
   | Write<"session", string, Session>
   | Write<"setup", string, SetupCode>
+  | Write<"challenge", string, Challenge>
+  | Write<"family", "family", Family>
 )[];
+
+/** The family as its members know it. */
+export type Family = { name: string };
 
 /** A setup code that let a keeper in, by its hash. Each code does so once. */
 export type SetupCode = { hash: string; usedAt: number };
@@ -53,6 +59,10 @@ export interface AccessReader {
   /** A session by the hash of its token. */
   session(hash: string): Session | null;
   sessionsOf(member: MemberId): Session[];
+  /** A step of signing in, by the hash of its token. */
+  challenge(hash: string): Challenge | null;
+  /** Null until the family is set up. */
+  family(): Family | null;
 }
 
 export type Forbidden = { code: "forbidden" };

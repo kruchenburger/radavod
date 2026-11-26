@@ -9,7 +9,16 @@ import {
   revokeCredential,
 } from "../domain/credential";
 import {
+  type Challenge,
+  type Expired,
+  openChallenge,
+  type Purpose,
+  takeChallenge,
+} from "../domain/challenge";
+import {
+  type Invitation,
   invite,
+  liveInvitation,
   recover,
   redeem,
   type RedeemError,
@@ -59,7 +68,11 @@ export type AccessError =
   | Missing
   | Duplicate
   | CredentialError
-  | RedeemError;
+  | RedeemError
+  | Expired;
+
+/** A step of signing in as it begins. */
+export type NewChallenge = Parameters<typeof openChallenge>[0];
 
 /**
  * Members, invitations, credentials and sessions of a family. A command that is refused or changes
@@ -76,7 +89,26 @@ export interface Access {
     now: number;
     /** The hash of the setup code: a new one lets in one more keeper, each only once. */
     code: string;
+    /** The name of the family, kept when it is set up first. */
+    family?: string;
   }): Result<Change, AccessError>;
+  /** The name of the family, null until it is set up. */
+  family(): string | null;
+  /** Whether a setup code, by its hash, already let a keeper in. */
+  isCodeUsed(hash: string): boolean;
+  credential(id: string): Credential | null;
+  /** What a live invitation is, without spending it. */
+  inspect(hash: string, now: number): Result<Invitation, AccessError>;
+  /** The invitations a keeper gave or may see. */
+  invitations(by: MemberId): Result<Invitation[], AccessError>;
+  /** Begins a step of signing in. */
+  openChallenge(input: NewChallenge, now: number): void;
+  /** Ends a step of signing in: it is answered once, whatever the answer. */
+  takeChallenge<P extends Purpose>(
+    hash: string,
+    purpose: P,
+    now: number,
+  ): Result<Extract<Challenge, { purpose: P }>, AccessError>;
   invite(
     by: MemberId,
     input: { id: string; hash: string; role: Role; person: PersonId | null; now: number },
@@ -104,6 +136,7 @@ export interface Access {
     credential: string;
     now: number;
     country?: unknown;
+    counter?: number;
   }): Result<Change, AccessError>;
   /** Who a session is, its end moved on; null for one that is over. */
   session(hash: string, now: number): Signed | null;
@@ -139,6 +172,20 @@ export function accessOver(store: AccessStore): Access {
     member: (id) => store.member(id),
     members: () => store.members(),
     credentialsOf: (id) => store.credentialsOf(id),
+    family: () => store.family()?.name ?? null,
+    isCodeUsed: (hash) => store.isCodeUsed(hash),
+    credential: (id) => store.credential(id),
+    inspect: (hash, now) => liveInvitation(store, hash, now),
+    invitations(by) {
+      const keeper = allowed(store, by, "manage-members");
+      return keeper.ok ? { ok: true, value: store.invitations() } : keeper;
+    },
+    openChallenge: (input, now) => store.save(openChallenge(input, now)),
+    takeChallenge(hash, purpose, now) {
+      const { change, taken } = takeChallenge(store, hash, purpose, now);
+      if (change.length > 0) store.save(change);
+      return taken;
+    },
     setUp: (input) => saved(setUp(store, input)),
     invite(by, input) {
       const tries = store.triesOf("invite", by, windowStart("invite", input.now));

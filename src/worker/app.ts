@@ -2,13 +2,21 @@ import { Hono } from "hono";
 import type { Config } from "../shared/config";
 import type { Health } from "../shared/health";
 import { parseSamplePath, SAMPLE_FILE } from "../shared/sample-path";
+import { type Api, gate } from "./auth";
 import type { Env } from "./env";
+import { memberRoutes } from "./routes/members";
+import { signInRoutes } from "./routes/sign-in";
 import { FAMILY_ID, stubFor } from "./stub";
 
-export const app = new Hono<{ Bindings: Env }>();
+export const app = new Hono<Api>();
 
-// Default deny, ahead of every route: no session exists yet, so no data route is open.
-app.all("/api/*", (c) => c.json({ error: "unauthorized" }, 401));
+// Ahead of every route: a changing request comes from the site, and nothing but signing in is open
+// without a session.
+app.use("/api/*", gate);
+signInRoutes(app);
+memberRoutes(app);
+// Whatever else a member asks of `/api` is not there yet.
+app.all("/api/*", (c) => c.json({ error: "not-found" }, 404));
 
 app.get("/health", async (c) => {
   const [tree, access] = await Promise.all([

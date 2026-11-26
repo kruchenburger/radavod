@@ -1,0 +1,118 @@
+import type { Hono } from "hono";
+import { can } from "../../contexts/access";
+import type { MemberId } from "../../kernel/id";
+import { inviteInput, type LinkAnswer, roleInput, versionInput } from "../../shared/access";
+import { accessOf, allow, type Api, type ApiContext, clearedCookie, refused } from "../auth";
+import { hashOf, newSecret } from "../secrets";
+import { badRequest, bodyOf, sessionAnswerOf } from "./passkeys";
+
+/** Who is signed in, the members of the family, and one's own account. Each needs a session. */
+export function memberRoutes(app: Hono<Api>): void {
+  app.get("/api/session", allow("own-account"), async (c) => {
+    const { member, role, person } = c.get("signed");
+    return c.json(await sessionAnswerOf(c, member, role, person));
+  });
+
+  app.post("/api/logout", allow("own-account"), async (c) => {
+    await accessOf(c).signOut(await hashOf(c.get("token")));
+    c.header("set-cookie", clearedCookie());
+    return c.body(null, 204);
+  });
+
+  // Everybody sees the names; a keeper sees credentials and invitations too.
+  app.get("/api/members", allow("see-members"), async (c) => {
+    const access = accessOf(c);
+    const signed = c.get("signed");
+    const members = (await access.members()).filter(({ revokedAt }) => revokedAt === null);
+    if (!can(signed.role, "manage-members")) {
+      return c.json({ members: members.map(({ id, name, role }) => ({ id, name, role })) });
+    }
+    const invitations = await access.invitations(signed.member);
+    const all = await access.members();
+    return c.json({
+      members: await Promise.all(
+        all.map(async (one) => ({ ...one, credentials: await access.credentialsOf(one.id) })),
+      ),
+      invitations: invitations.ok ? invitations.value.map(({ hash: _hash, ...one }) => one) : [],
+    });
+  });
+
+  app.post("/api/members/invitations", allow("manage-members"), async (c) => {
+    const input = await bodyOf(c, inviteInput);
+    if (input === null) return badRequest(c);
+    return linkOf(c, (id, hash, now) =>
+      accessOf(c).invite(c.get("signed").member, { id, hash, ...input, now }),
+    );
+  });
+
+  app.delete("/api/members/invitations/:id", allow("manage-members"), async (c) => {
+    const done = await accessOf(c).revokeInvitation(c.get("signed").member, c.req.param("id"));
+    return done.ok ? c.body(null, 204) : refused(c, done.error);
+  });
+
+  app.post("/api/members/:id/role", allow("manage-members"), async (c) => {
+    const input = await bodyOf(c, roleInput);
+    if (input === null) return badRequest(c);
+    const id = c.req.param("id") as MemberId;
+    const done = await accessOf(c).changeRole(c.get("signed").member, id, input.role, Date.now(), {
+      [`member/${id}`]: input.version,
+    });
+    return done.ok ? c.body(null, 204) : refused(c, done.error);
+  });
+
+  app.post("/api/members/:id/revoke", allow("manage-members"), async (c) => {
+    const input = await bodyOf(c, versionInput);
+    if (input === null) return badRequest(c);
+    const id = c.req.param("id") as MemberId;
+    const done = await accessOf(c).revoke(c.get("signed").member, id, Date.now(), {
+      [`member/${id}`]: input.version,
+    });
+    return done.ok ? c.body(null, 204) : refused(c, done.error);
+  });
+
+  // A link back into an account whose devices are lost; its old sign-ins end at once.
+  app.post("/api/members/:id/recovery", allow("manage-members"), async (c) => {
+    const member = c.req.param("id") as MemberId;
+    return linkOf(c, (id, hash, now) =>
+      accessOf(c).recover(c.get("signed").member, { id, hash, member, now }),
+    );
+  });
+
+  app.get("/api/members/log", allow("manage-members"), async (c) => {
+    const log = await accessOf(c).log(c.get("signed").member);
+    return log.ok ? c.json({ log: log.value }) : refused(c, log.error);
+  });
+
+  // One's own credential, or anybody's for a keeper: the rule says which.
+  app.post("/api/credentials/:id/revoke", allow("own-account"), async (c) => {
+    const done = await accessOf(c).revokeCredential(
+      c.get("signed").member,
+      c.req.param("id"),
+      Date.now(),
+    );
+    return done.ok ? c.body(null, 204) : refused(c, done.error);
+  });
+
+  app.delete("/api/account", allow("own-account"), async (c) => {
+    const done = await accessOf(c).deleteAccount(c.get("signed").member);
+    if (!done.ok) return refused(c, done.error);
+    c.header("set-cookie", clearedCookie());
+    return c.body(null, 204);
+  });
+}
+
+/** Gives a link: an id and a secret made here, kept by its hash, shown to the keeper once. */
+async function linkOf(
+  c: ApiContext,
+  give: (
+    id: string,
+    hash: string,
+    now: number,
+  ) => Promise<{ ok: true; value: { expiresAt: number } } | { ok: false; error: { code: string } }>,
+): Promise<Response> {
+  const [id, secret] = [newSecret(), newSecret()];
+  const done = await give(id, await hashOf(secret), Date.now());
+  if (!done.ok) return refused(c, done.error);
+  const answer: LinkAnswer = { id, secret, expiresAt: done.value.expiresAt };
+  return c.json(answer, 201);
+}

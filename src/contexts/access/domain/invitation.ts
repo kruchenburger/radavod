@@ -47,14 +47,26 @@ export type RedeemError = Spent | Expired | Missing | Duplicate | CredentialErro
 // The caller checks that the code is the setup code of the installation now; here each code counts once.
 export function setUp(
   reader: AccessReader,
-  input: { member: NewMember; credential: NewCredential; now: number; code: string },
+  input: {
+    member: NewMember;
+    credential: NewCredential;
+    now: number;
+    code: string;
+    /** The name of the family, kept when it is set up first. */
+    family?: string;
+  },
 ): Result<Change, SetUp | Duplicate | CredentialError> {
   const { member, credential, now, code } = input;
   if (reader.isCodeUsed(code)) return { ok: false, error: { code: "set-up" } };
   const made = joined(reader, { ...member, role: "keeper", person: null }, credential, now);
   if (!made.ok) return made;
   const used = writes("setup", code, null, { hash: code, usedAt: now });
-  return { ok: true, value: [...made.value, ...used] };
+  const family = reader.family();
+  const named =
+    family === null && input.family !== undefined
+      ? writes("family", "family" as const, null, { name: input.family })
+      : [];
+  return { ok: true, value: [...made.value, ...used, ...named] };
 }
 
 export function invite(
@@ -138,12 +150,9 @@ export function redeem(
   input: { hash: string; now: number; member?: NewMember; credential: NewCredential },
 ): Result<{ change: Change; member: MemberId }, RedeemError> {
   const { hash, now, credential } = input;
-  const invitation = reader.invitationByHash(hash);
-  if (invitation === null) return missing("invitation");
-  if (invitation.spentAt !== null) return { ok: false, error: { code: "spent" } };
-  if (now >= invitation.expiresAt) return { ok: false, error: { code: "expired" } };
-  // A link is worth what its giver may still do: one lowered or revoked since gives nothing.
-  if (!allowed(reader, invitation.by, "manage-members").ok) return missing("invitation");
+  const live = liveInvitation(reader, hash, now);
+  if (!live.ok) return live;
+  const invitation = live.value;
   const spent = writes("invitation", invitation.id, invitation, { ...invitation, spentAt: now });
   if (invitation.kind === "recovery") {
     const member = invitation.member === null ? null : reader.member(invitation.member);
@@ -159,6 +168,21 @@ export function redeem(
   const made = joined(reader, { ...input.member, role, person }, credential, now);
   if (!made.ok) return made;
   return { ok: true, value: { change: [...spent, ...made.value], member: input.member.id } };
+}
+
+/** An invitation that still lets somebody in: not spent, not over, and of a giver who still may. */
+export function liveInvitation(
+  reader: AccessReader,
+  hash: string,
+  now: number,
+): Result<Invitation, Missing | Spent | Expired> {
+  const invitation = reader.invitationByHash(hash);
+  if (invitation === null) return missing("invitation");
+  if (invitation.spentAt !== null) return { ok: false, error: { code: "spent" } };
+  if (now >= invitation.expiresAt) return { ok: false, error: { code: "expired" } };
+  // A link is worth what its giver may still do: one lowered or revoked since gives nothing.
+  if (!allowed(reader, invitation.by, "manage-members").ok) return missing("invitation");
+  return { ok: true, value: invitation };
 }
 
 /** Recovery links of a member not yet spent go: only the last one given, or used, counts. */

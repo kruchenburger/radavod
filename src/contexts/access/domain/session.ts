@@ -18,7 +18,13 @@ export type Signed = { member: MemberId; role: Role; person: PersonId | null; ex
 
 export function signIn(
   reader: AccessReader,
-  input: { hash: string; credential: string; now: number },
+  input: {
+    hash: string;
+    credential: string;
+    now: number;
+    /** What a passkey counts its uses at now, as it said when it signed. */
+    counter?: number;
+  },
 ): Result<Change, Missing | Duplicate> {
   const { hash, now } = input;
   if (reader.session(hash) !== null) return duplicate;
@@ -35,7 +41,11 @@ export function signIn(
   return {
     ok: true,
     value: [
-      ...writes("credential", credential.id, credential, { ...credential, lastUsedAt: now }),
+      ...writes("credential", credential.id, credential, {
+        ...credential,
+        lastUsedAt: now,
+        ...(input.counter === undefined ? {} : { counter: input.counter }),
+      }),
       ...writes("session", hash, null, session),
     ],
   };

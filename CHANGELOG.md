@@ -19,6 +19,7 @@ The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), and
 - The history of versions: undoing an edit, looking at any past state and returning to it, starting over, the trash, and erasing a person for ever. No screen uses them yet.
 - Adding a relative, editing a person, citing a fact and saying how well it is known, giving a branch, and the snapshot of the tree with what changed since a version. No screen uses them yet; the example is made by the same code.
 - The rules of access: roles and what each may do, invitations, recovery links, passkeys, a bound device for a reader, sliding sessions, and a keeper who can always sign in. They are kept in the object of sign-in with a sign-in log and limits of tries; nothing serves them over HTTP yet.
+- Signing in over HTTP: setting a family up with a code, invitations and recovery links, passkeys, a bound device for a reader, sessions in a cookie, and the routes of members, each admitting the roles of the table. No screen uses them yet.
 - Guards for the architecture, the texts, licenses and a real family's data. The last one reads every commit of a pull request and, with the hook turned on, every commit before a push.
 - Checks on every pull request: browser tests, accessibility, secrets and known vulnerabilities.
 
