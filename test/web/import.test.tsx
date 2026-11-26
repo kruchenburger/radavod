@@ -124,6 +124,18 @@ describe("the import of a table", () => {
     expect(screen.getByLabelText("Файл таблицы")).toBeTruthy();
   });
 
+  it("says that people in the trash keep the tree from being empty", async () => {
+    serve({
+      "GET /api/session": { body: keeper },
+      "POST /api/import/table/preview": { status: 409, body: { error: "trash-not-empty" } },
+    });
+    render(<App />);
+    await choose(table);
+    expect((await screen.findByRole("alert")).textContent).toContain(
+      "В корзине ещё есть люди, а с ними древо не пустое. Чтобы добавить таблицу, сотрите их насовсем.",
+    );
+  });
+
   it("does not send a file that is not in UTF-8", async () => {
     const asked = serve({ "GET /api/session": { body: keeper } });
     render(<App />);

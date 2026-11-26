@@ -62,7 +62,7 @@ An erasure is remembered in `FamilyAccess` first, then takes the person out of t
 
 ## Table import
 
-A keeper imports a family table from a spreadsheet saved as CSV (`/import`). `readTable` of `exchange` (`src/contexts/exchange/domain/table.ts`) says above itself which column means what, reads every row as far as it can and names each problem with its row. `src/scenarios/import-table.ts` writes the table through the commands of the contexts into a tree without people, as one entry, and tells a parent that kinship refuses as a problem of its row instead of refusing the table; the same scenario run as a preview is what the keeper sees first. The session says by `can` whether the member may import. `test/exchange/family-table.csv` is an invented table in that format.
+A keeper imports a family table from a spreadsheet saved as CSV (`/import`). `readTable` of `exchange` (`src/contexts/exchange/domain/table.ts`) says above itself which column means what, reads every row as far as it can and names each problem with its row. `src/scenarios/import-table.ts` writes the table through the commands of the contexts into a tree with nobody in it, the trash included, as one entry, and tells a parent that kinship refuses as a problem of its row instead of refusing the table; the same scenario run as a preview is what the keeper sees first. The session says by `can` whether the member may import. `test/exchange/family-table.csv` is an invented table in that format.
 
 ## Access
 

@@ -3,11 +3,12 @@ import { describe, expect, it } from "vitest";
 import { factOf } from "../../src/contexts/life";
 import type { Id, PersonId } from "../../src/kernel/id";
 import { importTable, type NewId } from "../../src/scenarios/import-table";
+import { restore, trash } from "../../src/scenarios/trash";
 import { undo } from "../../src/scenarios/undo";
 import { snapshotOf } from "../../src/shared/snapshot";
 import family from "../exchange/family-table.csv?raw";
 import { csv } from "../exchange/tables";
-import { accepted, addPerson, idOf, inTree, type Tree } from "../storage/tree";
+import { accepted, addPerson, anna, idOf, inTree, person, type Tree } from "../storage/tree";
 
 /** Identifiers that say the order they were made in. */
 function counting(): NewId {
@@ -99,6 +100,22 @@ describe("importing a family table", () => {
         error: { code: "tree-not-empty" },
       });
       expect(tree.entries).toBe(1);
+    }));
+
+  it("goes not into a tree whose people are in the trash, until they are back or gone", () =>
+    inTree((tree) => {
+      tree.do((c) => addPerson(c, "ada"));
+      accepted(tree.run((c) => trash(c, person("ada"), { actor: anna, now: 5 })));
+      expect(tree.read((c) => c.kinship.someone())).toBe(false);
+      const refused = { ok: false, error: { code: "trash-not-empty" } };
+      expect(tree.work.preview((c) => importTable(c, family, counting()))).toEqual(refused);
+      expect(tree.run((c) => importTable(c, family, counting()))).toEqual(refused);
+      accepted(tree.run((c) => restore(c, person("ada"))));
+      expect(tree.run((c) => importTable(c, family, counting()))).toEqual({
+        ok: false,
+        error: { code: "tree-not-empty" },
+      });
+      expect(tree.entries).toBe(3);
     }));
 
   it("is undone as one edit, and leaves an empty tree", () =>

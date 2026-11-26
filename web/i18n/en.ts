@@ -507,6 +507,8 @@ export const en = {
     "Row {row}: the patronymic “{value}” is a woman's, but the sex is male. It's kept as in the table.",
   "error.tree-not-empty":
     "The tree already has people in it. A table can only go into a tree with no one in it yet.",
+  "error.trash-not-empty":
+    "There are still people in the trash, so the tree isn't empty. To add the table, erase them for good.",
   "error.too-large":
     "The table is too big: up to 5,000 rows and 2 MB. Remove the extra rows and choose the file again.",
   "error.not-utf8": "The file isn't in UTF-8. Save the table as “CSV UTF-8” and choose it again.",

@@ -39,7 +39,10 @@ export function importTable(
 ): Result<TablePreview, ImportTableError> {
   const read = readTable(text);
   if (!read.ok) return read;
-  const empty = intoEmptyTree(c.kinship.someone());
+  const empty = intoEmptyTree({
+    hasPeople: c.kinship.someone(),
+    hasTrashed: c.history.trash.everybody().length > 0,
+  });
   if (!empty.ok) return empty;
   const table = read.value;
 

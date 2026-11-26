@@ -162,6 +162,7 @@ const statuses: Record<string, 400 | 401 | 403 | 404 | 409 | 410 | 413 | 429> = 
   "rate-limited": 429,
   "step-over": 410,
   "tree-not-empty": 409,
+  "trash-not-empty": 409,
   "too-large": 413,
 };
 
