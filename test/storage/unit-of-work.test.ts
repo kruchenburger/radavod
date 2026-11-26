@@ -860,12 +860,14 @@ describe("a place and a source", () => {
 });
 
 describe("the object", () => {
-  it("gives the outside a ping, the snapshot and what changed, and wakes for nothing else", () => {
+  it("gives the outside a ping, the snapshot, what changed and the import of a table, and wakes for nothing else", () => {
     expect(Object.getOwnPropertyNames(FamilyTree.prototype)).toEqual([
       "constructor",
       "ping",
       "snapshot",
       "changesSince",
+      "previewTable",
+      "importTable",
       "alarm",
     ]);
   });
