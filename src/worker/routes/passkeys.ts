@@ -43,10 +43,15 @@ export async function registration(
 ) {
   const site = siteOf(c);
   if (site === null) return notConfigured(c);
-  // A member who goes by a nickname has no name yet: the phone shows its keys, never an empty account.
+  // A member who goes by a nickname has no name yet: the phone shows its keys, capitalised, never an
+  // empty account. The server has no catalogs to write the words in a language, and a passkey keeps
+  // the name it was made with, whatever the member writes later.
   const { name, nickname } = member;
+  const capital = (key: string) => `${key.charAt(0).toUpperCase()}${key.slice(1)}`;
   const userName =
-    name !== "" || nickname == null ? name : `${nickname.adjective} ${nickname.creature}`;
+    name !== "" || nickname == null
+      ? name
+      : `${capital(nickname.adjective)} ${capital(nickname.creature)}`;
   // One challenge for both: the proof and the new passkey answer the same step.
   const challenge = crypto.getRandomValues(new Uint8Array(32));
   const options = await generateRegistrationOptions({

@@ -225,7 +225,16 @@ describe("an invitation", () => {
     ).toBeTruthy();
     fireEvent.blur(name);
     expect(screen.queryByText("Напишите ваше имя.")).toBeNull();
+    // Emptied, the field says what stays; written again, who wrote the name.
+    type(/Ваше имя/u, " ");
+    expect(screen.getByText("Если оставить поле пустым, останется «Dina».")).toBeTruthy();
+    expect(
+      screen.queryByText("Это имя написал тот, кто вас пригласил. Его можно изменить."),
+    ).toBeNull();
     type(/Ваше имя/u, "Dina Oak");
+    expect(
+      screen.getByText("Это имя написал тот, кто вас пригласил. Его можно изменить."),
+    ).toBeTruthy();
     press("Создать ключ доступа");
     await waitFor(() => expect(window.location.pathname).toBe("/family"));
     expect(asked.find(({ key }) => key === "POST /api/passkey/register/options")?.body).toEqual({
@@ -480,6 +489,11 @@ describe("the members", () => {
     });
     open("/family");
     expect(await screen.findByText("Каждому родственнику нужна своя ссылка.")).toBeTruthy();
+    expect(
+      screen.getByText(
+        "Можно не писать: тогда родственник получит шуточное имя и сможет написать своё.",
+      ),
+    ).toBeTruthy();
     press("Создать приглашение");
     await screen.findByRole("textbox", { name: "Ссылка" });
     type(/Кого вы приглашаете/u, "  Dina ");

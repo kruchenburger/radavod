@@ -403,7 +403,8 @@ describe("a name for whom a link lets in", () => {
     );
     // The passkey is called by the nickname, by its keys: the phone shows no empty account.
     const { adjective, creature } = link.nickname ?? { adjective: "", creature: "" };
-    expect(options.body.options.user.name).toBe(`${adjective} ${creature}`);
+    const capital = (key: string) => `${key.charAt(0).toUpperCase()}${key.slice(1)}`;
+    expect(options.body.options.user.name).toBe(`${capital(adjective)} ${capital(creature)}`);
     const response = await dino.passkey.register(options.body.options as never);
     const joined = await dino.json<Answer>("POST", "/api/passkey/register/verify", {
       body: { flow: options.body.flow, response },
@@ -416,9 +417,11 @@ describe("a name for whom a link lets in", () => {
       name: "Dina",
       nickname: null,
     });
-    expect((await dino.json("POST", "/api/account/name", { body: { name: " " } })).status).toBe(
-      400,
-    );
+    // A blank name reaches the rule of the domain, which says what is wrong with it.
+    expect(await dino.json("POST", "/api/account/name", { body: { name: " " } })).toMatchObject({
+      status: 400,
+      body: { error: "name-required" },
+    });
   });
 });
 

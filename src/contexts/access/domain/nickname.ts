@@ -119,9 +119,7 @@ export function nicknameFor(
     if (member.nickname !== null) taken.add(keyOf(member.nickname));
   }
   for (const invitation of reader.invitations()) {
-    if (invitation.spentAt === null && invitation.nickname !== null) {
-      taken.add(keyOf(invitation.nickname));
-    }
+    if (invitation.nickname !== null) taken.add(keyOf(invitation.nickname));
   }
   const free = from.adjectives
     .flatMap((adjective) => from.creatures.map((creature) => ({ adjective, creature })))

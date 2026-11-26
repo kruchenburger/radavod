@@ -73,7 +73,8 @@ export const inviteInput = z.strictObject({
 });
 
 /** The name a member writes for themselves. */
-export const renameInput = z.strictObject({ name: nameSchema });
+// A blank name passes: the domain refuses it, by its own code.
+export const renameInput = z.strictObject({ name: z.string().max(200) });
 
 /** The version of the member the keeper saw. */
 export const roleInput = z.strictObject({ role: roleSchema, version: z.int().nonnegative() });

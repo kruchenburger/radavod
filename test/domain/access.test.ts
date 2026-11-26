@@ -622,7 +622,24 @@ describe("a nickname", () => {
     expect(invite(store, member("ann"), link("named", { name: "Vera" })).ok).toBe(true);
   });
 
-  it("stays taken by a revoked member, whom a keeper still sees, and not by a spent link", () => {
+  it("stays taken by a used link still kept, though whom it let in wrote a name", () => {
+    const { access, store } = family();
+    expect(access.invite(member("ann"), link("a")).ok).toBe(true);
+    const nickname = store.invitation("a")?.nickname;
+    if (nickname == null) throw new Error("no nickname");
+    const redeem = {
+      hash: "a",
+      now: start,
+      member: { id: member("bob"), name: "Bob" },
+      credential: passkey("b"),
+    };
+    expect(access.redeem(redeem).ok).toBe(true);
+    expect(access.member(member("bob"))).toMatchObject({ name: "Bob", nickname: null });
+    const only = { adjectives: [nickname.adjective], creatures: [nickname.creature] };
+    expect(nicknameFor(store, 0, only)).toBeNull();
+  });
+
+  it("stays taken by a revoked member, whom a keeper still sees", () => {
     const { access, store } = family();
     expect(access.invite(member("ann"), link("a")).ok).toBe(true);
     const redeem = {

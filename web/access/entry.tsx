@@ -110,7 +110,12 @@ function Invitation({ secret, invitation }: { secret: string; invitation: Invita
   const named = isNew && written !== "" ? { name: written } : {};
   const isReady = isOptional || written !== "";
   const nameInput = (
-    <NameInput value={name} onChange={setName} isOptional={isOptional} {...hintOf(t, invitation)} />
+    <NameInput
+      value={name}
+      onChange={setName}
+      isOptional={isOptional}
+      {...hintOf(t, invitation, name.trim() === "")}
+    />
   );
   // A messenger's own browser often says it can and then cannot: it goes to a real one.
   const hasPasskeys = canUsePasskeys() && !isInApp();
@@ -311,8 +316,11 @@ function Form<T>({
 function hintOf(
   t: ReturnType<typeof useLanguage>["t"],
   { name, nickname }: InvitationAnswer,
+  isEmpty: boolean,
 ): { hint?: string } {
-  if (name !== null && name !== "") return { hint: t("join.keeperName") };
+  if (name !== null && name !== "") {
+    return { hint: isEmpty ? t("join.keeperNameEmpty", { name }) : t("join.keeperName") };
+  }
   const called = nickname === null ? "" : nameOf(t, { name: "", nickname });
   return called === "" ? {} : { hint: t("join.nickname", { nickname: called }) };
 }

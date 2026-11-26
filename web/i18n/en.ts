@@ -312,9 +312,9 @@ export const en = {
 
   "invite.name": "Who you're inviting",
   "invite.nameHint":
-    "You can leave it empty: the link gets a playful nickname, and your relative can write their own name.",
+    "You can leave it empty: your relative gets a playful nickname and can write their own name.",
   "invite.onePerson": "Each relative needs their own link.",
-  "invite.withdrawCost": "No one will be able to join with this link.",
+  "invite.withdrawCost": "No one will be able to use this link.",
   "join.nickname":
     "If you leave this blank, your relatives will see you as “{nickname}.” You can add your name later in your account.",
   "account.nickname": "This is a playful nickname. Write your real name.",
@@ -323,6 +323,7 @@ export const en = {
   "invite.untilUnnamed": "{role}, works until {date}",
   "invite.spentUnnamed": "{role}, link used {date}",
   "join.keeperName": "The person who invited you wrote this name. You can change it.",
+  "join.keeperNameEmpty": "If you leave this blank, you'll stay “{name}.”",
   "account.rename": "Save name",
   "account.renamed": "Your name is now {name}",
   "error.name-required": "Write a name.",

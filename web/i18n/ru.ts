@@ -331,7 +331,7 @@ export const ru = {
 
   "invite.name": "Кого вы приглашаете",
   "invite.nameHint":
-    "Можно не писать: тогда у ссылки будет шуточное имя, а родственник сможет написать своё.",
+    "Можно не писать: тогда родственник получит шуточное имя и сможет написать своё.",
   "invite.onePerson": "Каждому родственнику нужна своя ссылка.",
   "invite.withdrawCost": "По этой ссылке больше нельзя будет войти.",
   "join.nickname":
@@ -342,6 +342,7 @@ export const ru = {
   "invite.untilUnnamed": "{role}, действует до {date}",
   "invite.spentUnnamed": "{role}, ссылка использована {date}",
   "join.keeperName": "Это имя написал тот, кто вас пригласил. Его можно изменить.",
+  "join.keeperNameEmpty": "Если оставить поле пустым, останется «{name}».",
   "account.rename": "Сохранить имя",
   "account.renamed": "Теперь ваше имя: {name}",
   "error.name-required": "Напишите имя.",
