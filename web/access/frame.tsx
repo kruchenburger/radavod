@@ -9,7 +9,7 @@ import { sessionQuery } from "./session";
 import classes from "./members.module.css";
 
 type FrameProps = {
-  current: "members" | "account";
+  current: "members" | "account" | "import";
   children: (session: SessionAnswer) => ReactNode;
 };
 
@@ -52,6 +52,11 @@ export function SignedIn({ current, children }: FrameProps) {
           <Link href="/account" aria-current={current === "account" ? "page" : undefined}>
             {t("nav.account")}
           </Link>
+          {session.data.mayImport && (
+            <Link href="/import" aria-current={current === "import" ? "page" : undefined}>
+              {t("nav.import")}
+            </Link>
+          )}
         </nav>
         <div className={classes.tools}>
           <LanguageChoice />

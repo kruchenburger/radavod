@@ -212,6 +212,7 @@ export const en = {
   "nav.pages": "Sections",
   "nav.members": "Members",
   "nav.account": "Account",
+  "nav.import": "Import",
   "role.reader": "reader",
   "role.editor": "editor",
   "role.keeper": "keeper",
@@ -448,4 +449,68 @@ export const en = {
   "nickname.creature.swan": "Swan",
   "nickname.creature.cat": "Cat",
   "nickname.creature.panda": "Panda",
+  "import.title": "Import a table",
+  "import.about":
+    "A CSV file in UTF-8, comma-separated, with no header row. Columns: generation (0 for the youngest), surname, given name, patronymic, sex, day, month and year of birth, death, questionnaire, spouse's initials, notes, link, father's row number, mother's row number.",
+  "import.file": "Table file",
+  "import.reading": "Reading the table…",
+  "import.added": "What will be added",
+  "import.people": { one: "{count} person", other: "{count} people" },
+  "import.unions": { one: "{count} union", other: "{count} unions" },
+  "import.parents": { one: "{count} kinship record", other: "{count} kinship records" },
+  "import.births": { one: "{count} birth record", other: "{count} birth records" },
+  "import.deaths": { one: "{count} death record", other: "{count} death records" },
+  "import.sources": { one: "{count} source", other: "{count} sources" },
+  "import.skipped": "The questionnaire and notes columns aren't imported.",
+  "import.everyone": "Everyone in the table",
+  "import.line": "Row {row}",
+  "import.check": "What to check",
+  "import.clean": "Nothing to check in this table.",
+  "import.confirm": "Add to the tree",
+  "import.confirmNote":
+    "Every member will see these people right away. You can't import a table again after this.",
+  "import.another": "Choose another file",
+  "import.done": {
+    one: "{count} person added to the tree",
+    other: "{count} people added to the tree",
+  },
+  "problem.unknown-month":
+    "Row {row}: the month “{value}” can't be read. The birth date is kept as in the table.",
+  "problem.impossible-date":
+    "Row {row}: there's no such date as “{value}”. It's kept as in the table.",
+  "problem.unreadable-date":
+    "Row {row}: the date “{value}” can't be read. It's kept as in the table.",
+  "problem.unknown-sex": "Row {row}: the sex “{value}” can't be read. It's left unknown.",
+  "problem.unknown-generation":
+    "Row {row}: the generation “{value}” isn't a number, so the parents' generations aren't checked.",
+  "problem.missing-father":
+    "Row {row}: the father is given as “{value}”, but there's no such row. No father is added.",
+  "problem.missing-mother":
+    "Row {row}: the mother is given as “{value}”, but there's no such row. No mother is added.",
+  "problem.same-parent":
+    "Row {row}: the father and mother are both row {parent}. No mother is added.",
+  "problem.parent-cycle":
+    "Row {row}: row {parent} is given as a parent but is a descendant of this person. That parent isn't added.",
+  "problem.parent-generation":
+    "Row {row}: the parent in row {parent} isn't one generation older. The parent is kept as in the table.",
+  "problem.father-female":
+    "Row {row}: the father is row {parent}, but that row says female. The father is kept as in the table.",
+  "problem.mother-male":
+    "Row {row}: the mother is row {parent}, but that row says male. The mother is kept as in the table.",
+  "problem.ambiguous-spouse":
+    "Row {row}: the initials “{value}” fit rows {rows}. No union is added.",
+  "problem.unknown-spouse":
+    "Row {row}: the initials “{value}” fit no one in the same generation. No union is added.",
+  "problem.male-patronymic":
+    "Row {row}: the patronymic “{value}” is a man's, but the sex is female. It's kept as in the table.",
+  "problem.female-patronymic":
+    "Row {row}: the patronymic “{value}” is a woman's, but the sex is male. It's kept as in the table.",
+  "error.tree-not-empty":
+    "The tree already has people in it. A table can only go into a tree with no one in it yet.",
+  "error.trash-not-empty":
+    "There are still people in the trash, so the tree isn't empty. To add the table, erase them for good.",
+  "error.too-large":
+    "The table is too big: up to 5,000 rows and 2 MB. Remove the extra rows and choose the file again.",
+  "error.not-utf8": "The file isn't in UTF-8. Save the table as “CSV UTF-8” and choose it again.",
+  "error.empty-table": "The file has no rows with people. Choose another file.",
 } satisfies Record<keyof typeof ru, Text>;

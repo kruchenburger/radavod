@@ -87,6 +87,11 @@ export class Rows<Id extends string, Value extends Aggregate<Id>> {
     this.#row(id).now = frozen(value);
   }
 
+  /** How many aggregates this unit of work knows, whether they are there or not. */
+  get known(): number {
+    return this.#known.size;
+  }
+
   version(id: Id): number {
     return this.#row(id).stored?.version ?? 0;
   }

@@ -3,9 +3,10 @@ import { generateFamily } from "../examples/generate.ts";
 import type { Parentage } from "../src/contexts/kinship";
 import type { LifeEvent } from "../src/contexts/life";
 import { parseFuzzyDate } from "../src/kernel/fuzzy-date";
-import type { PersonId, UnionId } from "../src/kernel/id";
+import type { Id, PersonId, UnionId } from "../src/kernel/id";
 import type { Contexts } from "../src/scenarios/unit-of-work";
 import { addRelative } from "../src/scenarios/add-relative";
+import { importTable } from "../src/scenarios/import-table";
 import { eraseHere } from "../src/scenarios/erase";
 import { snapshotsOf } from "../src/scenarios/snapshot";
 import { fill, rowsOf } from "./storage/schema-1";
@@ -20,6 +21,7 @@ import {
   citation,
   event,
   form,
+  idOf,
   inTree,
   parentage,
   person,
@@ -263,5 +265,57 @@ describe("rows over 5 000 people", () => {
         );
       }
     }),
+  );
+});
+
+describe("an import of a table of 5 000 people", () => {
+  it(
+    "writes at most 10 rows a person, and reads a note of a spouse in every row in time",
+    { timeout: 180_000 },
+    () =>
+      inTree((tree) => {
+        // Couples of each generation have two children, who marry into the next: rows of a table.
+        // Every row names a spouse that half the table fits, and no row says its generation.
+        const rows: string[] = [];
+        for (let row = 1; row <= size; row++) {
+          const isFirst = row <= 2;
+          const father = isFirst ? "" : String(2 * Math.floor((row - 3) / 4) + 1);
+          const mother = isFirst ? "" : String(Number(father) + 1);
+          const sex = row % 2 === 1 ? "м" : "ж";
+          const link = row % 10 === 0 ? `https://example.org/${row}` : "";
+          rows.push(
+            [
+              "",
+              `Лазовік ${row}`,
+              "Ян",
+              "",
+              sex,
+              "1",
+              "Май",
+              "1900",
+              "5/1/1970",
+              "",
+              "Прим. Л.Я.",
+              "",
+              link,
+              father,
+              mother,
+            ].join(","),
+          );
+        }
+        let made = 0;
+        const newId = <K extends string>(kind: K) => idOf(kind, `${(made += 1)}`) as Id<K>;
+        const started = performance.now();
+        const counted = tree.count(() =>
+          accepted(tree.run((c) => importTable(c, rows.join("\n"), newId))),
+        );
+        const took = performance.now() - started;
+        console.log(
+          `import of ${size}: reading ${counted.read} rows and writing ${counted.written}`,
+        );
+        expect(counted.written).toBeLessThanOrEqual(10 * size);
+        // A Durable Object has 30 s of CPU for a request; the preview and the import take one each.
+        expect(took).toBeLessThan(15_000);
+      }),
   );
 });

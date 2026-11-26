@@ -1,0 +1,70 @@
+.about {
+  max-width: 34rem;
+  margin: 1.25rem 0 0;
+}
+
+/* The file is chosen with the control of the browser itself: every browser and reader knows it. */
+.file {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 0.5rem;
+  margin-top: 1.25rem;
+}
+
+.file label {
+  font-weight: 500;
+}
+
+.file input {
+  max-width: 100%;
+  min-height: 2.75rem;
+  font: inherit;
+}
+
+.counts {
+  margin: 0;
+  padding: 0;
+  list-style: none;
+  font: 400 1.0625rem/1.6 var(--serif);
+}
+
+.everyone {
+  margin-top: 1rem;
+}
+
+.everyone summary {
+  min-height: 1.5rem;
+  color: var(--action);
+  cursor: pointer;
+}
+
+/* Each problem names its row first: the list reads down the table. */
+.problems {
+  max-width: 40rem;
+  margin: 0;
+  padding: 0 0 0 1rem;
+  border-left: 2px solid var(--warning);
+  list-style: none;
+}
+
+.problems li {
+  padding: 0.25rem 0;
+}
+
+.confirm {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 0.75rem;
+  max-width: 34rem;
+}
+
+.confirm p {
+  margin: 0;
+}
+
+.done {
+  margin: 1.25rem 0 0;
+  font: 400 1.0625rem/1.4 var(--serif);
+}

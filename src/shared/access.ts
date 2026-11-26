@@ -90,6 +90,8 @@ export const sessionAnswer = z.strictObject({
   family: z.string().nullable(),
   /** What signed in this browser: a passkey, or the browser itself, linked by a reader. */
   via: z.enum(["passkey", "device"]),
+  /** Whether the rights let this member import into the tree. */
+  mayImport: z.boolean(),
 });
 
 /** What an invitation is, and nothing more. */
