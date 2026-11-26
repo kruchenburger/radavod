@@ -2,7 +2,7 @@ import type { Text } from "./text";
 
 export const ru = {
   "app.name": "Radavod",
-  "app.about": "Закрытый сайт с древом вашей семьи.",
+  "app.about": "Приватный сайт с древом вашей семьи.",
   "app.title": "{page}. Radavod",
   "settings.language": "Язык",
   "settings.theme": "Тема",

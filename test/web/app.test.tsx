@@ -15,7 +15,7 @@ beforeEach(() => {
 it("shows the name, one sentence and the version", async () => {
   render(<App />);
   expect(screen.getByRole("heading", { level: 1 }).textContent).toBe("Radavod");
-  expect(screen.getByText("Закрытый сайт с древом вашей семьи.")).toBeTruthy();
+  expect(screen.getByText("Приватный сайт с древом вашей семьи.")).toBeTruthy();
   expect(await screen.findByText("Версия 1.2.3")).toBeTruthy();
   expect(fetch).toHaveBeenCalledWith("/health", expect.anything());
 });

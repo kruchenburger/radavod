@@ -90,8 +90,10 @@ function setWidth(width: number): void {
 async function open(href: string): Promise<void> {
   window.history.replaceState(null, "", href);
   render(<App />);
-  await waitFor(() => expect(document.querySelector("[data-screen]")).not.toBeNull());
-  await waitFor(() => expect(screen.queryByText("Открываем древо")).toBeNull());
+  // A busy machine (CI, files run side by side) lays out 300 people slowly.
+  const slow = { timeout: 5000 };
+  await waitFor(() => expect(document.querySelector("[data-screen]")).not.toBeNull(), slow);
+  await waitFor(() => expect(screen.queryByText("Открываем древо")).toBeNull(), slow);
 }
 
 const address = () => window.location.pathname + window.location.search;
@@ -104,7 +106,8 @@ describe("the start page", () => {
     render(<App />);
     press(await screen.findByRole("link", { name: "Открыть пример" }));
     expect(address()).toBe("/sample");
-    expect(await screen.findByText("Пример")).toBeTruthy();
+    // The example of 300 people takes a while to lay out on a busy machine.
+    expect(await screen.findByText("Пример", {}, { timeout: 5000 })).toBeTruthy();
   });
 
   it.each([
@@ -358,29 +361,32 @@ describe("around a person", () => {
   it("gives the person in the centre the focus at once, and after every move", async () => {
     await open("/sample");
     const pressed = () => (document.activeElement as HTMLElement).dataset["press"];
-    expect(pressed()).toBe(`p:${start}`);
+    // The tree may come a render after the words of loading go.
+    await waitFor(() => expect(pressed()).toBe(`p:${start}`));
     fireEvent.keyDown(document.activeElement as HTMLElement, { key: "ArrowLeft" });
     const parent = pressed();
+    expect(parent).not.toBe(`p:${start}`);
     fireEvent.keyDown(document.activeElement as HTMLElement, { key: "Enter" });
     press(document.activeElement as HTMLElement);
-    expect(centre().dataset["key"]).toBe(parent);
-    expect(pressed()).toBe(parent);
+    await waitFor(() => expect(centre().dataset["key"]).toBe(parent));
+    await waitFor(() => expect(pressed()).toBe(parent));
     act(() => {
       window.history.back();
     });
     await waitFor(() => expect(centre().dataset["key"]).toBe(`p:${start}`));
-    expect(pressed()).toBe(`p:${start}`);
+    await waitFor(() => expect(pressed()).toBe(`p:${start}`));
   });
 
   it("leaves the focus where the visitor put it", async () => {
     await open("/sample");
+    await waitFor(() => expect(centre().contains(document.activeElement)).toBe(true));
     const field = screen.getByRole("combobox", { name: "Имя или место" });
     field.focus();
     act(() => {
       window.history.pushState(null, "", `/sample/tree/${hard.threeUnions}`);
       window.dispatchEvent(new PopStateEvent("popstate"));
     });
-    expect(centre().dataset["key"]).toBe(`p:${hard.threeUnions}`);
+    await waitFor(() => expect(centre().dataset["key"]).toBe(`p:${hard.threeUnions}`));
     expect(document.activeElement).toBe(field);
   });
 

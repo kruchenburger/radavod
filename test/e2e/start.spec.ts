@@ -3,7 +3,7 @@ import { expect, expectAccessible, expectNoSideScroll, test, theme } from "./pag
 const languages = [
   {
     locale: "ru",
-    about: "Закрытый сайт с древом вашей семьи.",
+    about: "Приватный сайт с древом вашей семьи.",
     version: "Версия dev",
     light: "Светлая",
     dark: "Тёмная",
@@ -96,7 +96,7 @@ test("the language and the theme survive a reload", async ({ page }) => {
   await page.getByText("Русский", { exact: true }).click();
   await page.getByText("Тёмная", { exact: true }).click();
   await page.reload();
-  await expect(page.getByText("Закрытый сайт с древом вашей семьи.")).toBeVisible();
+  await expect(page.getByText("Приватный сайт с древом вашей семьи.")).toBeVisible();
   await expect(page.locator("html")).toHaveAttribute("lang", "ru");
   expect(await theme(page)).toBe("dark");
   await expect(page.getByRole("radio", { name: "Русский" })).toBeChecked();

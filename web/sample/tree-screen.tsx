@@ -69,6 +69,10 @@ export function TreeScreen({ place }: { place: Centred }) {
   // Not the width: a window that changes moves nothing.
   const centre = [focus, siblings, layout.tree.open, half].join(" ");
   useEffect(() => holdCentre(), [centre]);
+  // A new layout (the window, the fonts) may take away the card that had the focus.
+  useEffect(() => {
+    if (document.activeElement === document.body) holdCentre();
+  }, [layout]);
   return (
     <section className={classes.screen} data-as={layout.as} aria-labelledby={heading}>
       <h1 id={heading} className={classes.said}>
