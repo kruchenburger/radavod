@@ -586,7 +586,8 @@ test.describe("the tree by generations", () => {
       test(`stands the chosen person in the middle at ${width} px, ${scheme}`, async ({ page }) => {
         await page.setViewportSize({ width, height });
         await page.addInitScript((value) => localStorage.setItem("radavod.theme", value), scheme);
-        for (const person of [twoUnions, manyChildren]) {
+        // The youngest of the family stands at the edge of the drawing.
+        for (const person of [twoUnions, manyChildren, snapshot.people.at(-1)?.id]) {
           await page.goto(`/sample/generations/${person}`);
           await ready(page);
           expect(await theme(page)).toBe(scheme);
@@ -652,7 +653,7 @@ test.describe("the tree by generations", () => {
     await page.goto(`/sample/generations/${twoUnions}`);
     await ready(page);
     const pressed = () => page.evaluate("document.activeElement?.dataset?.press ?? null");
-    expect(await pressed()).toBe(`p:${twoUnions}`);
+    await expect.poll(pressed).toBe(`p:${twoUnions}`);
     await page.keyboard.press("ArrowUp");
     const parent = await pressed();
     const parents = snapshot.people
@@ -667,21 +668,21 @@ test.describe("the tree by generations", () => {
       under: "-1",
     });
     await page.keyboard.press("ArrowDown");
-    expect(await pressed()).toBe(`p:${twoUnions}`);
+    await expect.poll(pressed).toBe(`p:${twoUnions}`);
     await page.keyboard.press("ArrowRight");
     const right = await pressed();
     expect(right).not.toBe(`p:${twoUnions}`);
     await page.keyboard.press("ArrowLeft");
-    expect(await pressed()).toBe(`p:${twoUnions}`);
+    await expect.poll(pressed).toBe(`p:${twoUnions}`);
     await page.keyboard.press("ArrowUp");
     await page.keyboard.press("Enter");
     await expect(page).toHaveURL(`/sample/generations/${String(parent).slice(2)}`);
     await expect(centre(page)).toHaveAttribute("data-key", String(parent));
-    expect(await pressed()).toBe(parent);
+    await expect.poll(pressed).toBe(parent);
     await page.keyboard.press("Backspace");
     await expect(page).toHaveURL(`/sample/generations/${twoUnions}`);
     await expect(centre(page)).toHaveAttribute("data-key", `p:${twoUnions}`);
-    expect(await pressed()).toBe(`p:${twoUnions}`);
+    await expect.poll(pressed).toBe(`p:${twoUnions}`);
   });
 
   test("leads to the pedigree and to all branches of the same person", async ({ page }) => {

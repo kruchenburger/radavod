@@ -29,8 +29,12 @@
   outline-offset: -2px;
 }
 
-.canvas {
+.spread {
   position: relative;
+}
+
+.canvas {
+  position: absolute;
   isolation: isolate;
 }
 

@@ -105,10 +105,16 @@ function Window({ layout, hint, words }: WindowProps) {
   }, [layout, focus, room.left, room.top, room.right, room.bottom]);
 
   const onKeyDown = useArrowKeys(move, scroller);
+  // The room is a box of its own: a margin beside a width is dropped on the right.
+  const spread: CSSProperties = {
+    width: rem(room.left + layout.width + room.right),
+    height: rem(room.top + layout.height + room.bottom),
+  };
   const style: CSSProperties = {
+    left: rem(room.left),
+    top: rem(room.top),
     width: rem(layout.width),
     height: rem(layout.height),
-    margin: `${rem(room.top)} ${rem(room.right)} ${rem(room.bottom)} ${rem(room.left)}`,
   };
   return (
     <div
@@ -118,16 +124,23 @@ function Window({ layout, hint, words }: WindowProps) {
       aria-label={t("view.generations")}
       aria-describedby={hint}
     >
-      <div className={classes.canvas} style={style} onKeyDown={onKeyDown}>
-        <Lines links={layout.links} width={layout.width} height={layout.height} corners={corners} />
-        {layout.order.map((key) => {
-          const card = layout.cards.find((one) => one.key === key);
-          return (
-            card && (
-              <PersonCard key={key} card={card} words={words} isFocus={key === layout.focus} />
-            )
-          );
-        })}
+      <div className={classes.spread} style={spread}>
+        <div className={classes.canvas} style={style} onKeyDown={onKeyDown}>
+          <Lines
+            links={layout.links}
+            width={layout.width}
+            height={layout.height}
+            corners={corners}
+          />
+          {layout.order.map((key) => {
+            const card = layout.cards.find((one) => one.key === key);
+            return (
+              card && (
+                <PersonCard key={key} card={card} words={words} isFocus={key === layout.focus} />
+              )
+            );
+          })}
+        </div>
       </div>
     </div>
   );
