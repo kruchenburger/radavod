@@ -92,9 +92,9 @@ export class Browser {
   }
 
   /** A keeper gives an invitation; its secret. */
-  async invite(role: "reader" | "editor" | "keeper"): Promise<string> {
+  async invite(role: "reader" | "editor" | "keeper", name?: string): Promise<string> {
     const given = await this.json<{ secret: string }>("POST", "/api/members/invitations", {
-      body: { role, person: null },
+      body: { role, person: null, ...(name === undefined ? {} : { name }) },
     });
     expect(given.status).toBe(201);
     return given.body.secret;

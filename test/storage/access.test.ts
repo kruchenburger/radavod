@@ -40,7 +40,7 @@ async function twoKeepers(stub: ReturnType<typeof objectOf>, now: number) {
     code: "c1",
   };
   expect(await stub.setUp(code)).toEqual({ ok: true, value: null });
-  const input = { id: "i", hash: "h", role: "keeper" as const, person: null, now };
+  const input = { id: "i", hash: "h", role: "keeper" as const, person: null, now, seed: 0 };
   expect((await stub.invite(member("ann"), input)).ok).toBe(true);
   const redeem = {
     hash: "h",
@@ -167,7 +167,14 @@ describe("the access of a family in its object", () => {
     const now = Date.now();
     await twoKeepers(stub, now);
     await stub.remember([person("ada")]);
-    const input = { id: "a", hash: "a", role: "reader" as const, person: person("ada"), now };
+    const input = {
+      id: "a",
+      hash: "a",
+      role: "reader" as const,
+      person: person("ada"),
+      now,
+      seed: 0,
+    };
     expect(await stub.invite(member("ann"), input)).toEqual({
       ok: false,
       error: { code: "missing", id: person("ada") },
@@ -200,7 +207,7 @@ describe("the access of a family in its object", () => {
     expect((await stub.signIn({ hash: "new", credential: "bob-1", now, country: null })).ok).toBe(
       true,
     );
-    const old = { id: "j", hash: "j", role: "reader" as const, person: null, now: long };
+    const old = { id: "j", hash: "j", role: "reader" as const, person: null, now: long, seed: 0 };
     expect((await stub.invite(member("ann"), old)).ok).toBe(true);
     expect((await stub.attempt("sign-in", "address", long)).ok).toBe(true);
     await runInDurableObject(stub, async (_, { storage }) => {
@@ -241,10 +248,17 @@ describe("the access of a family in its object", () => {
     const now = Date.now();
     await twoKeepers(stub, now);
     for (let i = 0; i < 49; i++) {
-      const input = { id: `i${i}`, hash: `h${i}`, role: "reader" as const, person: null, now };
+      const input = {
+        id: `i${i}`,
+        hash: `h${i}`,
+        role: "reader" as const,
+        person: null,
+        now,
+        seed: 0,
+      };
       expect((await stub.invite(member("ann"), input)).ok).toBe(true);
     }
-    const more = { id: "x", hash: "x", role: "reader" as const, person: null, now };
+    const more = { id: "x", hash: "x", role: "reader" as const, person: null, now, seed: 0 };
     expect(await stub.invite(member("ann"), more)).toEqual({
       ok: false,
       error: { code: "rate-limited", retryAfter: 86_400 },
@@ -292,6 +306,40 @@ describe("the tables of access", () => {
         ].sort(),
       );
       expect(() => migrateAccess(storage, [])).toThrow("schema-is-newer");
+    });
+  });
+
+  it("read rows written before names of links and nicknames, without them, as none", async () => {
+    await runInDurableObject(objectOf(), (_, { storage }) => {
+      const store = sqliteAccess(storage.sql);
+      const ann = member("ann");
+      // The JSON of each row as it was written before those fields were.
+      const old = { name: "Ann", role: "keeper", person: null, createdAt: 1, revokedAt: null };
+      storage.sql.exec(
+        "INSERT INTO access_member (id, version, data) VALUES (?, 1, ?)",
+        ann,
+        JSON.stringify(old),
+      );
+      const link = {
+        id: "i",
+        hash: "h",
+        role: "reader",
+        person: null,
+        by: ann,
+        expiresAt: day,
+        spentAt: null,
+        kind: "join",
+        member: null,
+      };
+      storage.sql.exec(
+        "INSERT INTO access_invitation (id, hash, expires_at, data) VALUES (?, ?, ?, ?)",
+        "i",
+        "h",
+        day,
+        JSON.stringify(link),
+      );
+      expect(store.member(ann)).toMatchObject({ name: "Ann", nickname: null });
+      expect(store.invitation("i")).toMatchObject({ name: null, nickname: null });
     });
   });
 

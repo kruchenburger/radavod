@@ -42,6 +42,7 @@ export function take(access: Access, step: Step, now: number, n: number): void {
         role: step.role,
         person: null,
         now,
+        seed: n,
       });
       return;
     case "recover":

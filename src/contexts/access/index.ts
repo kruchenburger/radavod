@@ -6,6 +6,7 @@ export {
   type AccessError,
   accessOver,
   type Expected,
+  type Inspected,
   type StaleVersion,
   type Account,
   type NewChallenge,
@@ -18,6 +19,7 @@ export type { AccessStore } from "./application/ports";
 export { type Credential, mayLinkBrowser, type NewCredential } from "./domain/credential";
 export type { Invitation } from "./domain/invitation";
 export type { Limit, RateLimited } from "./domain/limits";
+export type { Nickname } from "./domain/nickname";
 export type { LogEntry } from "./domain/log";
 export type { AccessReader, Change, Member, NewMember } from "./domain/member";
 export { type Action, can, type Role } from "./domain/rights";

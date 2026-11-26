@@ -261,9 +261,16 @@ describe("an invitation", () => {
     const secret = await keeper.invite("editor");
     const eve = family.browser();
     for (let i = 0; i < 2; i++) {
-      expect(await eve.json("POST", "/api/invitation", { body: { secret } })).toEqual({
+      expect(await eve.json("POST", "/api/invitation", { body: { secret } })).toMatchObject({
         status: 200,
-        body: { kind: "join", role: "editor", family: "Oaks", canLink: false },
+        body: {
+          kind: "join",
+          role: "editor",
+          family: "Oaks",
+          canLink: false,
+          name: null,
+          nameOptional: true,
+        },
       });
     }
     expect((await eve.join(secret, "Eve")).body).toMatchObject({ name: "Eve", role: "editor" });
@@ -346,6 +353,75 @@ describe("an invitation", () => {
       body: { flow: options.body.flow, response },
     });
     expect(done.body).toMatchObject({ member: session.body.member, role: "editor" });
+  });
+});
+
+describe("a name for whom a link lets in", () => {
+  type Answer = { name: string; nickname: { adjective: string; creature: string } | null };
+
+  it("is the keeper's, written in the field, and the person may change it", async () => {
+    const { family, keeper } = await Family.withRoles();
+    const secret = await keeper.invite("reader", "Aunt Vera");
+    const vera = family.browser();
+    const opened = await vera.json<Answer>("POST", "/api/invitation", { body: { secret } });
+    expect(opened.body).toMatchObject({ name: "Aunt Vera", nickname: null, nameOptional: true });
+    // Nothing written: the keeper's name stands.
+    const options = await vera.json<{ flow: string; options: never }>(
+      "POST",
+      "/api/passkey/register/options",
+      { body: { secret } },
+    );
+    const response = await vera.passkey.register(options.body.options);
+    const joined = await vera.json<Answer>("POST", "/api/passkey/register/verify", {
+      body: { flow: options.body.flow, response },
+    });
+    expect(joined.body).toMatchObject({ name: "Aunt Vera", nickname: null });
+    const other = family.browser();
+    const renamed = await other.join(await keeper.invite("reader", "Uncle Ivan"), "Ivan");
+    expect(renamed.body).toMatchObject({ name: "Ivan", nickname: null });
+  });
+
+  it("is a nickname nobody has when the keeper gives none, until the person writes a name", async () => {
+    const { family, keeper } = await Family.withRoles();
+    const seen = new Set<string>();
+    for (let i = 0; i < 5; i++) {
+      const secret = await keeper.invite("reader");
+      const { body } = await keeper.json<Answer>("POST", "/api/invitation", { body: { secret } });
+      expect(body.name).toBeNull();
+      expect(body.nickname).not.toBeNull();
+      seen.add(JSON.stringify(body.nickname));
+    }
+    expect(seen.size).toBe(5);
+    const secret = await keeper.invite("editor");
+    const dino = family.browser();
+    const { body: link } = await dino.json<Answer>("POST", "/api/invitation", { body: { secret } });
+    expect(link).toMatchObject({ name: null, nameOptional: true });
+    const options = await dino.json<{ flow: string; options: { user: { name: string } } }>(
+      "POST",
+      "/api/passkey/register/options",
+      { body: { secret } },
+    );
+    // The passkey is called by the nickname, by its keys: the phone shows no empty account.
+    const { adjective, creature } = link.nickname ?? { adjective: "", creature: "" };
+    const capital = (key: string) => `${key.charAt(0).toUpperCase()}${key.slice(1)}`;
+    expect(options.body.options.user.name).toBe(`${capital(adjective)} ${capital(creature)}`);
+    const response = await dino.passkey.register(options.body.options as never);
+    const joined = await dino.json<Answer>("POST", "/api/passkey/register/verify", {
+      body: { flow: options.body.flow, response },
+    });
+    expect(joined.body).toMatchObject({ name: "", nickname: link.nickname });
+    expect((await dino.call("POST", "/api/account/name", { body: { name: "Dina" } })).status).toBe(
+      204,
+    );
+    expect((await dino.json<Answer>("GET", "/api/session")).body).toMatchObject({
+      name: "Dina",
+      nickname: null,
+    });
+    // A blank name reaches the rule of the domain, which says what is wrong with it.
+    expect(await dino.json("POST", "/api/account/name", { body: { name: " " } })).toMatchObject({
+      status: 400,
+      body: { error: "name-required" },
+    });
   });
 });
 

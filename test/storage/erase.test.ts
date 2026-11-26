@@ -627,7 +627,17 @@ describe("the ledger of erasures", () => {
       const first = { member: { id: keeper, name: "Ann" }, credential: key("a"), now, code: "c" };
       expect((await stub.setUp(first)).ok).toBe(true);
       for (const id of ["i1", "i2"]) {
-        const input = { id, hash: id, role: "reader" as const, person: person("ada"), now };
+        // The keeper calls whom the link is for by her name.
+        const name = "Нимфадора Заозёрная";
+        const input = {
+          id,
+          hash: id,
+          role: "reader" as const,
+          person: person("ada"),
+          name,
+          now,
+          seed: 0,
+        };
         expect((await stub.invite(keeper, input)).ok).toBe(true);
       }
       const joined = { hash: "i1", now, member: { id: idOf("member", "ada"), name: "A" } };
@@ -651,8 +661,58 @@ describe("the ledger of erasures", () => {
         tables.map(({ name }) => [name, storage.sql.exec(`SELECT * FROM ${name}`).toArray()]),
       );
       // Of all the rows of both objects, her identifier is in the ledger and nowhere else: the
-      // member and the invitation tied to her are tied to nobody now.
+      // member and the invitation tied to her are tied to nobody now, and the link forgot her name.
       expect(found(rows, said)).toEqual([`access_erased: ${person("ada")}`]);
+    });
+  });
+
+  // A name the keeper wrote on a link is the link's until somebody joins by it; then it is the
+  // member's own, as if they had written it, and an erasure takes it from the link only.
+  it("leaves a member who joined without writing a name the name the link had", async () => {
+    const name = crypto.randomUUID();
+    const stub = env.ACCESS.getByName(name);
+    const keeper = idOf("member", "ann");
+    const key = (id: string) => ({ id, kind: "passkey" as const, label: "", publicKey: "k" });
+    const now = Date.now();
+    const first = { member: { id: keeper, name: "Ann" }, credential: key("a"), now, code: "c" };
+    expect((await stub.setUp(first)).ok).toBe(true);
+    const called = "Нимфадора Заозёрная";
+    for (const id of ["i1", "i2"]) {
+      const input = { id, hash: id, role: "reader" as const, person: person("ada"), now, seed: 0 };
+      expect((await stub.invite(keeper, { ...input, name: called })).ok).toBe(true);
+    }
+    // She joins by the first link and writes nothing: the keeper's name is hers now.
+    const ada = idOf("member", "ada");
+    const joined = await stub.newcomer("i1", now, { id: ada });
+    expect(joined).toMatchObject({ ok: true, value: { name: called } });
+    expect(
+      (await stub.redeem({ hash: "i1", now, member: { id: ada, name: "" }, credential: key("b") }))
+        .ok,
+    ).toBe(true);
+    // A step of joining by the second link, begun before the erasure, carries the name it was begun
+    // with until it is answered or runs over, in five minutes at most.
+    const begun = await stub.newcomer("i2", now, { id: idOf("member", "eve") });
+    if (!begun.ok) throw new Error("no newcomer");
+    const step = { hash: "s", challenge: "c", purpose: "register" as const, invitation: "i2" };
+    expect((await stub.openChallenge({ ...step, member: begun.value }, now)).ok).toBe(true);
+    await stub.remember([person("ada")]);
+    await runInDurableObject(stub, (_, { storage }) => {
+      const json = (table: string) =>
+        storage.sql
+          .exec<{ data: string }>(`SELECT data FROM ${table}`)
+          .toArray()
+          .map(({ data }) => data);
+      expect(found({ access_member: json("access_member") }, [called])).toEqual([
+        `access_member: ${called}`,
+      ]);
+      expect(found({ access_invitation: json("access_invitation") }, [called])).toEqual([]);
+      const steps = storage.sql
+        .exec<{ data: string; expires_at: number }>("SELECT data, expires_at FROM access_challenge")
+        .toArray();
+      expect(found({ access_challenge: steps.map(({ data }) => data) }, [called])).toEqual([
+        `access_challenge: ${called}`,
+      ]);
+      expect(steps.every(({ expires_at }) => expires_at <= now + 5 * 60_000)).toBe(true);
     });
   });
 

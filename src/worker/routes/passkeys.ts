@@ -7,7 +7,7 @@ import {
   verifyRegistrationResponse,
 } from "@simplewebauthn/server";
 import type { z } from "zod";
-import type { Credential, Purpose } from "../../contexts/access";
+import type { Credential, Nickname, Purpose } from "../../contexts/access";
 import type { MemberId } from "../../kernel/id";
 import type { passkeyAnswerSchema } from "../../shared/access";
 import {
@@ -33,7 +33,7 @@ export async function registration(
   c: ApiContext,
   /** What the passkey dialog of a phone calls the site: the family, once it has a name. */
   family: string | null,
-  member: { id: MemberId; name: string },
+  member: { id: MemberId; name: string; nickname?: Nickname | null },
   step: (
     hash: string,
     challenge: string,
@@ -43,6 +43,15 @@ export async function registration(
 ) {
   const site = siteOf(c);
   if (site === null) return notConfigured(c);
+  // A member who goes by a nickname has no name yet: the phone shows its keys, capitalised, never an
+  // empty account. The server has no catalogs to write the words in a language, and a passkey keeps
+  // the name it was made with, whatever the member writes later.
+  const { name, nickname } = member;
+  const capital = (key: string) => `${key.charAt(0).toUpperCase()}${key.slice(1)}`;
+  const userName =
+    name !== "" || nickname == null
+      ? name
+      : `${capital(nickname.adjective)} ${capital(nickname.creature)}`;
   // One challenge for both: the proof and the new passkey answer the same step.
   const challenge = crypto.getRandomValues(new Uint8Array(32));
   const options = await generateRegistrationOptions({
@@ -51,8 +60,8 @@ export async function registration(
     // A passkey the phone already keeps for this account is not made twice.
     excludeCredentials: (proving ?? []).map((id) => ({ id })),
     rpID: site.rpID,
-    userName: member.name,
-    userDisplayName: member.name,
+    userName,
+    userDisplayName: userName,
     userID: Uint8Array.from(new TextEncoder().encode(member.id)),
     attestationType: "none",
     authenticatorSelection: { residentKey: "required", userVerification: "required" },

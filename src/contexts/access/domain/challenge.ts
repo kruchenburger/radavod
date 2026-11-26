@@ -3,6 +3,7 @@ import type { MemberId } from "../../../kernel/id";
 import { type Missing, missing } from "../../../kernel/refusal";
 import type { Result } from "../../../kernel/result";
 import type { AccessReader, Change } from "./member";
+import type { Nickname } from "./nickname";
 
 /**
  * A step of signing in begun and not finished: the challenge a passkey must sign, and what the step
@@ -18,19 +19,19 @@ export type Challenge = {
       /** The hash of the setup code, the name of the family and of its first keeper. */
       code: string;
       family: string;
-      member: { id: MemberId; name: string };
+      member: { id: MemberId; name: string; nickname?: Nickname | null };
     }
   | {
       purpose: "register";
       /** The hash of the invitation or recovery link it spends. */
       invitation: string;
-      member: { id: MemberId; name: string };
+      member: { id: MemberId; name: string; nickname?: Nickname | null };
     }
   | { purpose: "login" }
   | {
       purpose: "add";
       /** The member adding a passkey to their own account. */
-      member: { id: MemberId; name: string };
+      member: { id: MemberId; name: string; nickname?: Nickname | null };
     }
 );
 

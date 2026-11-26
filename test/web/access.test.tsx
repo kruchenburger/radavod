@@ -1,4 +1,4 @@
-import { fireEvent, render, screen, waitFor } from "@testing-library/react";
+import { fireEvent, render, screen, waitFor, within } from "@testing-library/react";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import { App } from "../../web/app/app";
 
@@ -17,6 +17,7 @@ const secret = "A".repeat(43);
 const ann = {
   member: "member_Ann1111111111111111111",
   name: "Ann",
+  nickname: null,
   role: "keeper",
   person: null,
   family: "Oaks",
@@ -125,7 +126,10 @@ describe("the first run", () => {
 });
 
 describe("an invitation", () => {
-  const invitation = (body: object) => ({ "POST /api/invitation": { body } });
+  // What the server says of a link: a join link without a name or a nickname is an old one.
+  const invitation = (body: object) => ({
+    "POST /api/invitation": { body: { name: null, nickname: null, nameOptional: false, ...body } },
+  });
 
   it("needs its secret, and says when a link is cut off", async () => {
     serve({});
@@ -175,7 +179,13 @@ describe("an invitation", () => {
 
   it("brings an account back without asking a name", async () => {
     const asked = serve({
-      ...invitation({ kind: "recovery", role: "editor", family: "Oaks", canLink: false }),
+      ...invitation({
+        kind: "recovery",
+        role: "editor",
+        family: "Oaks",
+        canLink: false,
+        nameOptional: true,
+      }),
       "POST /api/passkey/register/options": { body: { flow: "f", options: {} } },
       "POST /api/passkey/register/verify": { body: ann },
       "GET /api/members": { body: { members: [] } },
@@ -185,6 +195,86 @@ describe("an invitation", () => {
       "Это ссылка для восстановления. Создайте новый ключ доступа: прежние уже отключены.",
     );
     expect(screen.queryByRole("textbox", { name: /Ваше имя/u })).toBeNull();
+    press("Создать ключ доступа");
+    await waitFor(() => expect(window.location.pathname).toBe("/family"));
+    expect(asked.find(({ key }) => key === "POST /api/passkey/register/options")?.body).toEqual({
+      secret,
+    });
+  });
+
+  it("puts the name the keeper wrote in the field, and sends the one written", async () => {
+    const asked = serve({
+      ...invitation({
+        kind: "join",
+        role: "editor",
+        family: "Oaks",
+        canLink: false,
+        name: "Dina",
+        nickname: null,
+        nameOptional: true,
+      }),
+      "POST /api/passkey/register/options": { body: { flow: "f", options: {} } },
+      "POST /api/passkey/register/verify": { body: ann },
+      "GET /api/members": { body: { members: [] } },
+    });
+    open("/join", `#${secret}`);
+    const name = await screen.findByRole("textbox", { name: /Ваше имя/u });
+    expect((name as HTMLInputElement).value).toBe("Dina");
+    expect(
+      screen.getByText("Это имя написал тот, кто вас пригласил. Его можно изменить."),
+    ).toBeTruthy();
+    fireEvent.blur(name);
+    expect(screen.queryByText("Напишите ваше имя.")).toBeNull();
+    // Emptied, the field says what stays; written again, who wrote the name.
+    type(/Ваше имя/u, " ");
+    expect(screen.getByText("Если оставить поле пустым, останется «Dina».")).toBeTruthy();
+    expect(
+      screen.queryByText("Это имя написал тот, кто вас пригласил. Его можно изменить."),
+    ).toBeNull();
+    type(/Ваше имя/u, "Dina Oak");
+    expect(
+      screen.getByText("Это имя написал тот, кто вас пригласил. Его можно изменить."),
+    ).toBeTruthy();
+    press("Создать ключ доступа");
+    await waitFor(() => expect(window.location.pathname).toBe("/family"));
+    expect(asked.find(({ key }) => key === "POST /api/passkey/register/options")?.body).toEqual({
+      secret,
+      name: "Dina Oak",
+    });
+  });
+
+  it("asks a name of an old link that has neither a name nor a nickname", async () => {
+    serve(invitation({ kind: "join", role: "editor", family: "Oaks", canLink: false }));
+    open("/join", `#${secret}`);
+    const button = await screen.findByRole("button", { name: "Создать ключ доступа" });
+    expect(button).toHaveProperty("disabled", true);
+    type(/Ваше имя/u, "Dina");
+    expect(button).toHaveProperty("disabled", false);
+  });
+
+  it("says which nickname waits for whom writes no name, and lets them leave it empty", async () => {
+    const asked = serve({
+      ...invitation({
+        kind: "join",
+        role: "editor",
+        family: "Oaks",
+        canLink: false,
+        name: null,
+        nickname: { adjective: "wild", creature: "owl" },
+        nameOptional: true,
+      }),
+      "POST /api/passkey/register/options": { body: { flow: "f", options: {} } },
+      "POST /api/passkey/register/verify": { body: ann },
+      "GET /api/members": { body: { members: [] } },
+    });
+    open("/join", `#${secret}`);
+    expect(
+      await screen.findByText(
+        "Если оставить поле пустым, родные увидят вас как «Бешеная Сова». Имя можно написать позже в учётной записи.",
+      ),
+    ).toBeTruthy();
+    fireEvent.blur(field(/Ваше имя/u));
+    expect(screen.queryByText("Напишите ваше имя.")).toBeNull();
     press("Создать ключ доступа");
     await waitFor(() => expect(window.location.pathname).toBe("/family"));
     expect(asked.find(({ key }) => key === "POST /api/passkey/register/options")?.body).toEqual({
@@ -221,7 +311,15 @@ describe("a messenger's own browser", () => {
     );
     serve({
       "POST /api/invitation": {
-        body: { kind: "join", role: "editor", family: "Oaks", canLink: false },
+        body: {
+          kind: "join",
+          role: "editor",
+          family: "Oaks",
+          canLink: false,
+          name: null,
+          nickname: null,
+          nameOptional: false,
+        },
       },
     });
     open("/join", `#${secret}`);
@@ -295,6 +393,7 @@ describe("the members", () => {
       {
         id: ann.member,
         name: "Ann",
+        nickname: null,
         role: "keeper",
         version: 1,
         revokedAt: null,
@@ -313,6 +412,7 @@ describe("the members", () => {
       {
         id: "member_Gran111111111111111111",
         name: "Gran",
+        nickname: null,
         role: "reader",
         version: 1,
         revokedAt: null,
@@ -377,10 +477,145 @@ describe("the members", () => {
     ).toBeTruthy();
   });
 
+  it("invite one person by the name a keeper writes, or by a nickname when it is empty", async () => {
+    const asked = serve({
+      "GET /api/session": { body: ann },
+      "GET /api/members": { body: roster },
+      "GET /api/members/log": { body: { log: [] } },
+      "POST /api/members/invitations": {
+        status: 201,
+        body: { id: "i", secret, expiresAt: 1_800_000_000_000 },
+      },
+    });
+    open("/family");
+    expect(await screen.findByText("Каждому родственнику нужна своя ссылка.")).toBeTruthy();
+    expect(
+      screen.getByText(
+        "Можно не писать: тогда родственник получит шуточное имя и сможет написать своё.",
+      ),
+    ).toBeTruthy();
+    press("Создать приглашение");
+    await screen.findByRole("textbox", { name: "Ссылка" });
+    type(/Кого вы приглашаете/u, "  Dina ");
+    press("Создать приглашение");
+    await waitFor(() =>
+      expect(asked.filter(({ key }) => key === "POST /api/members/invitations")).toHaveLength(2),
+    );
+    const sent = asked.filter(({ key }) => key === "POST /api/members/invitations");
+    expect(sent.map(({ body }) => body)).toEqual([
+      { role: "reader", person: null },
+      { role: "reader", person: null, name: "Dina" },
+    ]);
+  });
+
+  it("call a member and a link by their nickname as by a name, and say what withdrawing costs", async () => {
+    const dino = "member_Dino111111111111111111";
+    const asked = serve({
+      "GET /api/session": { body: ann },
+      "GET /api/members": {
+        body: {
+          members: [
+            ...roster.members,
+            {
+              id: dino,
+              name: "",
+              nickname: { adjective: "wild", creature: "owl" },
+              role: "reader",
+              version: 1,
+              revokedAt: null,
+              credentials: [],
+            },
+          ],
+          invitations: [
+            {
+              id: "i1",
+              role: "reader",
+              person: null,
+              by: ann.member,
+              expiresAt: 1_800_000_000_000,
+              spentAt: null,
+              kind: "join",
+              member: null,
+              name: null,
+              nickname: { adjective: "brave", creature: "hedgehog" },
+            },
+          ],
+        },
+      },
+      "GET /api/members/log": {
+        body: {
+          log: [
+            {
+              at: 1_800_000_000_000,
+              kind: "sign-in",
+              member: dino,
+              credential: "d2",
+              by: null,
+              country: null,
+            },
+          ],
+        },
+      },
+      "DELETE /api/members/invitations/i1": { status: 204 },
+    });
+    open("/family");
+    expect(await screen.findByText("Бешеная Сова")).toBeTruthy();
+    const lines = () => screen.getAllByRole("listitem").map(({ textContent }) => textContent ?? "");
+    expect(lines().some((text) => text.startsWith("Храбрый Ёж: читатель, действует до"))).toBe(
+      true,
+    );
+    await waitFor(() =>
+      expect(lines().some((text) => text.endsWith("Вход: Бешеная Сова, страна неизвестна"))).toBe(
+        true,
+      ),
+    );
+    press("Отозвать");
+    expect(screen.getByText("По этой ссылке больше нельзя будет войти.")).toBeTruthy();
+    const confirm = screen.getByRole("group", { name: "Отозвать" });
+    fireEvent.click(within(confirm).getByRole("button", { name: "Отозвать" }));
+    expect(await screen.findByText("Приглашение отозвано")).toBeTruthy();
+    expect(asked.map(({ key }) => key)).toContain("DELETE /api/members/invitations/i1");
+  });
+
+  it("call a link with neither a name nor a nickname by its role alone", async () => {
+    const link = {
+      role: "reader",
+      person: null,
+      by: ann.member,
+      expiresAt: 1_800_000_000_000,
+      kind: "join",
+      member: null,
+      // An old link, or one whose name went with the person it was for.
+      name: null,
+      nickname: null,
+    };
+    serve({
+      "GET /api/session": { body: ann },
+      "GET /api/members": {
+        body: {
+          members: roster.members,
+          invitations: [
+            { ...link, id: "i1", spentAt: null },
+            { ...link, id: "i2", spentAt: 1_700_000_000_000 },
+          ],
+        },
+      },
+      "GET /api/members/log": { body: { log: [] } },
+    });
+    open("/family");
+    await screen.findByText("Gran");
+    const lines = screen.getAllByRole("listitem").map(({ textContent }) => textContent ?? "");
+    expect(lines.some((text) => text.startsWith("читатель, действует до"))).toBe(true);
+    expect(lines.some((text) => text.startsWith("читатель, ссылка использована"))).toBe(true);
+    expect(lines.some((text) => text.startsWith(":"))).toBe(false);
+  });
+
   it("show only names and roles to a reader", async () => {
     serve({
       "GET /api/session": { body: { ...ann, role: "reader" } },
-      "GET /api/members": { body: { members: [{ id: ann.member, name: "Ann", role: "keeper" }] } },
+      "GET /api/members": {
+        body: { members: [{ id: ann.member, name: "Ann", nickname: null, role: "keeper" }] },
+      },
     });
     open("/family");
     await screen.findByText("Ann");
@@ -395,6 +630,7 @@ describe("one's own account", () => {
     member: {
       id: ann.member,
       name: "Gran",
+      nickname: null,
       role: "reader",
       person: null,
       createdAt: 1_800_000_000_000,
@@ -443,6 +679,34 @@ describe("one's own account", () => {
     press(await screen.findByRole("button", { name: "Выйти" }).then(() => "Выйти"));
     expect((await alert()).textContent).toBe("Сервер не ответил. Проверьте интернет и повторите.");
     expect(window.location.pathname).toBe("/account");
+  });
+
+  it("asks a member called by a nickname to write a name, and calls them by it", async () => {
+    const nickname = { adjective: "wild", creature: "owl" };
+    const asked = serve({
+      "GET /api/session": { body: { ...ann, name: "", nickname, role: "reader" } },
+      "GET /api/account": {
+        body: { ...account, member: { ...account.member, name: "", nickname } },
+      },
+      "POST /api/account/name": { status: 204 },
+    });
+    open("/account");
+    expect(await screen.findByText("Бешеная Сова")).toBeTruthy();
+    expect(screen.getByText("Это шуточное имя. Напишите настоящее.")).toBeTruthy();
+    const save = screen.getByRole("button", { name: "Сохранить имя" });
+    expect(save).toHaveProperty("disabled", true);
+    type(/Ваше имя/u, " Dina ");
+    press("Сохранить имя");
+    expect(await screen.findByText("Теперь ваше имя: Dina")).toBeTruthy();
+    expect(asked.find(({ key }) => key === "POST /api/account/name")?.body).toEqual({
+      name: "Dina",
+    });
+    // What the page knows of the member is asked again.
+    await waitFor(() => {
+      const keys = asked.map(({ key }) => key);
+      expect(keys.filter((key) => key === "GET /api/account").length).toBeGreaterThan(1);
+      expect(keys.filter((key) => key === "GET /api/session").length).toBeGreaterThan(1);
+    });
   });
 
   it("is in English too", async () => {

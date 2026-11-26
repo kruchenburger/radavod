@@ -126,8 +126,16 @@ export async function sessionAnswerOf(c: ApiContext, signed: Signed): Promise<Se
   const access = accessOf(c);
   const [members, family] = await Promise.all([access.members(), access.family()]);
   const { member, role, person, via } = signed;
-  const name = members.find(({ id }) => id === member)?.name ?? "";
-  return { member, name, role, person, family, via };
+  const own = members.find(({ id }) => id === member);
+  return {
+    member,
+    name: own?.name ?? "",
+    nickname: own?.nickname ?? null,
+    role,
+    person,
+    family,
+    via,
+  };
 }
 
 /** The country Cloudflare says a request came from, if any. */
@@ -144,6 +152,8 @@ const statuses: Record<string, 400 | 401 | 403 | 404 | 409 | 410 | 429> = {
   "last-keeper": 409,
   "stale-version": 409,
   "stale-counter": 401,
+  "name-required": 400,
+  "nicknames-spent": 409,
   "unknown-aggregate": 400,
   duplicate: 409,
   "passkey-required": 409,

@@ -69,8 +69,9 @@ export function signInRoutes(app: Hono<Api>): void {
     const access = accessOf(c);
     const found = await access.inspect(await hashOf(input.secret), Date.now());
     if (!found.ok) return refused(c, found.error);
-    const { kind, role, canLink } = found.value;
-    const answer: InvitationAnswer = { kind, role, family: await access.family(), canLink };
+    const { kind, role, canLink, name, nickname, nameOptional } = found.value;
+    const family = await access.family();
+    const answer: InvitationAnswer = { kind, role, family, canLink, name, nickname, nameOptional };
     return c.json(answer);
   });
 

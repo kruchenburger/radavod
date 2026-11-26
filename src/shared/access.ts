@@ -10,6 +10,12 @@ import { memberIdSchema, personIdSchema } from "./values";
 export const ACCESS_PAGES = ["/setup", "/join", "/sign-in", "/family", "/account"] as const;
 export type AccessPage = (typeof ACCESS_PAGES)[number];
 
+/**
+ * A nickname in an answer, by the keys of its words. The browser writes them in its language, and
+ * shows a key it does not know as nothing rather than as a word.
+ */
+const nicknameSchema = z.strictObject({ adjective: z.string(), creature: z.string() });
+
 export const roleSchema = z.enum(["reader", "editor", "keeper"]);
 
 /** 256 bits in base64url, from after the "#" of a link. */
@@ -59,7 +65,16 @@ export const bindInput = z.strictObject({
   label: z.string().max(100),
 });
 
-export const inviteInput = z.strictObject({ role: roleSchema, person: personIdSchema.nullable() });
+export const inviteInput = z.strictObject({
+  role: roleSchema,
+  person: personIdSchema.nullable(),
+  /** What to call whom the link lets in. Empty or missing, the link gets a nickname. */
+  name: z.string().trim().max(200).optional(),
+});
+
+/** The name a member writes for themselves. */
+// A blank name passes: the domain refuses it, by its own code.
+export const renameInput = z.strictObject({ name: z.string().max(200) });
 
 /** The version of the member the keeper saw. */
 export const roleInput = z.strictObject({ role: roleSchema, version: z.int().nonnegative() });
@@ -69,6 +84,7 @@ export const versionInput = z.strictObject({ version: z.int().nonnegative() });
 export const sessionAnswer = z.strictObject({
   member: memberIdSchema,
   name: z.string(),
+  nickname: nicknameSchema.nullable(),
   role: roleSchema,
   person: personIdSchema.nullable(),
   family: z.string().nullable(),
@@ -81,8 +97,14 @@ export const invitationAnswer = z.strictObject({
   kind: z.enum(["join", "recovery"]),
   role: roleSchema,
   family: z.string().nullable(),
+  /** What the keeper called whom they invite, to write in the field of the name. */
+  name: z.string().nullable(),
+  /** What they are called if they write no name. */
+  nickname: nicknameSchema.nullable(),
   /** Whether whom it lets in may link this browser instead of making a passkey. */
   canLink: z.boolean(),
+  /** Whether whom it lets in may join without writing a name: the link has one for them. */
+  nameOptional: z.boolean(),
 });
 
 const credentialAnswer = z.strictObject({
@@ -100,6 +122,7 @@ export const accountAnswer = z.strictObject({
   member: z.strictObject({
     id: memberIdSchema,
     name: z.string(),
+    nickname: nicknameSchema.nullable(),
     role: roleSchema,
     person: personIdSchema.nullable(),
     createdAt: z.int(),
@@ -115,6 +138,7 @@ export const rosterAnswer = z.strictObject({
     z.object({
       id: memberIdSchema,
       name: z.string(),
+      nickname: nicknameSchema.nullable(),
       role: roleSchema,
       version: z.int().optional(),
       person: personIdSchema.nullable().optional(),
@@ -134,6 +158,8 @@ export const rosterAnswer = z.strictObject({
         spentAt: z.int().nullable(),
         kind: z.enum(["join", "recovery"]),
         member: memberIdSchema.nullable(),
+        name: z.string().nullable(),
+        nickname: nicknameSchema.nullable(),
       }),
     )
     .optional(),

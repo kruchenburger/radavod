@@ -3,6 +3,7 @@ import type { MemberId } from "../../kernel/id";
 import {
   addInput,
   inviteInput,
+  renameInput,
   type LinkAnswer,
   roleInput,
   versionInput,
@@ -56,8 +57,18 @@ export function memberRoutes(app: Hono<Api>): void {
   app.post("/api/members/invitations", allow("manage-members"), async (c) => {
     const input = await bodyOf(c, inviteInput);
     if (input === null) return badRequest(c);
+    // A nickname is picked at random, by the server.
+    const [seed = 0] = crypto.getRandomValues(new Uint32Array(1));
     return linkOf(c, (id, hash, now) =>
-      accessOf(c).invite(c.get("signed").member, { id, hash, ...input, now }),
+      accessOf(c).invite(c.get("signed").member, {
+        id,
+        hash,
+        role: input.role,
+        person: input.person,
+        name: input.name ?? null,
+        now,
+        seed,
+      }),
     );
   });
 
@@ -124,7 +135,8 @@ export function memberRoutes(app: Hono<Api>): void {
     if (!account.ok) return refused(c, account.error);
     const passkeys = await access.provers(id);
     if (!passkeys.ok) return refused(c, passkeys.error);
-    const member = { id, name: account.value.member.name };
+    const { name, nickname } = account.value.member;
+    const member = { id, name, nickname };
     return registration(
       c,
       null,
@@ -156,6 +168,14 @@ export function memberRoutes(app: Hono<Api>): void {
     return done.error.code === "stale-counter"
       ? c.json({ error: "sign-in-refused" }, 401)
       : refused(c, done.error);
+  });
+
+  // The name one goes by, written by oneself: a nickname is one's own no more.
+  app.post("/api/account/name", allow("own-account"), async (c) => {
+    const input = await bodyOf(c, renameInput);
+    if (input === null) return badRequest(c);
+    const done = await accessOf(c).rename(c.get("signed").member, input.name);
+    return done.ok ? c.body(null, 204) : refused(c, done.error);
   });
 
   app.delete("/api/account", allow("own-account"), async (c) => {

@@ -79,8 +79,14 @@ const roleSchema = z.enum(["reader", "editor", "keeper"]);
 const time = z.int().nonnegative();
 const text = z.string().min(1);
 
+// A nickname as a row keeps it: two words by their keys, whatever words the domain knows now.
+const nicknameSchema = z.strictObject({ adjective: text, creature: text });
+// Rows written before nicknames have none: a missing one reads as none.
+const nicknameRow = nicknameSchema.nullable().default(null);
+
 const memberSchema = z.strictObject({
   name: z.string(),
+  nickname: nicknameRow,
   role: roleSchema,
   person: personIdSchema.nullable(),
   createdAt: time,
@@ -97,6 +103,8 @@ const invitationSchema = z.strictObject({
   spentAt: time.nullable(),
   kind: z.enum(["join", "recovery"]),
   member: memberIdSchema.nullable(),
+  name: z.string().nullable().default(null),
+  nickname: nicknameRow,
 }) satisfies z.ZodType<Invitation>;
 
 const credentialSchema = z.strictObject({
@@ -118,7 +126,11 @@ const sessionSchema = z.strictObject({
   expiresAt: time,
 }) satisfies z.ZodType<Session>;
 
-const newcomer = z.strictObject({ id: memberIdSchema, name: z.string() });
+const newcomer = z.strictObject({
+  id: memberIdSchema,
+  name: z.string(),
+  nickname: nicknameSchema.nullable().exactOptional(),
+});
 
 const challengeSchema = z.discriminatedUnion("purpose", [
   z.strictObject({
