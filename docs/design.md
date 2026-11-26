@@ -199,7 +199,7 @@ Under the strip a legend explains the cap, the dashes and the "?". Adoption is a
 ## States
 
 - Focus: 2 px `action` outline, 2 px away, 3 px on the map. Never removed, never clipped.
-- Focus on an entry of the tree, walked by the arrows, wide or on the phone: no outline. A tint of `hover` under the entry, 4 px beyond it above and below, 6 px to the right and 8 px to the left, corners of 3 px, with a 3 px bar of `action` on its left edge. It lies under the lines and the text, so it covers, clips and moves nothing; the bar keeps 3:1 against `paper`, `surface` and `hover` in both themes. Only the keys show it (`:focus-visible`), never a press of the mouse. Where the system forces its own colours, the plain outline comes back. The map keeps its own.
+- Focus on an entry of the tree, reached by the arrow keys on any width: no outline. A tint of `hover` under the entry, 4 px beyond it above and below, 6 px to the right and 8 px to the left, corners of 3 px, with a 3 px bar of `action` on its left edge. It lies under the lines and the text, so it covers, clips and moves nothing, and the sheet keeps room for it beside the outer columns; the bar keeps 3:1 against `paper`, `surface` and `hover` in both themes. Only the keys show it (`:focus-visible`), never a press of the mouse. Where the system forces its own colours, the plain outline comes back. The map keeps its own.
 - Hover: `hover` under a control, an underline for a name.
 - Filled button for the one main action of a screen, outlined for the rest. Disabled is `muted` text and a sentence that says why.
 - Loading keeps the last picture and says so in words. An error stands where the content would be, with the reason and the way out.

@@ -44,6 +44,8 @@
 
 .sheet {
   display: flex;
+  /* Room for the mark of focus beside the outer columns, which scrolling would cut off. */
+  padding-inline: 0.5rem;
   margin: 0 auto;
 }
 
@@ -57,8 +59,16 @@
 
 .canvas {
   position: relative;
-  /* What lies under the entries stays under the lines, and over the strip. */
+  /* Keeps the tint of the focused entry and the lines inside the canvas, over the strip. */
   isolation: isolate;
+}
+
+/*
+ * Every entry is moved by a transform and so stacks on its own: the lines go over the entries,
+ * where they end before the text, so that a tint under an entry never hides them.
+ */
+.canvas > svg {
+  z-index: 1;
 }
 
 .columns {
@@ -94,8 +104,8 @@
 }
 
 /*
- * The keys walk the tree; the entry they stand on gets a tint and a bar of the action ink before
- * it. Both lie under the lines and the text, so nothing is covered, clipped or moved.
+ * The keys walk the tree; the entry they stand on gets a tint and a bar in the `action` colour
+ * before it. Both lie under the lines and the text, so nothing is covered, clipped or moved.
  */
 .name:focus-visible {
   outline: none;

@@ -209,7 +209,7 @@ test.describe("around a person", () => {
     for (const key of ["ArrowLeft", "ArrowLeft", "ArrowLeft"]) await page.keyboard.press(key);
     const focused = page.locator("[data-press]:focus");
     await expect(focused).toBeInViewport({ ratio: 1 });
-    // A tint with a bar of the action ink, under the text: no ring, and nothing moves.
+    // A tint with an `action` bar, under the lines and the text: no ring, and nothing moves.
     const mark = () => page.evaluate(markOfFocus);
     expect(await mark()).toEqual({
       outline: "none",
@@ -231,20 +231,50 @@ test.describe("around a person", () => {
     await expect(page).toHaveURL(/\/sample\/person\//);
     await expect(page.getByRole("heading", { level: 1 })).toBeFocused();
   });
-});
 
-test.describe("the search", () => {
   test("a press of the mouse shows no mark of the keys", async ({ page }) => {
     await page.goto("/sample");
     await ready(page);
-    await page.locator(`[data-press="p:${father}"]`).click();
-    await expect(page).toHaveURL(`/sample/tree/${father}`);
-    const content = await page.evaluate(
-      "getComputedStyle(document.activeElement, '::before').content",
+    await page.locator(`[data-press="p:${father}"]`).hover();
+    await page.mouse.down();
+    const pressed = await page.evaluate(
+      "[document.activeElement.dataset.press, getComputedStyle(document.activeElement, '::before').content]",
     );
-    expect(content).toBe("none");
+    await page.mouse.up();
+    expect(pressed).toEqual([`p:${father}`, "none"]);
   });
 
+  test("the lines of kinship stay over the mark of focus", async ({ page }) => {
+    await page.setViewportSize({ width: 1440, height: 700 });
+    await page.goto("/sample");
+    await ready(page);
+    await page.locator(`[data-press="p:${start}"]`).focus();
+    await page.keyboard.press("ArrowLeft");
+    // Points of the lines that pass over the tint of the entry: each must be seen, not hidden.
+    const seen = await page.evaluate<boolean[]>(`(() => {
+      const entry = document.activeElement.getBoundingClientRect();
+      const svg = document.querySelector("svg[data-late]");
+      const matrix = svg.getScreenCTM();
+      // The lines let presses through; for this look they are hit like anything else.
+      svg.style.pointerEvents = "visiblePainted";
+      const found = [];
+      for (const path of svg.querySelectorAll("path")) {
+        const length = path.getTotalLength();
+        for (let at = 0; at <= length; at += 2) {
+          const { x, y } = path.getPointAtLength(at).matrixTransform(matrix);
+          const inside = x >= entry.left - 8 && x <= entry.left && y > entry.top && y < entry.bottom;
+          if (inside) found.push(document.elementFromPoint(x, y)?.closest("svg") === svg);
+        }
+      }
+      svg.style.pointerEvents = "";
+      return found;
+    })()`);
+    expect(seen.length).toBeGreaterThan(0);
+    expect(seen.every(Boolean)).toBe(true);
+  });
+});
+
+test.describe("the search", () => {
   test("finds by an old spelling and leads there", async ({ page }) => {
     await page.goto("/sample");
     await ready(page);
