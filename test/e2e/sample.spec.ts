@@ -26,6 +26,7 @@ const screens = [
   ["all branches near", `/sample/branches?level=near&person=${start}`],
   ["a person", `/sample/person/${manyUnions}`],
   ["the pages of branches", `/sample/list/${start}`],
+  ["the fan of ancestors", "/sample/branches?as=fan"],
 ] as const;
 
 /** Everything has come that will come. */
@@ -545,6 +546,7 @@ test("everything to press on a phone is as large as a finger", async ({ page, is
     `/sample/tree/${manyUnions}?siblings=open`,
     `/sample/person/${start}`,
     `/sample/list/${start}`,
+    "/sample/branches?as=fan",
   ]) {
     await page.goto(path);
     await page.waitForTimeout(600);
@@ -576,6 +578,78 @@ test.describe("screens whose code does not come", () => {
     await page.goto("/sample");
     await expect(page.getByRole("alert")).toContainText("The page didn't open.");
     await expect(page.getByRole("button", { name: "Reload" })).toBeVisible();
+  });
+});
+
+test.describe("the fan of ancestors", () => {
+  test("is walked by the keys, with the mark of the tree, and Enter puts one in the centre", async ({
+    page,
+  }) => {
+    await page.setViewportSize({ width: 1440, height: 900 });
+    await page.goto("/sample/branches?as=fan");
+    await ready(page);
+    const fan = page.locator("[data-fan] svg");
+    await expect(fan.locator("[data-key]").first()).toBeAttached();
+    await fan.locator('[data-key][tabindex="0"]').focus();
+    await page.keyboard.press("ArrowUp");
+    await page.keyboard.press("ArrowRight");
+    const focused = page.locator("[data-fan] [data-key]:focus");
+    await expect(focused).toBeInViewport();
+    const mark = await page.evaluate(`(() => {
+      const cell = document.activeElement;
+      const [ground, bar] = cell.querySelectorAll("path");
+      return {
+        outline: getComputedStyle(cell).outlineStyle,
+        tint: getComputedStyle(ground).fill,
+        bar: getComputedStyle(bar).stroke,
+      };
+    })()`);
+    const tokens: { hover: string; action: string } = await page.evaluate(`(() => {
+      const probe = document.createElement("i");
+      document.body.append(probe);
+      probe.style.color = "var(--hover)";
+      const hover = getComputedStyle(probe).color;
+      probe.style.color = "var(--action)";
+      const action = getComputedStyle(probe).color;
+      probe.remove();
+      return { hover, action };
+    })()`);
+    expect(mark).toEqual({ outline: "none", tint: tokens.hover, bar: tokens.action });
+    const href = (await focused.getAttribute("href")) ?? "";
+    await page.keyboard.press("Enter");
+    await expect(page).toHaveURL(href);
+    await expect(page.getByRole("group", { name: /^Ancestors of / })).toBeVisible();
+    // The keys go on from the new fan, not from the top of the page.
+    await expect(page.locator("[data-fan] [data-key]:focus")).toHaveCount(1);
+  });
+
+  test("fits a wide window across with the centre in sight, no text below 14 px", async ({
+    page,
+  }) => {
+    await page.setViewportSize({ width: 1440, height: 900 });
+    await page.goto("/sample/branches?as=fan");
+    await ready(page);
+    const stage = page.locator("[data-fan]");
+    expect(await stage.evaluate((element) => element.scrollWidth <= element.clientWidth)).toBe(
+      true,
+    );
+    await expect(page.locator("[data-fan] svg a").last()).toBeInViewport();
+    // Every text is drawn at its size times the scale of the drawing.
+    const sizes: number[] = await page.evaluate(`(() => {
+      const svg = document.querySelector("[data-fan] svg");
+      const scale = svg.getBoundingClientRect().width / svg.viewBox.baseVal.width;
+      return [...svg.querySelectorAll("text tspan, text")]
+        .filter((one) => getComputedStyle(one).opacity !== "0" && one.textContent.trim() !== "")
+        .map((one) => parseFloat(getComputedStyle(one).fontSize) * scale);
+    })()`);
+    expect(Math.min(...sizes)).toBeGreaterThanOrEqual(13.9);
+  });
+
+  test("opens at its centre on the phone", async ({ page }) => {
+    await page.setViewportSize({ width: 390, height: 844 });
+    await page.goto("/sample/branches?as=fan");
+    await ready(page);
+    await expect(page.locator("[data-fan] svg a").last()).toBeInViewport();
   });
 });
 

@@ -18,6 +18,8 @@ export type TreePlace = {
 
 export type BranchesPlace = {
   screen: "branches";
+  /** The map of all branches, or the fan of the ancestors of the chosen person. */
+  as: "map" | "fan";
   level: MapLevel;
   /** The chosen person. */
   person: string | null;
@@ -27,6 +29,8 @@ export type BranchesPlace = {
   at: Spot | null;
   /** How much larger than the level is, 1 by default. */
   scale: number;
+  /** On the fan, the partner who stands in the centre with the chosen person. */
+  partner: string | null;
 };
 
 export type Place =
@@ -45,11 +49,13 @@ export const treePlace = (person: string | null): TreePlace => ({
 
 export const branchesPlace = (place: Partial<BranchesPlace> = {}): BranchesPlace => ({
   screen: "branches",
+  as: "map",
   level: "far",
   person: null,
   branch: null,
   at: null,
   scale: 1,
+  partner: null,
   ...place,
 });
 
@@ -78,6 +84,8 @@ export function readPlace(path: string, search: string): Place | null {
   const [, person, dx, dy] = spot.exec(query.get("at") ?? "") ?? [];
   const scale = Number(query.get("scale") ?? 1);
   return branchesPlace({
+    as: query.get("as") === "fan" ? "fan" : "map",
+    partner: idOf("with"),
     level: level === "closer" || level === "near" ? level : "far",
     person: idOf("person"),
     branch: idOf("branch"),
@@ -93,7 +101,11 @@ export function hrefOf(place: Place): string {
     if (place.open !== null) query.set("union", place.open);
     if (place.half === "descendants") query.set("half", place.half);
   }
-  if (place.screen === "branches") {
+  if (place.screen === "branches" && place.as === "fan") {
+    query.set("as", "fan");
+    if (place.person !== null) query.set("person", place.person);
+    if (place.partner !== null) query.set("with", place.partner);
+  } else if (place.screen === "branches") {
     if (place.level !== "far") query.set("level", place.level);
     if (place.person !== null) query.set("person", place.person);
     if (place.branch !== null) query.set("branch", place.branch);

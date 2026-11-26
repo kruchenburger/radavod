@@ -3,6 +3,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { generateFamily } from "../../examples/generate.ts";
 import { sampleOf } from "../../examples/snapshot.ts";
 import { App } from "../../web/app/app";
+import { labelsOf } from "../../web/sample/fan-screen";
 import { kinOf } from "../../web/tree/layout/kin";
 import { relativesOf } from "../../web/tree/layout/relatives";
 import { wordsOf } from "../../web/tree/words";
@@ -551,6 +552,92 @@ describe("the pages of branches", () => {
     expect(address()).toBe(`/sample/list/${start}`);
     press(screen.getAllByRole("link", { name: "Родословная" }).at(-1) as HTMLElement);
     expect(address()).toBe(`/sample/tree/${start}`);
+  });
+});
+
+describe("the words of the choices of the centre", () => {
+  const forms: Record<string, [string, string, string]> = {
+    a: ["Анна", "Анна Ольхунич", "1900–1950"],
+    b: ["Анна", "Анна Мятлик", "1901–1960"],
+    c: ["Анна", "Анна Мятлик", "1930–2000"],
+    d: ["Иван", "Иван Мятлик", "1899–1970"],
+  };
+  const label = (ids: string[]) => labelsOf(ids, (id) => forms[id] ?? ["", "", ""]);
+
+  it("are the given name, the whole name when two share it, and the years when two share that", () => {
+    expect(["a", "d"].map(label(["a", "d"]))).toEqual(["Анна", "Иван"]);
+    expect(["a", "b", "d"].map(label(["a", "b", "d"]))).toEqual([
+      "Анна Ольхунич",
+      "Анна Мятлик",
+      "Иван",
+    ]);
+    expect(["b", "c"].map(label(["b", "c"]))).toEqual([
+      "Анна Мятлик, 1901–1960",
+      "Анна Мятлик, 1930–2000",
+    ]);
+  });
+});
+
+describe("the fan", () => {
+  const fan = () => screen.getByRole("group", { name: /^Предки:/ });
+
+  it("opens on the couple where the branches meet, and the centre can be chosen", async () => {
+    await open("/sample/branches?as=fan");
+    const { line } = sample;
+    const partner = kinOf(sample.snapshot).unions(line)[0]?.other;
+    expect(fan().getAttribute("aria-label")).toContain(name(line));
+    expect(fan().getAttribute("aria-label")).toContain(name(partner ?? ""));
+    const centre = screen.getByRole("navigation", { name: "В центре" });
+    const current = within(centre)
+      .getAllByRole("link")
+      .filter((link) => link.getAttribute("aria-current"));
+    expect(current.map((link) => link.getAttribute("href"))).toEqual([
+      `/sample/branches?as=fan&person=${line}&with=${partner}`,
+    ]);
+    press(within(centre).getAllByRole("link")[0] as HTMLElement);
+    expect(address()).toBe(`/sample/branches?as=fan&person=${line}`);
+    expect(fan().getAttribute("aria-label")).toBe(`Предки: ${name(line)}`);
+  });
+
+  it("puts a pressed ancestor in the centre, and leads from the centre to the pedigree", async () => {
+    await open(`/sample/branches?as=fan&person=${sample.line}`);
+    const cell = fan().querySelector<SVGAElement>("[data-key][tabindex='0']");
+    const href = cell?.getAttribute("href") ?? "";
+    expect(href).toMatch(/^\/sample\/branches\?as=fan&person=p\d+$/);
+    press(cell as unknown as HTMLElement);
+    expect(address()).toBe(href);
+    const centre = screen.getAllByRole("link", { name: name(href.split("=").at(-1) ?? "") });
+    press(centre.at(-1) as HTMLElement);
+    expect(address()).toBe(`/sample/tree/${href.split("=").at(-1)}`);
+  });
+
+  it("is walked by the arrows, one cell at a time in the order of the keys", async () => {
+    await open(`/sample/branches?as=fan&person=${sample.line}`);
+    const stops = () => fan().querySelectorAll("[data-key][tabindex='0']");
+    expect(stops()).toHaveLength(1);
+    const first = stops()[0] as SVGAElement;
+    act(() => first.focus());
+    fireEvent.keyDown(first, { key: "ArrowUp" });
+    await waitFor(() => expect(document.activeElement).not.toBe(first));
+    const up = document.activeElement as SVGAElement;
+    expect(up.getAttribute("data-key")?.startsWith(first.getAttribute("data-key") ?? "")).toBe(
+      true,
+    );
+    fireEvent.keyDown(up, { key: "ArrowDown" });
+    await waitFor(() => expect(document.activeElement).toBe(first));
+    expect(stops()).toHaveLength(1);
+    const keys = document.getElementById(fan().getAttribute("aria-describedby") ?? "");
+    expect(keys?.textContent).toContain("Стрелки ведут по вееру");
+  });
+
+  it("is a way of the map, and the pedigree leads to it", async () => {
+    await open("/sample/branches");
+    const ways = screen.getByRole("navigation", { name: "Показать как" });
+    press(within(ways).getByRole("link", { name: "Веер" }));
+    expect(address()).toBe("/sample/branches?as=fan");
+    await open(`/sample/tree/${start}`);
+    press(screen.getByRole("link", { name: "Веер предков" }));
+    expect(address()).toBe(`/sample/branches?as=fan&person=${start}`);
   });
 });
 

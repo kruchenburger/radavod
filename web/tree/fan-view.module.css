@@ -1,0 +1,137 @@
+.stage {
+  flex: 1;
+  min-height: 0;
+  overflow: auto;
+  max-width: 100%;
+  padding: 0 1.75rem;
+}
+
+.fan {
+  display: block;
+  margin: 0 auto;
+  overflow: visible;
+}
+
+.cell,
+.centre {
+  cursor: pointer;
+  outline: none;
+}
+
+.ground {
+  fill: var(--paper);
+  stroke: var(--edge);
+  stroke-width: 1;
+}
+
+.cell:hover .ground,
+.centre:hover .ground {
+  fill: var(--hover);
+}
+
+/*
+ * The cell the keys stand on: a tint of `hover` and a bar of `action` on its inner edge, the mark
+ * of the tree. The text lies over both. A press of the mouse shows nothing.
+ */
+.bar {
+  fill: none;
+  stroke: none;
+}
+
+.cell:focus-visible .ground,
+.centre:focus-visible .ground {
+  fill: var(--hover);
+}
+
+.cell:focus-visible .bar,
+.centre:focus-visible .bar {
+  stroke: var(--action);
+  stroke-width: 3px;
+}
+
+@media (forced-colors: active) {
+  .cell:focus-visible .ground,
+  .centre:focus-visible .ground {
+    stroke: CanvasText;
+    stroke-width: 3px;
+  }
+}
+
+.text {
+  fill: var(--ink);
+  font: 400 17px var(--serif);
+}
+
+.cell[data-direct] .text {
+  font-weight: 700;
+}
+
+.years {
+  fill: var(--muted);
+  font: 400 16px var(--sans);
+}
+
+/* The name of a link for a screen reader, which the cell shows in part or not at all. */
+.said {
+  font-size: 1px;
+  opacity: 0;
+  pointer-events: none;
+}
+
+.cell[data-repeat] .ground {
+  fill: var(--surface);
+}
+
+.bracket,
+.direct,
+.leader {
+  fill: none;
+}
+
+.bracket {
+  stroke: var(--rule);
+  stroke-width: 1.6px;
+}
+
+.direct {
+  stroke: var(--ink);
+  stroke-width: 3px;
+}
+
+.spoke {
+  fill: none;
+  stroke-width: 4px;
+}
+
+.leader {
+  stroke-width: 1.2px;
+}
+
+.branch {
+  font: 700 19px var(--serif);
+}
+
+.decade {
+  fill: var(--muted);
+  font: italic 400 16px var(--serif);
+}
+
+.centre text {
+  fill: var(--ink);
+  font: 700 17px var(--serif);
+}
+
+.centre .ground {
+  stroke: none;
+}
+
+.ring {
+  fill: var(--muted);
+  font: 400 17px var(--serif);
+}
+
+@media (max-width: 44.99em) {
+  .stage {
+    padding: 0 0.5rem;
+  }
+}

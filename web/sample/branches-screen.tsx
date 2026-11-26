@@ -26,6 +26,7 @@ import {
 import classes from "./branches-screen.module.css";
 import { useData } from "./data";
 import { rememberTree } from "./last-tree";
+import { Modes } from "./modes";
 import { type BranchesPlace, branchesPlace, hrefOf, treePlace } from "./places";
 
 const levels: MapLevel[] = ["far", "closer", "near"];
@@ -73,6 +74,7 @@ export function BranchesScreen({ place }: { place: BranchesPlace }) {
         <Link className={classes.close} href={back} aria-label={t("card.back")}>
           <CloseIcon />
         </Link>
+        <Modes place={place} />
         {maps.status === "ready" && <Levels place={place} latest={latest} />}
       </div>
       {maps.status === "loading" && <Message text={t("map.loading")} />}
