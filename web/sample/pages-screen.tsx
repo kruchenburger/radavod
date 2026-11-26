@@ -127,18 +127,16 @@ type EntryProps = { entry: PageEntry; page: string | null; chosen: string };
 type Placed = EntryProps & { line?: "pass" | "in" | undefined; isAlone?: boolean | undefined };
 
 function Entry({ entry, page, chosen, line, isAlone = false }: Placed) {
-  const { parents, partners, children, alone } = entry;
+  const { parents, partners, children } = entry;
   return (
     <li data-line={line} data-kind={turnOf(entry.tie)}>
       {parents !== null && <Line entry={parents} page={page} chosen={chosen} />}
       <Line entry={entry} page={page} chosen={chosen} isAlone={isAlone} />
       <Children entries={children} page={page} chosen={chosen} />
-      <Children entries={alone} page={page} chosen={chosen} isAlone />
       {partners.map((partner) => (
         <div key={partner.key}>
           <Line entry={partner} page={page} chosen={chosen} isPartner />
-          <Children entries={partner.children} page={page} chosen={chosen} />
-          <Children entries={partner.alone} page={page} chosen={chosen} isAlone />
+          <Children entries={partner.children} alone={partner.alone} page={page} chosen={chosen} />
           {partner.partners.map((other) => (
             <div key={other.key}>
               <Line entry={other} page={page} chosen={chosen} isPartner />
@@ -151,31 +149,41 @@ function Entry({ entry, page, chosen, line, isAlone = false }: Placed) {
   );
 }
 
-/** The line of the trunk is dark down to the child on the direct line. */
+/**
+ * Children on one trunk, dark down to the child on the direct line. Those of a partner whose other
+ * parent is unknown come first, as the map has them, and say so.
+ */
 function Children({
   entries,
+  alone = [],
   ...rest
 }: {
   entries: PageEntry[];
+  alone?: PageEntry[];
   page: string | null;
   chosen: string;
-  isAlone?: boolean;
 }) {
-  if (entries.length === 0) return null;
-  const direct = entries.findIndex(({ tie }) => tie?.direct === true);
+  const all = [...alone, ...entries];
+  if (all.length === 0) return null;
+  const direct = all.findIndex(({ tie }) => tie?.direct === true);
   return (
     <ul>
-      {entries.map((entry, i) => (
+      {all.map((entry, i) => (
         <Entry
           key={entry.key}
           entry={entry}
           {...rest}
           line={i < direct ? "pass" : i === direct ? "in" : undefined}
+          isAlone={i < alone.length && isOfBlood(entry.tie)}
         />
       ))}
     </ul>
   );
 }
+
+/** Taken in alone, by adoption or guardianship, a child has no second parent to be unknown. */
+const isOfBlood = (tie: PageTie | null): boolean =>
+  tie === null || tie.kind === "blood" || tie.kind === "unknown";
 
 type LineProps = {
   entry: PageEntry;
@@ -284,8 +292,14 @@ function useChosen(strip: React.RefObject<HTMLDivElement | null>, chosen: string
       `[data-key="${CSS.escape(personKey(chosen))}"]`,
     );
     if (line == null) return;
-    // Back to the pages, the browser puts the window where it was.
-    if (!isFirst.current || !cameBack()) {
+    if (isFirst.current && cameBack()) {
+      // Back to the pages the browser puts the window where it was; the row of pages is new.
+      const row = strip.current;
+      const page = line.closest<HTMLElement>("[data-page]");
+      if (row != null && page != null) {
+        row.scrollLeft = page.offsetLeft - (row.clientWidth - page.offsetWidth) / 2;
+      }
+    } else {
       line.scrollIntoView?.({ block: "center", inline: "center" });
     }
     if (!isFirst.current) line.querySelector<HTMLElement>("a")?.focus({ preventScroll: true });
@@ -336,19 +350,30 @@ function useWires(
       const rem = Number.parseFloat(getComputedStyle(document.documentElement).fontSize) || 16;
       const sizes = { rail: 0.75 * rem, apart: 0.5 * rem };
       const wires = routeCrossings(sheets.map(boxOf), ends, sizes);
-      // The rail grows with its lanes and keeps a lane of room above the pages.
+      // The rail grows with its lanes; under the last one there is room of two lanes.
       const lanes = wires.filter((points) => points.length > 4).length;
       const top = sizes.rail + (lanes + 1) * sizes.apart;
-      setDrawn({ wires, rail: top > 2.75 * rem ? `${top / rem}rem` : null });
+      const rail = top > 2.75 * rem ? `${top / rem}rem` : null;
+      if (rail !== null && row.style.paddingTop !== rail) {
+        // The pages move down: measured again where they stand.
+        row.style.paddingTop = rail;
+        draw();
+        return;
+      }
+      setDrawn((old) => (same(old.wires, wires) && old.rail === rail ? old : { wires, rail }));
     };
+    let isLive = true;
     draw();
     const observer = new ResizeObserver(draw);
     observer.observe(row);
     for (const sheet of row.querySelectorAll("[data-page]")) observer.observe(sheet);
     const fonts = typeof document.fonts === "undefined" ? null : document.fonts;
     fonts?.addEventListener("loadingdone", draw);
-    void fonts?.ready.then(draw);
+    void fonts?.ready.then(() => {
+      if (isLive) draw();
+    });
     return () => {
+      isLive = false;
       observer.disconnect();
       fonts?.removeEventListener("loadingdone", draw);
     };
@@ -357,3 +382,5 @@ function useWires(
 }
 
 const none = { wires: [], rail: null };
+
+const same = (a: Point[][], b: Point[][]): boolean => JSON.stringify(a) === JSON.stringify(b);

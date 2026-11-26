@@ -6,6 +6,7 @@ import { App } from "../../web/app/app";
 import { kinOf } from "../../web/tree/layout/kin";
 import { relativesOf } from "../../web/tree/layout/relatives";
 import { wordsOf } from "../../web/tree/words";
+import { familyOf } from "./layout/family";
 
 /** Answers as the worker of a browser does, or breaks as one that did not load. */
 const { FakeWorker } = vi.hoisted(() => {
@@ -487,6 +488,32 @@ describe("the pages of branches", () => {
     const target = document.querySelector<HTMLAnchorElement>('a[aria-current="true"]');
     expect(target?.getAttribute("href")).toBe(href);
     await waitFor(() => expect(document.activeElement).toBe(target));
+  });
+
+  it("keep the children of a partner alone on the trunk of the union, and say so", async () => {
+    const snapshot = familyOf({
+      people: [
+        { id: "a", branch: "A" },
+        "wife",
+        { id: "both", branch: "A", parents: ["a", "wife"], born: 2 },
+        { id: "hers", parents: ["wife"], born: 1 },
+        { id: "taken", parents: [{ parent: "wife", kind: "adoption" }], born: 3 },
+      ],
+      unions: [["a", "wife"]],
+      branches: ["A"],
+    });
+    const own = { snapshot, start: "a", line: "both" };
+    answers["/sample/tree.json"] = () => Promise.resolve(Response.json(own));
+    await open("/sample/list/a");
+    await screen.findAllByRole("heading", { level: 2 });
+    const item = (id: string) => document.querySelector(`[data-key="p:${id}"]`)?.closest("li");
+    expect(item("hers")?.textContent).toContain("второй родитель неизвестен");
+    expect(item("taken")?.textContent).not.toContain("второй родитель неизвестен");
+    expect(item("both")?.textContent).not.toContain("второй родитель неизвестен");
+    // One trunk: dark past the child of the partner alone, down to the child on the line.
+    expect(item("hers")?.parentElement).toBe(item("both")?.parentElement);
+    expect(item("hers")?.dataset["line"]).toBe("pass");
+    expect(item("both")?.dataset["line"]).toBe("in");
   });
 
   it("lead back to the tree, and from the tree here", async () => {
