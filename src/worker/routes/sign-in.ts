@@ -1,4 +1,5 @@
 import type { Hono } from "hono";
+import { mayLinkBrowser } from "../../contexts/access";
 import {
   answerInput,
   bindInput,
@@ -70,7 +71,12 @@ export function signInRoutes(app: Hono<Api>): void {
     const found = await access.inspect(await hashOf(input.secret), Date.now());
     if (!found.ok) return refused(c, found.error);
     const { kind, role } = found.value;
-    const answer: InvitationAnswer = { kind, role, family: await access.family() };
+    const answer: InvitationAnswer = {
+      kind,
+      role,
+      family: await access.family(),
+      canLink: mayLinkBrowser(role),
+    };
     return c.json(answer);
   });
 
@@ -85,8 +91,7 @@ export function signInRoutes(app: Hono<Api>): void {
     });
     if (!member.ok) return nobody(c, member.error);
     // A family set up before it had a name is called by its domain.
-    const family = (await access.family()) ?? c.env.RP_ID ?? "";
-    return registration(c, family, member.value, (flow, challenge) => ({
+    return registration(c, null, member.value, (flow, challenge) => ({
       hash: flow,
       challenge,
       purpose: "register",

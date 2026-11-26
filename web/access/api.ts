@@ -55,7 +55,8 @@ export async function signInWithPasskey(): Promise<Answer<SessionAnswer>> {
       response,
     });
   } catch (error) {
-    return { ok: false, error: { code: refusalOf(error) } };
+    const code = refusalOf(error);
+    return { ok: false, error: { code: code === "passkey-refused" ? "passkey-failed" : code } };
   }
 }
 

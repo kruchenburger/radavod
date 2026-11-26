@@ -131,8 +131,8 @@ describe("a step of signing in", () => {
     const body = { flow: options.body.flow, response };
     expect((await browser.call("POST", "/api/setup/verify", { body })).status).toBe(200);
     expect(await browser.json("POST", "/api/setup/verify", { body })).toEqual({
-      status: 404,
-      body: { error: "missing" },
+      status: 410,
+      body: { error: "step-over" },
     });
   });
 
@@ -150,7 +150,7 @@ describe("a step of signing in", () => {
     expect((await browser.json("POST", "/api/setup/verify", { body })).body).toEqual({
       error: "passkey-refused",
     });
-    expect((await browser.call("POST", "/api/setup/verify", { body })).status).toBe(404);
+    expect((await browser.call("POST", "/api/setup/verify", { body })).status).toBe(410);
   });
 });
 
@@ -251,7 +251,7 @@ describe("an invitation", () => {
     for (let i = 0; i < 2; i++) {
       expect(await eve.json("POST", "/api/invitation", { body: { secret } })).toEqual({
         status: 200,
-        body: { kind: "join", role: "editor", family: "Oaks" },
+        body: { kind: "join", role: "editor", family: "Oaks", canLink: false },
       });
     }
     expect((await eve.join(secret, "Eve")).body).toMatchObject({ name: "Eve", role: "editor" });
@@ -339,7 +339,7 @@ describe("an invitation", () => {
 
 describe("one's own account", () => {
   it("shows its passkeys without keys, and takes one more passkey proven by one of them", async () => {
-    const { family, editor } = await Family.withRoles();
+    const { family, editor, keeper } = await Family.withRoles();
     const own = await editor.json<{ member: { name: string }; credentials: object[] }>(
       "GET",
       "/api/account",
@@ -353,10 +353,15 @@ describe("one's own account", () => {
       "/api/passkey/add/options",
     );
     const response = await second.passkey.register(options.body.options);
+    // A keeper's passkey signs well, and proves nothing of the editor's account.
     const unproven = await editor.json("POST", "/api/passkey/add/verify", {
-      body: { flow: options.body.flow, response, proof: response },
+      body: {
+        flow: options.body.flow,
+        response,
+        proof: await keeper.passkey.signIn(options.body.proof),
+      },
     });
-    expect(unproven.status).toBe(401);
+    expect(unproven).toEqual({ status: 409, body: { error: "passkey-required" } });
     const again = await editor.json<{ flow: string; options: never; proof: never }>(
       "POST",
       "/api/passkey/add/options",

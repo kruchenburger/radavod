@@ -43,16 +43,15 @@ export const gate: MiddlewareHandler<Api> = async (c, next) => {
   if (open.has(`${method} ${c.req.path}`)) {
     return isChange && !isOurs ? c.json({ error: "origin" }, 403) : next();
   }
-  const token = tokenOf(c.req.header("cookie"));
-  if (token === null) return c.json({ error: "unauthorized" }, 401);
+  if (tokenOf(c.req.header("cookie")) === null) return c.json({ error: "unauthorized" }, 401);
   if (isChange && !isOurs) return c.json({ error: "origin" }, 403);
-  const signed = await accessOf(c).session(await hashOf(token), Date.now());
-  if (signed === null) {
+  const found = await signedOf(c);
+  if (found === null) {
     c.header("set-cookie", clearedCookie());
     return c.json({ error: "unauthorized" }, 401);
   }
-  c.set("signed", signed);
-  c.set("token", token);
+  c.set("signed", found.signed);
+  c.set("token", found.token);
   await next();
 };
 
@@ -150,6 +149,7 @@ const statuses: Record<string, 400 | 401 | 403 | 404 | 409 | 410 | 429> = {
   "passkey-required": 409,
   "one-device": 409,
   "rate-limited": 429,
+  "step-over": 410,
 };
 
 /** A refusal as an answer: its code, and when a limit lets the next try in. */

@@ -59,9 +59,10 @@ test.describe("a family from its first keeper", () => {
   test("sets up, invites, lets a relative in, signs out and back in", async ({
     browser,
     baseURL,
+    context,
   }) => {
-    const keeperContext = await browser.newContext({ baseURL: baseURL ?? "", locale: "en" });
-    const keeper = await withAuthenticator(keeperContext);
+    // The keeper is the browser of the test itself, whose requests the page checks.
+    const keeper = await withAuthenticator(context);
     await keeper.goto("/setup");
     await keeper.getByRole("textbox", { name: /Setup code/u }).fill(SETUP_CODE);
     await keeper.getByRole("textbox", { name: /Family name/u }).fill("Oaks");
@@ -109,6 +110,6 @@ test.describe("a family from its first keeper", () => {
     await relative.getByRole("button", { name: "Sign in with a passkey" }).click();
     await expect(relative).toHaveURL(/\/family$/u);
 
-    await Promise.all([keeperContext.close(), relativeContext.close()]);
+    await relativeContext.close();
   });
 });

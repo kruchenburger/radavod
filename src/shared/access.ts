@@ -81,6 +81,76 @@ export const invitationAnswer = z.strictObject({
   kind: z.enum(["join", "recovery"]),
   role: roleSchema,
   family: z.string().nullable(),
+  /** Whether whom it lets in may link this browser instead of making a passkey. */
+  canLink: z.boolean(),
+});
+
+const credentialAnswer = z.strictObject({
+  id: z.string(),
+  member: memberIdSchema,
+  kind: z.enum(["passkey", "device"]),
+  label: z.string(),
+  createdAt: z.int(),
+  lastUsedAt: z.int(),
+  revokedAt: z.int().nullable(),
+});
+
+/** One's own account, as the browser gets it: what one signs in with, without any key. */
+export const accountAnswer = z.strictObject({
+  member: z.strictObject({
+    id: memberIdSchema,
+    name: z.string(),
+    role: roleSchema,
+    person: personIdSchema.nullable(),
+    createdAt: z.int(),
+    revokedAt: z.int().nullable(),
+  }),
+  credentials: z.array(credentialAnswer),
+  canAddPasskey: z.boolean(),
+});
+
+/** The members as a member sees them: a keeper sees credentials and invitations too. */
+export const rosterAnswer = z.strictObject({
+  members: z.array(
+    z.object({
+      id: memberIdSchema,
+      name: z.string(),
+      role: roleSchema,
+      version: z.int().optional(),
+      person: personIdSchema.nullable().optional(),
+      createdAt: z.int().optional(),
+      revokedAt: z.int().nullable().optional(),
+      credentials: z.array(credentialAnswer).optional(),
+    }),
+  ),
+  invitations: z
+    .array(
+      z.strictObject({
+        id: z.string(),
+        role: roleSchema,
+        person: personIdSchema.nullable(),
+        by: memberIdSchema,
+        expiresAt: z.int(),
+        spentAt: z.int().nullable(),
+        kind: z.enum(["join", "recovery"]),
+        member: memberIdSchema.nullable(),
+      }),
+    )
+    .optional(),
+});
+
+/** The sign-in log, the newest first. */
+export const logAnswer = z.strictObject({
+  log: z.array(
+    z.strictObject({
+      at: z.int(),
+      kind: z.enum(["sign-in", "recovery"]),
+      member: memberIdSchema,
+      credential: z.string().nullable(),
+      by: memberIdSchema.nullable(),
+      country: z.string().nullable(),
+    }),
+  ),
 });
 
 /** A link to give: its secret goes after the "#" and is shown once. */
@@ -92,4 +162,7 @@ export const linkAnswer = z.strictObject({
 
 export type SessionAnswer = z.infer<typeof sessionAnswer>;
 export type InvitationAnswer = z.infer<typeof invitationAnswer>;
+export type AccountAnswer = z.infer<typeof accountAnswer>;
+export type RosterAnswer = z.infer<typeof rosterAnswer>;
+export type LogAnswer = z.infer<typeof logAnswer>;
 export type LinkAnswer = z.infer<typeof linkAnswer>;

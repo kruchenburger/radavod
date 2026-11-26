@@ -168,8 +168,8 @@ export class FamilyAccess extends DurableObject<Env> {
     return this.#change({}, (access) => access.addPasskey(id, credential, now, proof));
   }
 
-  addCredential(id: MemberId, credential: NewCredential, now: number): Promise<Done> {
-    return this.#change({}, (access) => access.addCredential(id, credential, now));
+  provers(id: MemberId): Result<string[], AccessError> {
+    return this.#access().provers(id);
   }
 
   revokeCredential(by: MemberId, id: string, now: number): Promise<Done> {

@@ -1,20 +1,15 @@
 import { Button } from "@mantine/core";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { useState } from "react";
-import type { SessionAnswer } from "../../src/shared/access";
+import { type AccountAnswer, accountAnswer, type SessionAnswer } from "../../src/shared/access";
 import { useLanguage } from "../app/language";
 import { go } from "../app/router";
 import { call, canUsePasskeys, makePasskey, type Refusal, sessionQuery } from "./api";
 import { LabelInput } from "./entry";
 import { asRefusal } from "./errors";
 import { SignedIn } from "./frame";
-import { Confirm, CredentialLine, Problem, Section } from "./members";
+import { Confirm, CredentialLine, Problem, read, Section, Title } from "./members";
 import classes from "./members.module.css";
-
-type Account = {
-  member: { id: string; name: string; role: "reader" | "editor" | "keeper" };
-  credentials: Parameters<typeof CredentialLine>[0]["credential"][];
-};
 
 const accountKey = ["account"];
 
@@ -27,34 +22,54 @@ function Own({ session }: { session: SessionAnswer }) {
   const { t } = useLanguage();
   const account = useQuery({
     queryKey: accountKey,
-    queryFn: async () => {
-      const answer = await call<Account>("GET", "/api/account");
-      if (!answer.ok) throw answer.error;
-      return answer.value;
-    },
+    queryFn: () => read("/api/account", accountAnswer),
   });
-  if (account.isPending) return <p role="status">{t("page.loading")}</p>;
-  if (account.isError) return <Problem refusal={asRefusal(account.error)} />;
-  const { member, credentials } = account.data;
-  const live = credentials.filter(({ revokedAt }) => revokedAt === null);
   return (
     <>
-      <h1 className={classes.title}>{t("account.title")}</h1>
+      <Title>{t("account.title")}</Title>
+      {account.isPending && <p role="status">{t("page.loading")}</p>}
+      {account.isError && <Problem refusal={asRefusal(account.error)} />}
+      {account.data !== undefined && <Details account={account.data} session={session} />}
+    </>
+  );
+}
+
+function Details({ account, session }: { account: AccountAnswer; session: SessionAnswer }) {
+  const { t } = useLanguage();
+  const { member, credentials, canAddPasskey } = account;
+  const passkeys = credentials.filter(({ kind }) => kind === "passkey");
+  return (
+    <>
       <p className={classes.who}>
         <span className={classes.name}>{member.name}</span>
         <span className={classes.meta}>{t(`role.${member.role}`)}</span>
       </p>
       <Section title={t("account.credentials")}>
         <ul className={classes.credentials}>
-          {live.map((credential) => (
-            <CredentialLine key={credential.id} credential={credential} />
+          {credentials.map((credential) => (
+            <CredentialLine
+              key={credential.id}
+              credential={credential}
+              // Turning off one's last passkey locks one out: that is the cost to say.
+              {...(credential.kind === "passkey" && passkeys.length === 1
+                ? { cost: t("account.revokeLastCost") }
+                : {})}
+            />
           ))}
         </ul>
-        {canUsePasskeys() && <AddPasskey />}
+        {canAddPasskey && canUsePasskeys() ? (
+          <AddPasskey />
+        ) : (
+          <p className={classes.meta}>{t("account.addNeedsLink")}</p>
+        )}
       </Section>
-      <Section title={t("account.download")}>
+      <Section title={t("account.data")}>
         <p>{t("account.downloadAbout")}</p>
-        <Button variant="outline" size="md" onClick={() => download(account.data)}>
+        <Button
+          variant="outline"
+          size="md"
+          onClick={() => download(account, t("account.fileName"))}
+        >
           {t("account.download")}
         </Button>
       </Section>
@@ -93,71 +108,77 @@ function AddPasskey() {
         loading={state.isWorking === true}
         onClick={() => void add()}
       >
-        {state.isWorking ? t("passkey.working") : t("account.add")}
+        {state.isWorking === true ? t("passkey.working") : t("account.add")}
       </Button>
-      {state.isDone && <p role="status">{t("account.added")}</p>}
-      {state.refusal && <Problem refusal={state.refusal} />}
+      {state.isDone === true && <p role="status">{t("account.added")}</p>}
+      {state.refusal !== undefined && <Problem refusal={state.refusal} />}
     </div>
   );
 }
 
-/** Signing out, and deleting the account: each with what it costs beside its button. */
+/** Signing out and deleting the account: each with what it costs beside its button, asked once more. */
 function Leave({ session }: { session: SessionAnswer }) {
   const { t } = useLanguage();
   const client = useQueryClient();
   const [asked, setAsked] = useState<"out" | "delete" | null>(null);
   const [refusal, setRefusal] = useState<Refusal | null>(null);
   const isLinked = session.via === "device";
-  const gone = () => {
+  /** Only once the server says so: a page that only looks signed out leaves the session behind. */
+  const leave = async (method: "POST" | "DELETE", path: string) => {
+    setAsked(null);
+    const done = await call(method, path);
+    if (!done.ok) return setRefusal(done.error);
     client.setQueryData(sessionQuery.queryKey, null);
     go("/", "replace");
   };
-  const signOut = async () => {
-    await call("POST", "/api/logout");
-    gone();
-  };
-  const remove = async () => {
-    const done = await call("DELETE", "/api/account");
-    if (!done.ok) {
-      setAsked(null);
-      return setRefusal(done.error);
-    }
-    gone();
-  };
   return (
-    <>
-      <Section title={t("account.signOut")}>
-        {isLinked && <p>{t("account.signOutBrowserCost")}</p>}
-        <Button variant="outline" size="md" onClick={() => void signOut()}>
-          {t("account.signOut")}
-        </Button>
-      </Section>
-      <Section title={t("account.delete")}>
-        {asked !== "delete" && <p>{t("account.deleteCost")}</p>}
+    <Section>
+      <div className={classes.leave}>
+        {asked === "out" ? (
+          <Confirm
+            cost={t("account.signOutBrowserCost")}
+            action={t("account.signOut")}
+            onConfirm={() => void leave("POST", "/api/logout")}
+            onCancel={() => setAsked(null)}
+          />
+        ) : (
+          <Button
+            variant="outline"
+            size="md"
+            // A linked browser does not come back without a new link: that is asked once more.
+            onClick={() => (isLinked ? setAsked("out") : void leave("POST", "/api/logout"))}
+          >
+            {t("account.signOut")}
+          </Button>
+        )}
         {asked === "delete" ? (
           <Confirm
             cost={t("account.deleteCost")}
             action={t("account.deleteConfirm")}
-            onConfirm={() => void remove()}
+            onConfirm={() => void leave("DELETE", "/api/account")}
             onCancel={() => setAsked(null)}
           />
         ) : (
-          <Button variant="outline" size="md" onClick={() => setAsked("delete")}>
-            {t("account.delete")}
-          </Button>
+          <div>
+            <p>{t("account.deleteCost")}</p>
+            <Button variant="outline" size="md" onClick={() => setAsked("delete")}>
+              {t("account.delete")}
+            </Button>
+          </div>
         )}
-        {refusal !== null && <Problem refusal={refusal} />}
-      </Section>
-    </>
+      </div>
+      {refusal !== null && <Problem refusal={refusal} />}
+    </Section>
   );
 }
 
 /** The account as a file the member keeps: their name, role and passkeys, without any key. */
-function download(account: Account): void {
+function download(account: AccountAnswer, name: string): void {
   const file = new Blob([JSON.stringify(account, null, 2)], { type: "application/json" });
   const link = document.createElement("a");
   link.href = URL.createObjectURL(file);
-  link.download = "account.json";
+  link.download = name;
   link.click();
-  URL.revokeObjectURL(link.href);
+  // Some browsers start the download after the click returns.
+  setTimeout(() => URL.revokeObjectURL(link.href), 10_000);
 }

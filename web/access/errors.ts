@@ -1,28 +1,6 @@
+import { ru } from "../i18n/ru";
 import type { Key, Params } from "../i18n/t";
 import type { Refusal } from "./api";
-
-/** Codes the server or the browser refuse with, each with its text. */
-const known = new Set<string>([
-  "origin",
-  "not-configured",
-  "setup-refused",
-  "passkey-refused",
-  "sign-in-refused",
-  "cancelled",
-  "bad-request",
-  "spent",
-  "expired",
-  "missing",
-  "passkey-required",
-  "one-device",
-  "last-keeper",
-  "stale-version",
-  "forbidden",
-  "unauthorized",
-  "duplicate",
-  "rate-limited",
-  "broken",
-]);
 
 /** What a query threw: a refusal, or something that is not one. */
 export function asRefusal(error: unknown): Refusal {
@@ -36,5 +14,7 @@ export function textOf(t: (key: Key, params?: Params) => string, refusal: Refusa
   if (code === "rate-limited") {
     return t("error.rate-limited", { count: Math.max(1, Math.ceil((retryAfter ?? 60) / 60)) });
   }
-  return t(known.has(code) ? (`error.${code}` as Key) : "error.unknown");
+  const key = `error.${code}`;
+  // Every code with a text in the catalog is known; any other is a server that said nothing of use.
+  return t(Object.hasOwn(ru, key) ? (key as Key) : "error.unknown");
 }

@@ -122,18 +122,15 @@ export function memberRoutes(app: Hono<Api>): void {
     const { member: id } = c.get("signed");
     const account = await access.account(id);
     if (!account.ok) return refused(c, account.error);
-    const passkeys = account.value.credentials
-      .filter(({ kind, revokedAt }) => kind === "passkey" && revokedAt === null)
-      .map((one) => one.id);
-    if (passkeys.length === 0) return refused(c, { code: "passkey-required" });
+    const passkeys = await access.provers(id);
+    if (!passkeys.ok) return refused(c, passkeys.error);
     const member = { id, name: account.value.member.name };
-    const family = (await access.family()) ?? c.env.RP_ID ?? "";
     return registration(
       c,
-      family,
+      null,
       member,
       (hash, challenge) => ({ hash, challenge, purpose: "add", member }),
-      passkeys,
+      passkeys.value,
     );
   });
 
@@ -154,7 +151,11 @@ export function memberRoutes(app: Hono<Api>): void {
     if (passkey === null) return c.json({ error: "passkey-refused" }, 400);
     const proof = { credential: by.id, counter };
     const done = await access.addPasskey(step.value.member.id, passkey, Date.now(), proof);
-    return done.ok ? c.body(null, 201) : refused(c, done.error);
+    if (done.ok) return c.body(null, 201);
+    // A count that went back is a refused proof, as at sign-in.
+    return done.error.code === "stale-counter"
+      ? c.json({ error: "sign-in-refused" }, 401)
+      : refused(c, done.error);
   });
 
   app.delete("/api/account", allow("own-account"), async (c) => {

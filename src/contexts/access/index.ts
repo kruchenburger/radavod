@@ -15,7 +15,7 @@ export {
 export type { Challenge, Purpose } from "./domain/challenge";
 export type { ErasureLedger } from "./application/ledger";
 export type { AccessStore } from "./application/ports";
-export type { Credential, NewCredential } from "./domain/credential";
+export { type Credential, mayLinkBrowser, type NewCredential } from "./domain/credential";
 export type { Invitation } from "./domain/invitation";
 export type { Limit, RateLimited } from "./domain/limits";
 export type { LogEntry } from "./domain/log";

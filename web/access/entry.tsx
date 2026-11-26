@@ -1,6 +1,6 @@
 import { Button, TextInput, Title } from "@mantine/core";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
-import { type FormEvent, type ReactNode, useState } from "react";
+import { type FormEvent, type ReactNode, useEffect, useRef, useState } from "react";
 import type { InvitationAnswer, SessionAnswer } from "../../src/shared/access";
 import { useArrival } from "../app/arrival";
 import { Halves } from "../app/halves";
@@ -46,6 +46,7 @@ export function Setup() {
         }
         onDone={signed}
         isReady={code !== "" && family.trim() !== "" && name.trim() !== ""}
+        working={t("passkey.working")}
       >
         <TextInput
           label={t("setup.code")}
@@ -79,6 +80,9 @@ export function Join() {
     queryKey: ["invitation", secret],
     enabled: secret !== null,
     retry: false,
+    // Coming back from a messenger or the passkey window does not ask again, nor lose the form.
+    refetchOnWindowFocus: false,
+    staleTime: Infinity,
     queryFn: async () => {
       const answer = await call<InvitationAnswer>("POST", "/api/invitation", { secret });
       if (!answer.ok) throw answer.error;
@@ -98,8 +102,9 @@ function Invitation({ secret, invitation }: { secret: string; invitation: Invita
   const [passkeyLabel, setPasskeyLabel] = useState("");
   const signed = useSignedIn();
   const isNew = invitation.kind === "join";
-  const hasPasskeys = canUsePasskeys();
-  const canBind = invitation.role === "reader";
+  // A messenger's own browser often says it can and then cannot: it goes to a real one.
+  const hasPasskeys = canUsePasskeys() && !isInApp();
+  const canBind = invitation.canLink;
   return (
     <Halves family={invitation.family}>
       <Heading>
@@ -124,12 +129,13 @@ function Invitation({ secret, invitation }: { secret: string; invitation: Invita
           }
           onDone={signed}
           isReady={!isNew || name.trim() !== ""}
+          working={t("passkey.working")}
         >
           {isNew && <NameInput value={name} onChange={setName} />}
           <LabelInput value={passkeyLabel} onChange={setPasskeyLabel} />
         </Form>
       ) : (
-        <NoPasskeys />
+        <NoPasskeys text={t(isInApp() ? "passkey.inApp" : "passkey.noBrowser")} />
       )}
       {hasPasskeys && <p className={classes.note}>{t("passkey.about")}</p>}
       {canBind && (
@@ -147,6 +153,7 @@ function Invitation({ secret, invitation }: { secret: string; invitation: Invita
             }
             onDone={signed}
             isReady={!isNew || name.trim() !== ""}
+            working={t("join.binding")}
           >
             {!hasPasskeys && isNew && <NameInput value={name} onChange={setName} />}
             <TextInput
@@ -163,24 +170,40 @@ function Invitation({ secret, invitation }: { secret: string; invitation: Invita
   );
 }
 
-/** A messenger's own browser cannot make a passkey: the link goes to a real one, whole. */
-function NoPasskeys() {
+/**
+ * A browser that cannot use passkeys: the link goes to a real one, whole. Where the clipboard is
+ * closed too, the link stands in a field to copy by hand.
+ */
+function NoPasskeys({ text }: { text: string }) {
   const { t } = useLanguage();
-  const [isCopied, setCopied] = useState(false);
+  const [state, setState] = useState<"copied" | "by-hand" | null>(null);
+  const link = window.location.href;
   return (
     <div className={classes.form}>
       <p role="alert" className={classes.problem}>
-        {t(isInApp() ? "passkey.inApp" : "passkey.noBrowser")}
+        {text}
       </p>
       <Button
         size="md"
         onClick={() =>
-          void navigator.clipboard.writeText(window.location.href).then(() => setCopied(true))
+          void navigator.clipboard.writeText(link).then(
+            () => setState("copied"),
+            () => setState("by-hand"),
+          )
         }
       >
         {t("link.copy")}
       </Button>
-      {isCopied && <p role="status">{t("link.copied")}</p>}
+      {state === "copied" && <p role="status">{t("link.copied")}</p>}
+      {state === "by-hand" && (
+        <TextInput
+          label={t("invite.link")}
+          value={link}
+          readOnly
+          autoFocus
+          onFocus={(event) => event.currentTarget.select()}
+        />
+      )}
     </div>
   );
 }
@@ -192,12 +215,16 @@ export function SignIn() {
     <Halves>
       <Heading>{t("signIn.title")}</Heading>
       <p className={classes.about}>{t("signIn.about")}</p>
-      {canUsePasskeys() ? (
-        <Form submit={t("signIn.button")} onSubmit={signInWithPasskey} onDone={signed} isReady />
+      {canUsePasskeys() && !isInApp() ? (
+        <Form
+          submit={t("signIn.button")}
+          onSubmit={signInWithPasskey}
+          onDone={signed}
+          isReady
+          working={t("passkey.working")}
+        />
       ) : (
-        <p role="alert" className={classes.problem}>
-          {t(isInApp() ? "passkey.inApp" : "passkey.noBrowser")}
-        </p>
+        <NoPasskeys text={t(isInApp() ? "passkey.inApp" : "signIn.noBrowser")} />
       )}
       <p className={classes.note}>{t("signIn.lost")}</p>
       <p className={classes.note}>{t("signIn.none")}</p>
@@ -219,6 +246,8 @@ type FormProps<T> = {
   onSubmit: () => Promise<Answer<T>>;
   onDone: (value: T) => void;
   isReady: boolean;
+  /** What the button says while the step goes on. */
+  working: string;
   variant?: "filled" | "outline";
   children?: ReactNode;
 };
@@ -229,11 +258,17 @@ function Form<T>({
   onSubmit,
   onDone,
   isReady,
+  working,
   variant = "filled",
   children,
 }: FormProps<T>) {
   const { t } = useLanguage();
   const [refusal, setRefusal] = useState<Refusal | null>(null);
+  // A refusal takes the focus the busy button lost, so the keys and a reader find it.
+  const problem = useRef<HTMLParagraphElement>(null);
+  useEffect(() => {
+    if (refusal !== null) problem.current?.focus();
+  }, [refusal]);
   const [isWorking, setWorking] = useState(false);
   const send = async (event: FormEvent) => {
     event.preventDefault();
@@ -249,10 +284,10 @@ function Form<T>({
     <form className={classes.form} onSubmit={(event) => void send(event)} noValidate>
       {children}
       <Button type="submit" size="md" variant={variant} disabled={!isReady} loading={isWorking}>
-        {isWorking ? t("passkey.working") : submit}
+        {isWorking ? working : submit}
       </Button>
       {refusal !== null && (
-        <p role="alert" className={classes.problem}>
+        <p ref={problem} role="alert" tabIndex={-1} className={classes.problem}>
           {textOf(t, refusal)}
         </p>
       )}

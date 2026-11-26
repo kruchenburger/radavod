@@ -4,8 +4,7 @@ import type { SessionAnswer } from "../../src/shared/access";
 import { useLanguage } from "../app/language";
 import { Message } from "../app/message";
 import { go, Link } from "../app/router";
-import { LanguageChoice, ThemeButton } from "../sample/frame";
-import frame from "../sample/frame.module.css";
+import { LanguageChoice, ThemeButton } from "../app/controls";
 import { sessionQuery } from "./session";
 import classes from "./members.module.css";
 
@@ -42,11 +41,11 @@ export function SignedIn({ current, children }: FrameProps) {
   }
   return (
     <div className={classes.frame}>
-      <header className={frame.top}>
-        <Link className={frame.brand} href="/family">
+      <header className={classes.top}>
+        <Link className={classes.brand} href="/family">
           {session.data.family ?? t("app.name")}
         </Link>
-        <nav className={frame.views} aria-label={t("nav.pages")}>
+        <nav className={classes.views} aria-label={t("nav.pages")}>
           <Link href="/family" aria-current={current === "members" ? "page" : undefined}>
             {t("nav.members")}
           </Link>
@@ -54,7 +53,7 @@ export function SignedIn({ current, children }: FrameProps) {
             {t("nav.account")}
           </Link>
         </nav>
-        <div className={frame.tools}>
+        <div className={classes.tools}>
           <LanguageChoice />
           <ThemeButton />
         </div>

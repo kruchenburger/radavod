@@ -4,6 +4,7 @@ import type { Result } from "../../../kernel/result";
 import {
   addCredential,
   addPasskey,
+  provers,
   type Credential,
   type CredentialError,
   type NewCredential,
@@ -80,6 +81,8 @@ export type AccessError =
 export type Account = {
   member: Omit<Member, "version">;
   credentials: Omit<Credential, "publicKey" | "counter">[];
+  /** Only a passkey of the account can prove it to add one more. */
+  canAddPasskey: boolean;
 };
 
 /** The members as one of them sees them. */
@@ -123,6 +126,8 @@ export interface Access {
     now: number,
     fresh: { id: MemberId; name?: string | undefined },
   ): Result<NewMember, AccessError>;
+  /** The passkeys of an account that may prove it, to add one more. */
+  provers(id: MemberId): Result<string[], AccessError>;
   /** A member's own account: who they are and what they sign in with, without keys. */
   account(id: MemberId): Result<Account, AccessError>;
   /** The members as a member may see them: names for all, credentials and invitations for keepers. */
@@ -220,14 +225,17 @@ export function accessOver(store: AccessStore): Access {
       const member = newcomerOf(store, live.value, fresh);
       return member === null ? missing("member") : { ok: true, value: member };
     },
+    provers: (id) => provers(store, id),
     account(id) {
       const self = allowed(store, id, "own-account");
       if (!self.ok) return self;
       const { version: _version, ...member } = self.value;
       const credentials = store
         .credentialsOf(id)
+        .filter((one) => isLive(one))
         .map(({ publicKey: _key, counter: _counter, ...credential }) => credential);
-      return { ok: true, value: { member, credentials } };
+      const canAddPasskey = provers(store, id).ok;
+      return { ok: true, value: { member, credentials, canAddPasskey } };
     },
     roster(by) {
       const reader = allowed(store, by, "see-members");
@@ -246,6 +254,7 @@ export function accessOver(store: AccessStore): Access {
             ...one,
             credentials: store
               .credentialsOf(one.id)
+              .filter((credential) => isLive(credential))
               .map(({ publicKey: _key, counter: _counter, ...credential }) => credential),
           })),
           invitations: store.invitations().map(({ hash: _hash, ...one }) => one),

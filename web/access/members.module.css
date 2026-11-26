@@ -4,6 +4,69 @@
   flex-direction: column;
 }
 
+/* The head of a member's pages: the family, the two pages as words, the language and the theme. */
+.top {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0 1.5rem;
+  padding: 0.75rem 1.75rem 0.625rem;
+  border-bottom: 1px solid var(--edge);
+}
+
+.brand {
+  color: var(--ink);
+  font: italic 500 1.3125rem/1.2 var(--serif);
+  text-decoration: none;
+}
+
+.views {
+  display: flex;
+  gap: 1.5rem;
+}
+
+.views a {
+  display: inline-flex;
+  align-items: center;
+  min-height: 2.75rem;
+  border-bottom: 2px solid transparent;
+  color: var(--muted);
+  font-size: 1.0625rem;
+  text-decoration: none;
+  white-space: nowrap;
+}
+
+.views a:hover,
+.views a[aria-current] {
+  border-color: var(--ink);
+  color: var(--ink);
+}
+
+.views a[aria-current] {
+  font-weight: 500;
+}
+
+.tools {
+  display: flex;
+  align-items: center;
+  margin-left: auto;
+  gap: 0.25rem;
+}
+
+.leave {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 1.25rem;
+  padding-top: 1.25rem;
+  border-top: 1px solid var(--edge);
+}
+
+.leave p {
+  margin: 0 0 0.75rem;
+  max-width: 34rem;
+}
+
 .lone {
   display: flex;
   min-height: 100dvh;
@@ -140,6 +203,10 @@
 }
 
 @media (max-width: 45em) {
+  .top {
+    padding: 0.5rem 1rem;
+  }
+
   .page {
     padding: 1.25rem 1rem 3rem;
   }

@@ -1,5 +1,6 @@
 import { MantineProvider } from "@mantine/core";
 import { QueryClient, QueryClientProvider, useQuery } from "@tanstack/react-query";
+import { parseSamplePath } from "../../src/shared/sample-path";
 import { sessionQuery } from "../access/session";
 import { useState } from "react";
 import { Home } from "./home";
@@ -32,8 +33,6 @@ function Screen() {
   const { path, search } = useAddress();
   // Whenever the app opens it asks who is signed in: that also gives the cookie again. The
   // example is open to anybody and asks nobody.
-  useQuery({ ...sessionQuery, enabled: !isSample(path) });
+  useQuery({ ...sessionQuery, enabled: parseSamplePath(path) === null });
   return path === "/" ? <Home /> : <Pages path={path} search={search} />;
 }
-
-const isSample = (path: string): boolean => path === "/sample" || path.startsWith("/sample/");

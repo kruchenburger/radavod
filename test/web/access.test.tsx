@@ -145,7 +145,7 @@ describe("an invitation", () => {
 
   it("names the family and the role, and lets a reader link this browser", async () => {
     const asked = serve({
-      ...invitation({ kind: "join", role: "reader", family: "Oaks" }),
+      ...invitation({ kind: "join", role: "reader", family: "Oaks", canLink: true }),
       "POST /api/device/bind": { body: { ...ann, role: "reader", via: "device" } },
       "GET /api/members": { body: { members: [] } },
     });
@@ -167,7 +167,7 @@ describe("an invitation", () => {
   });
 
   it("offers no browser to link to an editor, and no name to a recovery link", async () => {
-    serve(invitation({ kind: "join", role: "editor", family: "Oaks" }));
+    serve(invitation({ kind: "join", role: "editor", family: "Oaks", canLink: false }));
     open("/join", `#${secret}`);
     await screen.findByText("Вас приглашают редактором.");
     expect(screen.queryByRole("button", { name: "Привязать этот браузер" })).toBeNull();
@@ -175,7 +175,7 @@ describe("an invitation", () => {
 
   it("brings an account back without asking a name", async () => {
     const asked = serve({
-      ...invitation({ kind: "recovery", role: "editor", family: "Oaks" }),
+      ...invitation({ kind: "recovery", role: "editor", family: "Oaks", canLink: false }),
       "POST /api/passkey/register/options": { body: { flow: "f", options: {} } },
       "POST /api/passkey/register/verify": { body: ann },
       "GET /api/members": { body: { members: [] } },
@@ -195,7 +195,9 @@ describe("an invitation", () => {
   it("in a messenger, sends to a real browser and keeps the reader's other way in", async () => {
     webauthn.supports = false;
     vi.spyOn(navigator, "userAgent", "get").mockReturnValue("Mozilla/5.0 Telegram-Android/11");
-    const asked = serve(invitation({ kind: "join", role: "reader", family: "Oaks" }));
+    const asked = serve(
+      invitation({ kind: "join", role: "reader", family: "Oaks", canLink: true }),
+    );
     open("/join", `#${secret}`);
     expect((await alert()).textContent).toBe(
       "Внутри мессенджера ключ доступа не создать. Откройте ссылку в браузере: в меню «Открыть в браузере» или скопируйте её.",
@@ -204,6 +206,30 @@ describe("an invitation", () => {
     expect(screen.getByRole("button", { name: "Привязать этот браузер" })).toBeTruthy();
     // Opening it spends nothing.
     expect(asked.map(({ key }) => key)).not.toContain("POST /api/device/bind");
+  });
+});
+
+describe("a messenger's own browser", () => {
+  it("is sent to a real one even when it says it can make passkeys, and shows the link when it cannot copy", async () => {
+    webauthn.supports = true;
+    vi.spyOn(navigator, "userAgent", "get").mockReturnValue("Mozilla/5.0 WhatsApp/2.24");
+    vi.stubGlobal(
+      "navigator",
+      Object.assign(Object.create(navigator), {
+        clipboard: { writeText: () => Promise.reject(new Error("closed")) },
+      }),
+    );
+    serve({
+      "POST /api/invitation": {
+        body: { kind: "join", role: "editor", family: "Oaks", canLink: false },
+      },
+    });
+    open("/join", `#${secret}`);
+    await screen.findByText(/Внутри мессенджера ключ доступа не создать/u);
+    expect(screen.queryByRole("button", { name: "Создать ключ доступа" })).toBeNull();
+    press("Скопировать ссылку");
+    const field = await screen.findByRole("textbox", { name: "Ссылка" });
+    expect((field as HTMLInputElement).value).toContain(`/join#${secret}`);
   });
 });
 
@@ -275,8 +301,10 @@ describe("the members", () => {
         credentials: [
           {
             id: "p1",
+            member: ann.member,
             kind: "passkey",
             label: "phone",
+            createdAt: 1_800_000_000_000,
             lastUsedAt: 1_800_000_000_000,
             revokedAt: null,
           },
@@ -289,7 +317,15 @@ describe("the members", () => {
         version: 1,
         revokedAt: null,
         credentials: [
-          { id: "d1", kind: "device", label: "", lastUsedAt: 1_800_000_000_000, revokedAt: null },
+          {
+            id: "d1",
+            member: ann.member,
+            createdAt: 1_800_000_000_000,
+            kind: "device",
+            label: "",
+            lastUsedAt: 1_800_000_000_000,
+            revokedAt: null,
+          },
         ],
       },
     ],
@@ -326,7 +362,7 @@ describe("the members", () => {
       expect(
         screen
           .getAllByRole("listitem")
-          .some(({ textContent }) => textContent?.endsWith("Ann, вход, страна неизвестна")),
+          .some(({ textContent }) => textContent?.endsWith("Вход: Ann, страна неизвестна")),
       ).toBe(true),
     );
     press("Создать приглашение");
@@ -335,7 +371,9 @@ describe("the members", () => {
     expect(screen.getByText(/Больше она не появится, скопируйте её сейчас\./u)).toBeTruthy();
     fireEvent.click(screen.getAllByRole("button", { name: "Отключить вход" })[1] as HTMLElement);
     expect(
-      await screen.findByText("Gran больше не сможет войти. Правки останутся в журнале правок."),
+      await screen.findByText(
+        "Gran больше не сможет войти. Журнал правок сохранит всё, что было сделано.",
+      ),
     ).toBeTruthy();
   });
 
@@ -353,9 +391,25 @@ describe("the members", () => {
 
 describe("one's own account", () => {
   const account = {
-    member: { id: ann.member, name: "Gran", role: "reader" },
+    canAddPasskey: false,
+    member: {
+      id: ann.member,
+      name: "Gran",
+      role: "reader",
+      person: null,
+      createdAt: 1_800_000_000_000,
+      revokedAt: null,
+    },
     credentials: [
-      { id: "d1", kind: "device", label: "tablet", lastUsedAt: 1_800_000_000_000, revokedAt: null },
+      {
+        id: "d1",
+        member: ann.member,
+        createdAt: 1_800_000_000_000,
+        kind: "device",
+        label: "tablet",
+        lastUsedAt: 1_800_000_000_000,
+        revokedAt: null,
+      },
     ],
   };
 
@@ -367,9 +421,12 @@ describe("one's own account", () => {
     });
     open("/account");
     await screen.findByText("браузер «tablet»");
+    // Signing out of a linked browser is asked once more, with its cost.
+    press("Выйти");
     expect(
       screen.getByText("В этом браузере вы больше не войдёте без новой ссылки от хранителя."),
     ).toBeTruthy();
+    press("Отмена");
     press("Удалить учётную запись");
     expect(screen.getByText(/«удалённая учётная запись»/u)).toBeTruthy();
     press("Удалить навсегда");
@@ -381,7 +438,7 @@ describe("one's own account", () => {
     localStorage.setItem("radavod.language", "en");
     serve({
       "GET /api/session": { body: { ...ann, via: "passkey" } },
-      "GET /api/account": { body: { ...account, credentials: [] } },
+      "GET /api/account": { body: { ...account, credentials: [], canAddPasskey: true } },
     });
     open("/account");
     expect(await screen.findByRole("heading", { level: 1, name: "Your account" })).toBeTruthy();
