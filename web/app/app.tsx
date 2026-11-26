@@ -4,11 +4,12 @@ import { useState } from "react";
 import { Home } from "./home";
 import { LanguageProvider } from "./language";
 import { Pages } from "./pages";
-import { useAddress } from "./router";
+import { useAddress, useBackKey } from "./router";
 import { colorSchemeManager, cssVariables, theme } from "./theme";
 
 export function App() {
   const [queryClient] = useState(() => new QueryClient());
+  useBackKey();
   return (
     <MantineProvider
       theme={theme}
