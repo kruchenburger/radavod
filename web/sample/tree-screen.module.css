@@ -44,8 +44,6 @@
 
 .sheet {
   display: flex;
-  /* Room for the mark of focus beside the outer columns, which scrolling would cut off. */
-  padding-inline: 0.5rem;
   margin: 0 auto;
 }
 
@@ -204,6 +202,11 @@ a.name:hover > span > span {
   min-height: 1.75rem;
   color: var(--action);
   text-underline-offset: 3px;
+}
+
+/* Room for the mark of focus beside the outer columns, which scrolling would cut off. */
+.screen[data-as="wide"] .sheet {
+  padding-inline: 0.5rem;
 }
 
 .screen[data-as="narrow"] .scroller {
