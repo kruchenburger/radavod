@@ -209,8 +209,21 @@ test.describe("around a person", () => {
     for (const key of ["ArrowLeft", "ArrowLeft", "ArrowLeft"]) await page.keyboard.press(key);
     const focused = page.locator("[data-press]:focus");
     await expect(focused).toBeInViewport({ ratio: 1 });
-    const outline = await page.evaluate("getComputedStyle(document.activeElement).outlineStyle");
-    expect(outline).toBe("solid");
+    // A tint with a bar of the action ink, under the text: no ring, and nothing moves.
+    const mark = () => page.evaluate(markOfFocus);
+    expect(await mark()).toEqual({
+      outline: "none",
+      content: '""',
+      tint: true,
+      bar: true,
+      under: "-1",
+    });
+    const box = await focused.boundingBox();
+    await page.evaluate(
+      "document.documentElement.setAttribute('data-mantine-color-scheme', 'dark')",
+    );
+    expect(await mark()).toMatchObject({ tint: true, bar: true });
+    expect(await focused.boundingBox()).toEqual(box);
     const key = await focused.getAttribute("data-press");
     await page.keyboard.press("Enter");
     await expect(centre(page)).toHaveAttribute("data-key", key ?? "");
@@ -221,6 +234,17 @@ test.describe("around a person", () => {
 });
 
 test.describe("the search", () => {
+  test("a press of the mouse shows no mark of the keys", async ({ page }) => {
+    await page.goto("/sample");
+    await ready(page);
+    await page.locator(`[data-press="p:${father}"]`).click();
+    await expect(page).toHaveURL(`/sample/tree/${father}`);
+    const content = await page.evaluate(
+      "getComputedStyle(document.activeElement, '::before').content",
+    );
+    expect(content).toBe("none");
+  });
+
   test("finds by an old spelling and leads there", async ({ page }) => {
     await page.goto("/sample");
     await ready(page);
@@ -473,3 +497,25 @@ test("the card leads back to the place one came from", async ({ page }) => {
   await page.getByRole("link", { name: "Back to the tree" }).click();
   await expect(page).toHaveURL(`/sample/tree/${father}`);
 });
+
+/** How the entry with the focus is marked, its two colours compared with the tokens. */
+const markOfFocus = `(() => {
+  const element = document.activeElement;
+  const before = getComputedStyle(element, "::before");
+  const root = getComputedStyle(document.documentElement);
+  const colorOf = (value) => {
+    const probe = document.createElement("i");
+    probe.style.color = value;
+    document.body.append(probe);
+    const color = getComputedStyle(probe).color;
+    probe.remove();
+    return color;
+  };
+  return {
+    outline: getComputedStyle(element).outlineStyle,
+    content: before.content,
+    tint: before.backgroundColor === colorOf(root.getPropertyValue("--hover")),
+    bar: before.borderLeftColor === colorOf(root.getPropertyValue("--action")),
+    under: before.zIndex,
+  };
+})()`;
