@@ -434,6 +434,17 @@ describe("one's own account", () => {
     expect(asked.map(({ key }) => key)).toContain("DELETE /api/account");
   });
 
+  it("stays signed in when signing out did not reach the server, and says so", async () => {
+    serve({
+      "GET /api/session": { body: ann },
+      "GET /api/account": { body: { ...account, canAddPasskey: true } },
+    });
+    open("/account");
+    press(await screen.findByRole("button", { name: "Выйти" }).then(() => "Выйти"));
+    expect((await alert()).textContent).toBe("Сервер не ответил. Проверьте интернет и повторите.");
+    expect(window.location.pathname).toBe("/account");
+  });
+
   it("is in English too", async () => {
     localStorage.setItem("radavod.language", "en");
     serve({
