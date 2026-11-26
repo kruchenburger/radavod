@@ -8,7 +8,7 @@ export type Patch = { aggregate: string; path: string; before: unknown; after: u
 export type State = { readonly [aggregate: string]: unknown };
 
 import { isOfLists } from "../kernel/change";
-import { ERASED } from "../kernel/id";
+import { ERASED, ERASED_IN_WORDS, isErasedMark } from "../kernel/id";
 
 export { ERASED, isOfLists };
 
@@ -86,9 +86,7 @@ export function withoutErased(aggregate: string, value: unknown): unknown {
     case "person":
       return {
         ...fields,
-        parents: thingsOf(fields.parents).map((link) =>
-          link.parent === ERASED ? { ...link, parent: "unknown", union: null } : link,
-        ),
+        parents: linksWithoutErased(fields.parents),
         childOrder: withoutMark(fields.childOrder),
       };
     case "union":
@@ -97,9 +95,34 @@ export function withoutErased(aggregate: string, value: unknown): unknown {
       return { ...fields, events: eventsWithoutErased(fields.events) };
     case "trash":
       return trashWithoutErased(fields);
+    case "cited": {
+      // An aggregate of lists with nothing in it is not there.
+      const citations = citationsWithoutErased(fields.citations);
+      return citations.length === 0 ? null : { ...fields, citations };
+    }
     default:
       return value;
   }
+}
+
+/**
+ * Links to somebody erased since are to a parent nobody knows. A link named by that parent carries the
+ * mark in its name, and is named as a link to nobody known is, by a number when that is taken: the
+ * rule of `linkId` in src/scenarios/add-relative.ts, which this module cannot import.
+ */
+function linksWithoutErased(links: unknown): Thing[] {
+  const all = thingsOf(links);
+  const taken = new Set(all.map(({ id }) => id).filter((id) => !isErasedMark(id)));
+  return all.map((link) => {
+    if (link.parent !== ERASED) return link;
+    let { id } = link;
+    if (isErasedMark(id)) {
+      id = "unknown";
+      for (let n = 2; taken.has(id); n++) id = `unknown-${n}`;
+      taken.add(id);
+    }
+    return { ...link, id, parent: "unknown", union: null };
+  });
 }
 
 function unionWithoutErased(union: Fields): Fields | null {
@@ -131,7 +154,16 @@ function trashWithoutErased(trashed: Fields): Fields {
       .map((one) => ({ ...one, children: withoutMark(one.children, "child") })),
     events: eventsWithoutErased(trashed.events),
     guest: withoutMark(trashed.guest, "home"),
+    citations: citationsWithoutErased(trashed.citations),
   };
+}
+
+/** Citations of a fact that named somebody erased since: the fact is not there to cite. */
+function citationsWithoutErased(citations: unknown): unknown[] {
+  return listOf(citations).filter((one) => {
+    const fact = fieldsOf(fieldsOf(one)?.fact)?.fact;
+    return typeof fact !== "string" || !fact.includes(ERASED_IN_WORDS);
+  });
 }
 
 /** A list without those who are marked as erased, themselves or by a field. */

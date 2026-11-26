@@ -18,6 +18,8 @@ export function purge(
   forms: readonly Parts[],
   /** Names of everybody else: a whole name of somebody else is not taken. */
   others: readonly Parts[],
+  /** The mark of links named by them, of this erasure. */
+  link: string,
 ): void {
   // Packed, so nobody can look into it. A new one is made when the tree is opened.
   sqliteSnapshots(sql).clear();
@@ -35,7 +37,7 @@ export function purge(
   const names = wholeNames([...forms, ...known], others);
   const words = wordsOf(names);
   for (const { number, part, entry } of partsWith(sql, [id, ...names])) {
-    const left = withoutPerson(entry.patches, id, words);
+    const left = withoutPerson(entry.patches, id, words, link);
     const data = JSON.stringify({ ...entry, patches: left });
     if (!entrySchema.safeParse(jsonOf(data)).success) throw new BadWrite(`entry/${number}`);
     sql.exec("UPDATE history_entry SET data = ? WHERE number = ? AND part = ?", data, number, part);

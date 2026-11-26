@@ -24,6 +24,7 @@ import {
   form,
   idOf,
   inTree,
+  parentage,
   person,
   source,
   type Tree,
@@ -305,6 +306,237 @@ describe("an erased person", () => {
         });
       }
     }));
+
+  it("leaves no identifier in a path of the journal, where a link of a child is named by her", () =>
+    inTree(async (tree) => {
+      const ada = person("ada");
+      // As the app links a parent: the link is named by the parent, and by a number when taken.
+      tree.do((c) => {
+        for (const who of ["ada", "eve", "kid"]) addPerson(c, who);
+        addUnion(c, "u", "ada", "eve");
+        addParent(c, "kid", "ada", { id: ada, union: union("u") });
+        addParent(c, "kid", "eve", { id: person("eve"), union: union("u") });
+      });
+      tree.do((c) =>
+        accepted(
+          c.kinship.apply({
+            do: "add-parent",
+            child: person("kid"),
+            parentage: { ...parentage("ada"), id: `${ada}-2`, kind: "adoption", main: false },
+          }),
+        ),
+      );
+      tree.do((c) =>
+        accepted(
+          c.kinship.apply({
+            do: "edit-parent",
+            child: person("kid"),
+            id: ada,
+            patch: { certainty: "one-source" },
+          }),
+        ),
+      );
+      tree.do((c) => {
+        accepted(
+          c.evidence.addSource({
+            id: source("book"),
+            kind: "story",
+            title: "",
+            repository: "",
+            note: "",
+          }),
+        );
+        accepted(
+          c.evidence.cite({
+            id: citation("p"),
+            source: source("book"),
+            fact: { subject: person("kid"), fact: `parentage:${ada}` },
+            page: "",
+            quote: "",
+          }),
+        );
+      });
+      tree.do((c) =>
+        accepted(c.kinship.apply({ do: "remove-parent", child: person("kid"), id: `${ada}-2` })),
+      );
+      const last = tree.read((c) => c.history.last());
+      await versionsOf(tree.storage, tree.work).checkpoint();
+      await snapshotsOf(tree.storage, tree.work).snapshot();
+      expect(found(tree.rows(), [ada]).length).toBeGreaterThan(0);
+      accepted(await erase(tree, "ada"));
+      // Of every row of the tree, none holds her identifier, in a value, a key or a path.
+      expect(found(tree.rows(), [ada])).toEqual([]);
+      const all = versionsOf(tree.storage, tree.work);
+      for (let number = 0; number <= last + 1; number++) {
+        const state = JSON.stringify(await all.at(number));
+        expect(state).not.toContain(ada);
+        expect(state).not.toContain('"erased"');
+      }
+      // The child had three links there: two to a parent nobody can name, told apart, and Eve.
+      const past = (await all.at(last - 1)) as Record<
+        string,
+        { parents: Record<string, string>[] }
+      >;
+      const links = past[`person/${person("kid")}`]?.parents ?? [];
+      expect(links.map(({ parent }) => parent).toSorted()).toEqual(
+        [person("eve"), "unknown", "unknown"].toSorted(),
+      );
+      expect(new Set(links.map(({ id }) => id)).size).toBe(3);
+      for (const number of [1, last - 1, last]) {
+        accepted(tree.run((c) => restoreTo(c, number)));
+        expect(found(tree.rows(), [ada])).toEqual([]);
+        // A citation of a link to her does not come back with the past.
+        const live = Object.entries(tree.rows()).filter(([table]) => !table.startsWith("history_"));
+        expect(found(Object.fromEntries(live), ["[erased]", "erased"])).toEqual([]);
+      }
+    }));
+
+  it("leaves a child two links to nobody known when both parents are erased", () =>
+    inTree(async (tree) => {
+      tree.do((c) => {
+        for (const who of ["ada", "bob", "kid"]) addPerson(c, who);
+      });
+      tree.do((c) => addParent(c, "kid", "ada", { id: person("ada") }));
+      tree.do((c) => addParent(c, "kid", "bob", { id: person("bob") }));
+      tree.do((c) =>
+        accepted(
+          c.kinship.apply({
+            do: "edit-parent",
+            child: person("kid"),
+            id: person("bob"),
+            patch: { certainty: "one-source" },
+          }),
+        ),
+      );
+      const last = tree.read((c) => c.history.last());
+      accepted(await erase(tree, "ada"));
+      accepted(await erase(tree, "bob"));
+      expect(found(tree.rows(), [person("ada"), person("bob")])).toEqual([]);
+      const all = versionsOf(tree.storage, tree.work);
+      const linksAt = async (number: number) =>
+        ((await all.at(number)) as Record<string, { parents: Record<string, string>[] }>)[
+          `person/${person("kid")}`
+        ]?.parents ?? [];
+      for (const [number, count] of [
+        [last - 2, 1],
+        [last - 1, 2],
+        [last, 2],
+      ] as const) {
+        const links = await linksAt(number);
+        expect(links.map(({ parent }) => parent)).toEqual(Array(count).fill("unknown"));
+        expect(new Set(links.map(({ id }) => id)).size).toBe(count);
+      }
+      expect((await linksAt(last)).map(({ certainty }) => certainty).toSorted()).toEqual([
+        "hypothesis",
+        "one-source",
+      ]);
+      // An edit of a link to somebody erased cannot be told any more.
+      expect(tree.run((c) => undo(c, last))).toMatchObject({ error: { code: "irreversible" } });
+      accepted(tree.run((c) => restoreTo(c, last)));
+      tree.read((c) => expect(c.kinship.get(person("kid"))?.parents).toHaveLength(2));
+      expect(found(tree.rows(), [person("ada"), person("bob")])).toEqual([]);
+    }));
+
+  it("keeps the order of the links of a child in the past", () =>
+    inTree(async (tree) => {
+      tree.do((c) => {
+        for (const who of ["ada", "bob", "kid"]) addPerson(c, who);
+        addParent(c, "kid", "ada", { id: person("ada") });
+        addParent(c, "kid", "bob", { id: person("bob") });
+      });
+      const before = tree.read((c) => c.history.last());
+      // Her link is not the last one: the entry says the order too.
+      accepted(tree.run((c) => trash(c, person("ada"), act)));
+      accepted(await erase(tree, "ada"));
+      const past = (await versionsOf(tree.storage, tree.work).at(before)) as Record<
+        string,
+        { parents: Record<string, string>[] }
+      >;
+      expect(past[`person/${person("kid")}`]?.parents.map(({ parent }) => parent)).toEqual([
+        "unknown",
+        person("bob"),
+      ]);
+      accepted(tree.run((c) => restoreTo(c, before)));
+      tree.read((c) =>
+        expect(c.kinship.get(person("kid"))?.parents.map(({ parent }) => parent)).toEqual([
+          "unknown",
+          person("bob"),
+        ]),
+      );
+    }));
+
+  it("leaves no citation of a link to her, whoever of the two was in the trash", async () => {
+    // A child cites the link to her, as the app names a link: by the parent.
+    const linked = (tree: Tree) => {
+      const ada = person("ada");
+      tree.do((c) => {
+        for (const who of ["ada", "kid"]) addPerson(c, who);
+        addParent(c, "kid", "ada", { id: ada });
+        accepted(
+          c.evidence.addSource({
+            id: source("book"),
+            kind: "story",
+            title: "",
+            repository: "",
+            note: "",
+          }),
+        );
+        accepted(
+          c.evidence.cite({
+            id: citation("p"),
+            source: source("book"),
+            fact: { subject: person("kid"), fact: `parentage:${ada}` },
+            page: "",
+            quote: "",
+          }),
+        );
+      });
+    };
+    // A link taken back by an undo leaves its citation behind: that goes too.
+    await inTree(async (tree) => {
+      tree.do((c) => {
+        for (const who of ["ada", "kid"]) addPerson(c, who);
+      });
+      tree.do((c) => addParent(c, "kid", "ada", { id: person("ada") }));
+      const linkedAt = tree.read((c) => c.history.last());
+      tree.do((c) => {
+        accepted(
+          c.evidence.addSource({
+            id: source("book"),
+            kind: "story",
+            title: "",
+            repository: "",
+            note: "",
+          }),
+        );
+        accepted(
+          c.evidence.cite({
+            id: citation("p"),
+            source: source("book"),
+            fact: { subject: person("kid"), fact: `parentage:${person("ada")}` },
+            page: "",
+            quote: "",
+          }),
+        );
+      });
+      accepted(tree.run((c) => undo(c, linkedAt)));
+      accepted(await erase(tree, "ada"));
+      expect(found(tree.rows(), [person("ada")])).toEqual([]);
+    });
+    for (const first of ["ada", "kid"]) {
+      await inTree(async (tree) => {
+        linked(tree);
+        accepted(tree.run((c) => trash(c, person(first), act)));
+        accepted(await erase(tree, "ada"));
+        if (first === "kid") accepted(tree.run((c) => restore(c, person("kid"))));
+        expect(found(tree.rows(), [person("ada")])).toEqual([]);
+        // The journal marks where she was; what lives in the tree has no mark of her.
+        const live = Object.entries(tree.rows()).filter(([table]) => !table.startsWith("history_"));
+        expect(found(Object.fromEntries(live), ["[erased]", '"erased"'])).toEqual([]);
+        tree.read((c) => expect(c.evidence.citationsOf(person("kid"))).toEqual([]));
+      });
+    }
+  });
 
   it("is told of where others still speak of them, for a person to decide", () =>
     inTree(async (tree) => {

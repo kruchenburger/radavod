@@ -13,6 +13,11 @@ export function isId<K extends string>(kind: K, value: unknown): value is Id<K> 
 export const ERASED = "erased";
 export const ERASED_IN_WORDS = "[erased]";
 
+/** Whether a text is or holds a mark of somebody erased: of a person, of a link named by them, in words. */
+export function isErasedMark(text: string): boolean {
+  return text === ERASED || text.startsWith(`${ERASED}-`) || text.includes(ERASED_IN_WORDS);
+}
+
 export type PersonId = Id<"person">;
 export type UnionId = Id<"union">;
 export type EventId = Id<"event">;

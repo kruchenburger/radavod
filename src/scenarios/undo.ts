@@ -1,7 +1,7 @@
 import { differ } from "../kernel/change";
 import { type Missing, missing } from "../kernel/refusal";
 import type { Result } from "../kernel/result";
-import { ERASED_IN_WORDS } from "../kernel/id";
+import { ERASED_IN_WORDS, isErasedMark } from "../kernel/id";
 import { ERASED, isOfLists, isOrder, type Patch, takeBack, valueAt } from "../shared/reverse";
 import { putBack, type PutBackError } from "./put-back";
 import type { Contexts } from "./unit-of-work";
@@ -20,10 +20,13 @@ export function undo(c: Contexts, number: number): Result<object, UndoError> {
   if (entry === null) return missing(String(number));
   // Where somebody was erased, in a field or in words, nobody can tell any more what there was.
   const told = JSON.stringify(entry.patches);
+  const isOfErased = ({ path }: Patch) => path.split("/").some(isErasedMark);
   if (
     entry.patches.length === 0 ||
     told.includes(`"${ERASED}"`) ||
-    told.includes(ERASED_IN_WORDS)
+    told.includes(`"${ERASED}-`) ||
+    told.includes(ERASED_IN_WORDS) ||
+    entry.patches.some(isOfErased)
   ) {
     return { ok: false, error: { code: "irreversible" } };
   }
