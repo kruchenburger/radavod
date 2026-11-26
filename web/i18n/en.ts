@@ -85,7 +85,6 @@ export const en = {
 
   "map.keyboard": "Keyboard.",
   "map.modes": "Show as",
-  "map.asCanvas": "Canvas",
   "map.asFan": "Fan",
   "fan.open": "Fan of ancestors",
   "fan.pair": "{one} and {other}",
@@ -97,9 +96,6 @@ export const en = {
   "fan.further": "further ancestors not shown",
   "fan.decade": "{year}s",
   "fan.none": "No ancestors known for {name}",
-  "map.keys":
-    "Arrow keys move through the family: up to a parent, down to a child, left and right along the row. Enter opens the person.",
-  "map.whole": "Branches of the whole family",
   "map.noBranch": "No branch",
   "map.see": "{name}, see",
   "map.seeParents": "Parents, see",

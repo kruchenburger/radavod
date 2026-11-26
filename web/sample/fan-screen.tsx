@@ -1,5 +1,6 @@
 import { useEffect, useId, useMemo } from "react";
 import { useArrival } from "../app/arrival";
+import { CloseIcon } from "../app/icons";
 import { useLanguage } from "../app/language";
 import { Link } from "../app/router";
 import { isPhone, usePage } from "../app/use-page";
@@ -74,7 +75,14 @@ export function FanScreen({ place }: { place: BranchesPlace }) {
             <KindsLegend kinds={new Set(["direct"])} />
           </span>
         )}
-        <Modes place={place} />
+        <Modes as="fan" person={place.person} />
+        <Link
+          className={classes.close}
+          href={hrefOf(treePlace(place.person))}
+          aria-label={t("card.back")}
+        >
+          <CloseIcon />
+        </Link>
       </div>
       <nav className={classes.centre} aria-label={t("fan.centre")}>
         <span>{t("fan.centre")}</span>

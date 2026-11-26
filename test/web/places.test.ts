@@ -10,15 +10,7 @@ const places: [string, Place][] = [
     { screen: "tree", person: "p1", siblings: true, open: "p2", half: "descendants" },
   ],
   ["/sample/branches", branchesPlace()],
-  [
-    "/sample/branches?person=p1&at=p7.-12.340&scale=1.25",
-    branchesPlace({
-      person: "p1",
-      at: { person: "p7", dx: -12, dy: 340 },
-      scale: 1.25,
-    }),
-  ],
-  ["/sample/branches?branch=b3", branchesPlace({ branch: "b3" })],
+  ["/sample/branches?person=p1&branch=b3", branchesPlace({ person: "p1", branch: "b3" })],
   ["/sample/branches?as=fan", branchesPlace({ as: "fan" })],
   [
     "/sample/branches?as=fan&person=p1&with=p2",
@@ -57,15 +49,8 @@ it.each([
   expect(readPlace("/sample/branches", `?${search}`)).toEqual(branchesPlace(place));
 });
 
-it("opens an address of the old map on the canvas, on the same person and place", () => {
-  expect(readPlace("/sample/branches", "?level=near&person=p1&at=p7.-12.340")).toEqual(
-    branchesPlace({ person: "p1", at: { person: "p7", dx: -12, dy: 340 } }),
-  );
-});
-
-it("writes no more of a spot than it needs", () => {
-  const at = { person: "p1", dx: 1.4, dy: -2.6 };
-  expect(hrefOf(branchesPlace({ at, scale: 1.2345 }))).toBe(
-    "/sample/branches?at=p1.1.-3&scale=1.23",
+it("reads an address of the old map or canvas as the pages, on the same person", () => {
+  expect(readPlace("/sample/branches", "?level=near&person=p1&at=p7.-12.340&scale=2")).toEqual(
+    branchesPlace({ person: "p1" }),
   );
 });

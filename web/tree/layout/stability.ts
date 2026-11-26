@@ -1,5 +1,3 @@
-import type { BranchMap } from "./branch-map";
-
 /**
  * How much of the order two drawings share: of the neighbors that stood in one row, how many still
  * stand in one row and in the same order. A move as a whole costs nothing.
@@ -25,19 +23,4 @@ export function stability(
     });
   }
   return { pairs, kept, share: pairs === 0 ? 1 : kept / pairs };
-}
-
-/** The people of every row of every page, from left to right. */
-export function mapTracks({ cards, pages }: BranchMap): string[][] {
-  const tracks = new Map<string, BranchMap["cards"]>();
-  for (const card of cards) {
-    if (card.person === null) continue;
-    const name = `${pages[card.page]?.branch} ${card.row}`;
-    const track = tracks.get(name);
-    if (track === undefined) tracks.set(name, [card]);
-    else track.push(card);
-  }
-  return [...tracks.values()].map((track) =>
-    track.sort((a, b) => a.x - b.x || a.y - b.y).map(({ person }) => person as string),
-  );
 }

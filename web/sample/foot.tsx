@@ -4,9 +4,9 @@ import { Link } from "../app/router";
 import { kinOf } from "../tree/layout/kin";
 import { useData } from "./data";
 import classes from "./foot.module.css";
-import { branchesPlace, hrefOf } from "./places";
+import { hrefOf } from "./places";
 
-/** The running foot: every branch in its ink. It opens the map. */
+/** The running foot: every branch in its ink. It opens the pages by branch. */
 export function Foot({ person }: { person: string }) {
   const { t } = useLanguage();
   const { snapshot, words } = useData();
@@ -21,14 +21,14 @@ export function Foot({ person }: { person: string }) {
       <nav aria-label={t("list.branches")}>
         <ul>
           <li>
-            <Link className={classes.all} href={hrefOf(branchesPlace({ person }))}>
+            <Link className={classes.all} href={hrefOf({ screen: "list", person })}>
               {t("view.branches")}
             </Link>
           </li>
           {snapshot.branches.map(({ id }) => (
             <li key={id}>
               <Link
-                href={hrefOf(branchesPlace({ person, branch: id }))}
+                href={`${hrefOf({ screen: "list", person })}#page-${id}`}
                 aria-current={id === own || undefined}
                 style={{ color: words.ink(id) }}
               >

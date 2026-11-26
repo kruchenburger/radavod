@@ -3,11 +3,9 @@ import { describe, expect, it, vi } from "vitest";
 import { type TreeSnapshot, treeSnapshotSchema } from "../../../src/shared/tree";
 import { around, type AroundOptions } from "../../../web/tree/layout/around";
 import { aroundNarrow } from "../../../web/tree/layout/around-narrow";
-import { branchMap, type MapCard } from "../../../web/tree/layout/branch-map";
-import { aroundKeys, mapKeys } from "../../../web/tree/layout/keys";
-import { mapText } from "../../../web/tree/layout/map-text";
+import { aroundKeys } from "../../../web/tree/layout/keys";
 import { personKey } from "../../../web/tree/layout/types";
-import { expectedAround, expectedLine, lineAround } from "./expected";
+import { expectedAround, lineAround } from "./expected";
 import { measure, wordingOf } from "./family";
 import { problems } from "./geometry";
 import { unreachable } from "./reach";
@@ -161,37 +159,6 @@ describe("any family the contract allows", () => {
         }
       }),
       runs,
-    );
-  });
-
-  it("is drawn right on the map of branches", () => {
-    const options = fc.record({
-      lineOf: fc.option(someone),
-    });
-    fc.assert(
-      fc.property(snapshots, options, (snapshot, more) => {
-        const map = branchMap(snapshot, { ...more, measure, headOf: ({ title }) => title.ru });
-        const cards = new Map(map.cards.map((card) => [card.key, card]));
-        const byId = new Map<string, TreeSnapshot["people"][number]>();
-        for (const one of snapshot.people) if (!byId.has(one.id)) byId.set(one.id, one);
-        const wording = wordingOf(snapshot);
-        const found = problems(map, {
-          snapshot,
-          people: byId.keys(),
-          children: "x",
-          line: expectedLine(snapshot, more.lineOf),
-          spacing: { least: 6, outside: map.pages },
-          row: ({ key }) => `${cards.get(key)?.page} ${cards.get(key)?.row}`,
-          lines: ({ key }) => {
-            const card = cards.get(key) as MapCard;
-            return mapText(card, { map, measure, wording, person: (id) => byId.get(id) });
-          },
-          measure,
-        });
-        expect(found).toEqual({});
-        expect(unreachable(map.cards, mapKeys(map))).toEqual([]);
-      }),
-      { ...runs, numRuns: 1000 },
     );
   });
 });

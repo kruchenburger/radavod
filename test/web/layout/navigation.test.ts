@@ -2,9 +2,7 @@ import { describe, expect, it } from "vitest";
 import { generateFamily } from "../../../examples/generate.ts";
 import { snapshotOf } from "../../../examples/snapshot.ts";
 import { around } from "../../../web/tree/layout/around";
-import { branchMap } from "../../../web/tree/layout/branch-map";
-import { cardIndex } from "../../../web/tree/layout/hit";
-import { type Arrow, aroundKeys, listKeys, mapKeys } from "../../../web/tree/layout/keys";
+import { type Arrow, aroundKeys, listKeys } from "../../../web/tree/layout/keys";
 import { relativesOf } from "../../../web/tree/layout/relatives";
 import { unreachable } from "./reach";
 import { type FamilySpec, familyOf, measure, wordingOf } from "./family";
@@ -34,102 +32,7 @@ const family: FamilySpec = {
   branches: ["A", "B"],
 };
 const snapshot = familyOf(family);
-const map = branchMap(snapshot, {
-  measure,
-  headOf: ({ title }) => title.ru,
-  lineOf: "x",
-});
 const view = around(snapshot, "x", { measure, wording: wordingOf(snapshot), lineOf: "x" });
-
-describe("hit testing", () => {
-  const index = cardIndex(map.cards);
-
-  it("finds the card under a point and nothing beside it", () => {
-    for (const card of map.cards) {
-      expect(index.at(card.x + card.w / 2, card.y + card.h / 2)?.key).toBe(card.key);
-    }
-    expect(index.at(-50, -50)).toBeNull();
-    expect(cardIndex([]).at(0, 0)).toBeNull();
-  });
-
-  it("takes the nearest within a finger's reach", () => {
-    const [card] = map.cards;
-    if (card === undefined) throw new Error("no cards");
-    expect(index.at(card.x - 6, card.y + 1)).toBeNull();
-    expect(index.at(card.x - 6, card.y + 1, 10)?.key).toBe(card.key);
-  });
-
-  it("finds everybody in a window and nobody outside", () => {
-    const window = { x: 100, y: 100, w: 400, h: 120 };
-    const isIn = ({ x, y, w, h }: (typeof map.cards)[number]): boolean =>
-      x < 500 && x + w > 100 && y < 220 && y + h > 100;
-    expect(
-      index
-        .within(window)
-        .map(({ key }) => key)
-        .sort(),
-    ).toEqual(
-      map.cards
-        .filter(isIn)
-        .map(({ key }) => key)
-        .sort(),
-    );
-  });
-});
-
-describe("the keyboard on the map", () => {
-  const move = mapKeys(map);
-  const go = (from: string, arrow: Arrow, cameFrom?: string): string | null =>
-    move(`p:${from}`, arrow, cameFrom === undefined ? null : `p:${cameFrom}`)?.slice(2) ?? null;
-
-  it("goes up to a parent, the one on the direct line first", () => {
-    expect(go("x", "up")).toBe("f");
-    expect(go("f", "up")).toBe("gf");
-    expect(go("gf", "up")).toBeNull();
-  });
-
-  it("goes down to the child one came from, else along the direct line, else to the first", () => {
-    expect(go("f", "down", "half")).toBe("half");
-    expect(go("f", "down")).toBe("x");
-    expect(go("f", "down", "gf")).toBe("x");
-    expect(go("x", "down")).toBe("ward");
-    expect(go("wife", "down")).toBe("son");
-    expect(go("son", "down")).toBeNull();
-  });
-
-  it("goes along the row of the page", () => {
-    expect(go("f", "right")).toBe("m");
-    expect(go("m", "left")).toBe("f");
-    expect(go("gf", "left")).toBeNull();
-  });
-
-  it("reaches everybody", () => {
-    const example = snapshotOf(generateFamily(1, 300));
-    const all = branchMap(example, { measure, headOf: ({ title }) => title.ru });
-    const step = mapKeys(all);
-    expect(unreachable(all.cards, step)).toEqual([]);
-  });
-
-  it("loses nobody when a family goes to another page and comes back", () => {
-    const people = [
-      { id: "G", branch: "A" },
-      { id: "P", branch: "B", parents: ["G"] },
-      { id: "Y", branch: "B", parents: ["P"] },
-      { id: "X", branch: "A", parents: ["P"] },
-      { id: "below", branch: "A", parents: ["X"] },
-    ];
-    const lost = branchMap(familyOf({ people, branches: ["A", "B"] }), {
-      measure,
-      headOf: ({ title }) => title.ru,
-    });
-    expect(unreachable(lost.cards, mapKeys(lost))).toEqual([]);
-  });
-
-  it("knows nothing of strangers", () => {
-    expect(go("nobody", "up")).toBeNull();
-    expect(go("nobody", "left")).toBeNull();
-  });
-});
 
 describe("the keyboard around a person", () => {
   const move = aroundKeys(view);

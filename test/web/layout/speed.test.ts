@@ -1,6 +1,5 @@
 import { expect, it, vi } from "vitest";
 import { around } from "../../../web/tree/layout/around";
-import { branchMap } from "../../../web/tree/layout/branch-map";
 import { branchPages } from "../../../web/tree/layout/branch-pages";
 import { bigSnapshot, busiest } from "./big";
 import { measure, wordingOf } from "./family";
@@ -9,16 +8,6 @@ import { measure, wordingOf } from "./family";
 vi.setConfig({ testTimeout: 60_000 });
 
 // Generous bounds: a shared machine in CI is slow. `pnpm bench` tells the real times.
-
-it.each([
-  [300, 300],
-  [5000, 4000],
-])("lays out the map of %i people within %i ms", (size, bound) => {
-  const snapshot = bigSnapshot(size);
-  const start = performance.now();
-  branchMap(snapshot, { measure, headOf: ({ title }) => title.ru });
-  expect(performance.now() - start).toBeLessThan(bound);
-});
 
 it.each([
   [300, 100],

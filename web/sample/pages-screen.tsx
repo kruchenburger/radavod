@@ -16,6 +16,7 @@ import { personKey, type Point } from "../tree/layout/types";
 import { type LineKind, lineLooks, linePath, tieKind } from "../tree/line-path";
 import { KindsLegend } from "../tree/lines";
 import { useData } from "./data";
+import { Modes } from "./modes";
 import { hrefOf, treePlace } from "./places";
 import classes from "./pages-screen.module.css";
 
@@ -43,7 +44,7 @@ export function PagesScreen({ person: chosen }: { person: string }) {
     <article className={classes.screen}>
       <header className={classes.head}>
         <h1 ref={heading} tabIndex={-1}>
-          {t("view.list")}
+          {t("view.branches")}
         </h1>
         <span className={classes.count}>
           {t("people.count", { count: snapshot.people.length })},{" "}
@@ -52,6 +53,7 @@ export function PagesScreen({ person: chosen }: { person: string }) {
         <span className={classes.legend}>
           <KindsLegend kinds={kinds} />
         </span>
+        <Modes as="list" person={chosen} />
         <Button component={Link} href={hrefOf(treePlace(chosen))} size="md" variant="outline">
           {t("view.around")}
         </Button>
@@ -288,7 +290,12 @@ function useChosen(strip: React.RefObject<HTMLDivElement | null>, chosen: string
       `[data-key="${CSS.escape(personKey(chosen))}"]`,
     );
     if (line == null) return;
-    if (isFirst.current && cameBack()) {
+    // An address may name a page, as the running foot does: the pages open on it.
+    const asked = isFirst.current ? window.location.hash.slice(1) : "";
+    const page = asked.startsWith("page-") ? document.getElementById(asked) : null;
+    if (page !== null) {
+      page.scrollIntoView?.({ block: "nearest", inline: "start" });
+    } else if (isFirst.current && cameBack()) {
       // Back to the pages the browser puts the window where it was; the row of pages is new.
       const row = strip.current;
       const page = line.closest<HTMLElement>("[data-page]");

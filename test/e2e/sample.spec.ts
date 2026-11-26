@@ -21,8 +21,6 @@ const screens = [
   ["around a person", "/sample"],
   ["several unions", `/sample/tree/${manyUnions}?siblings=open`],
   ["a repeated ancestor", "/sample/tree/p162"],
-  ["all branches", "/sample/branches"],
-  ["all branches on a person", `/sample/branches?person=${father}`],
   ["a person", `/sample/person/${manyUnions}`],
   ["the pages of branches", `/sample/list/${start}`],
   ["the fan of ancestors", "/sample/branches?as=fan"],
@@ -37,9 +35,7 @@ async function ready(page: Page): Promise<void> {
   await page.evaluate("document.fonts.ready");
 }
 
-const map = (page: Page): Locator => page.locator("[data-canvas]");
 const centre = (page: Page): Locator => page.locator("[data-focus]");
-const searchOf = (page: Page) => new URL(page.url()).searchParams;
 
 for (const locale of ["ru", "en"] as const) {
   test.describe(locale, () => {
@@ -359,172 +355,19 @@ test.describe("the search", () => {
   });
 });
 
-/** How large the names on the map are, once they stand still. */
-const scaleOf = (page: Page): Promise<number> =>
-  page.evaluate(
-    "(document.querySelector('[data-canvas] > div')?.style.transform.match(/scale\\((.*)\\)/)?.[1] ?? 0) * 1",
+test("all branches open as the pages by branch, an old address of the canvas too", async ({
+  page,
+}) => {
+  await page.goto(`/sample/branches?level=near&person=${father}&at=p1.0.0`);
+  await expect(page).toHaveURL(`/sample/list/${father}`);
+  await ready(page);
+  await expect(page.locator('[data-page] a[aria-current="true"]')).toHaveAttribute(
+    "href",
+    `/sample/list/${father}`,
   );
-
-test.describe("all branches", () => {
-  test("open on the person the example begins with, names as large as in the tree", async ({
-    page,
-    isMobile,
-  }) => {
-    await page.goto("/sample/branches");
-    await ready(page);
-    const chosen = map(page).locator("[data-chosen]");
-    await expect(chosen).toBeInViewport();
-    expect(await chosen.getAttribute("data-press")).toBe(`p:${start}`);
-    // Names of 19 px are never below 14 on the screen.
-    expect(await scaleOf(page)).toBeGreaterThanOrEqual(14 / 19 - 0.001);
-    // On the phone the names of the branches do not fit over the strip; «По ветвям» lists them.
-    if (!isMobile) {
-      await expect(
-        page.getByRole("navigation", { name: "Branches of the whole family" }),
-      ).toBeVisible();
-    }
-  });
-
-  test("an old address of the map opens the canvas on the same person", async ({ page }) => {
-    await page.goto(`/sample/branches?level=near&person=${father}`);
-    await ready(page);
-    await expect(map(page).locator("[data-chosen]")).toHaveAttribute("data-press", `p:${father}`);
-    await expect.poll(() => searchOf(page).get("at")).not.toBeNull();
-    expect(searchOf(page).get("level")).toBeNull();
-  });
-
-  test("a drag moves the canvas and presses nothing", async ({ page }) => {
-    await page.goto(`/sample/branches?person=${start}`);
-    await ready(page);
-    const chosen = map(page).locator("[data-chosen]");
-    const before = await chosen.boundingBox();
-    if (before === null) throw new Error("nobody is chosen");
-    const [x, y] = [before.x + 20, before.y + 10];
-    await page.mouse.move(x, y);
-    await page.mouse.down();
-    await page.mouse.move(x - 60, y + 40, { steps: 6 });
-    await page.mouse.up();
-    await expect(page).toHaveURL(/\/sample\/branches/);
-    await expect
-      .poll(async () => {
-        const after = await chosen.boundingBox();
-        return [(after?.x ?? 0) - before.x, (after?.y ?? 0) - before.y].map(Math.round);
-      })
-      .toEqual([-60, 40]);
-    await chosen.click();
-    await expect(page).toHaveURL(`/sample/person/${start}`);
-  });
-
-  test("a wheel makes the canvas larger and smaller, within bounds", async ({ page, isMobile }) => {
-    test.skip(isMobile, "a phone has no wheel");
-    await page.goto(`/sample/branches?person=${start}`);
-    await ready(page);
-    const box = await map(page).boundingBox();
-    if (box === null) throw new Error("no canvas");
-    await page.mouse.move(box.x + box.width / 3, box.y + box.height / 2);
-    for (let i = 0; i < 8; i += 1) await page.mouse.wheel(0, -200);
-    await expect.poll(() => scaleOf(page)).toBeGreaterThan(1.2);
-    expect(await scaleOf(page)).toBeLessThanOrEqual(1.5);
-    for (let i = 0; i < 16; i += 1) await page.mouse.wheel(0, 200);
-    await expect.poll(() => scaleOf(page)).toBeLessThan(0.8);
-    expect(await scaleOf(page)).toBeGreaterThanOrEqual(14 / 19 - 0.001);
-  });
-
-  test("two fingers make it larger", async ({ page, isMobile }) => {
-    test.skip(!isMobile, "two fingers are for a touch screen");
-    await page.goto("/sample/branches");
-    await ready(page);
-    const before = await scaleOf(page);
-    const session = await page.context().newCDPSession(page);
-    const touch = (type: "touchStart" | "touchMove" | "touchEnd", spread: number) =>
-      session.send("Input.dispatchTouchEvent", {
-        type,
-        touchPoints:
-          type === "touchEnd"
-            ? []
-            : [
-                { x: 190 - spread, y: 500, id: 1 },
-                { x: 190 + spread, y: 500, id: 2 },
-              ],
-      });
-    await touch("touchStart", 20);
-    for (let spread = 25; spread <= 120; spread += 5) await touch("touchMove", spread);
-    await touch("touchEnd", 0);
-    await expect.poll(() => scaleOf(page)).toBeGreaterThan(before);
-    await expect.poll(() => searchOf(page).get("scale")).not.toBeNull();
-  });
-
-  test("a link opens the same view, in another language too", async ({ page, browser }) => {
-    await page.goto(`/sample/branches?person=${father}`);
-    await ready(page);
-    await expect.poll(() => searchOf(page).get("at")).not.toBeNull();
-    const place = await map(page).locator("[data-chosen]").boundingBox();
-    const size = page.viewportSize();
-    const context = await browser.newContext({ locale: "ru", viewport: size });
-    const other = await context.newPage();
-    await other.goto(page.url());
-    await ready(other);
-    await expect(map(other).locator("[data-chosen]")).toBeVisible();
-    const there = await map(other).locator("[data-chosen]").boundingBox();
-    expect(Math.abs((there?.x ?? 0) - (place?.x ?? 0))).toBeLessThan(3);
-    expect(Math.abs((there?.y ?? 0) - (place?.y ?? 0))).toBeLessThan(3);
-    await context.close();
-  });
-
-  test("is walked by the keys with the mark of the tree, and the view follows", async ({
-    page,
-  }) => {
-    await page.goto("/sample/branches");
-    await ready(page);
-    await map(page).locator('a[tabindex="0"]').focus();
-    for (const key of ["ArrowUp", "ArrowUp", "ArrowRight", "ArrowDown", "ArrowLeft"]) {
-      await page.keyboard.press(key);
-    }
-    const focused = map(page).locator("[data-press]:focus");
-    await expect(focused).toBeInViewport({ ratio: 0.99 });
-    expect(await page.evaluate(markOfFocus)).toEqual({
-      outline: "none",
-      content: '""',
-      tint: true,
-      bar: true,
-      under: "-1",
-    });
-    const href = (await focused.getAttribute("href")) ?? "";
-    await page.keyboard.press("Enter");
-    await expect(page).toHaveURL(href);
-  });
-
-  test("the strip of the whole moves the window where it is pressed", async ({
-    page,
-    isMobile,
-  }) => {
-    await page.goto(`/sample/branches?person=${start}`);
-    await ready(page);
-    const strip = page.locator("[data-whole]");
-    const box = await strip.boundingBox();
-    if (box === null) throw new Error("no strip");
-    await expect.poll(() => searchOf(page).get("at")).not.toBeNull();
-    const before = searchOf(page).get("at");
-    await page.mouse.click(box.x + box.width * (isMobile ? 0.9 : 0.95), box.y + box.height - 6);
-    await expect.poll(() => searchOf(page).get("at")).not.toBe(before);
-    const mark = await page.locator("[data-whole] [data-mark]").boundingBox();
-    expect((mark?.x ?? 0) + (mark?.width ?? 0) / 2).toBeGreaterThan(box.x + box.width * 0.6);
-    // The frame stands on the picture of the family, not over the names of the branches.
-    const picture = await page.locator("[data-whole] canvas").boundingBox();
-    expect(mark?.y ?? 0).toBeGreaterThanOrEqual((picture?.y ?? 0) - 1);
-    expect((mark?.y ?? 0) + (mark?.height ?? 0)).toBeLessThanOrEqual(
-      (picture?.y ?? 0) + (picture?.height ?? 0) + 1,
-    );
-  });
-
-  test("draws the names near the window and no others", async ({ page }) => {
-    await page.goto(`/sample/branches?person=${start}`);
-    await ready(page);
-    const names = map(page).locator("[data-press]");
-    expect(await names.count()).toBeGreaterThan(3);
-    expect(await names.count()).toBeLessThan(160);
-    await expect(map(page).locator('[data-press][tabindex="0"]')).toHaveCount(1);
-  });
+  const ways = page.getByRole("navigation", { name: "Show as" });
+  await ways.getByRole("link", { name: "Fan" }).click();
+  await expect(page).toHaveURL(`/sample/branches?as=fan&person=${father}`);
 });
 
 test("everything to press on a phone is as large as a finger", async ({ page, isMobile }) => {
@@ -648,7 +491,7 @@ test.describe("the pages of branches", () => {
     await ready(page);
     const names = page.locator('[data-key^="p:"] > a');
     expect(await names.count()).toBe(snapshot.people.length);
-    await expect(page.locator('a[aria-current="true"]')).toHaveAttribute(
+    await expect(page.locator('[data-page] a[aria-current="true"]')).toHaveAttribute(
       "href",
       `/sample/list/${start}`,
     );
@@ -675,8 +518,8 @@ test.describe("the pages of branches", () => {
     const href = (await focused.getAttribute("href")) ?? "";
     await page.keyboard.press("Enter");
     await expect(page).toHaveURL(href);
-    await expect(page.locator('a[aria-current="true"]')).toBeFocused();
-    await expect(page.locator('a[aria-current="true"]')).toBeInViewport();
+    await expect(page.locator('[data-page] a[aria-current="true"]')).toBeFocused();
+    await expect(page.locator('[data-page] a[aria-current="true"]')).toBeInViewport();
   });
 
   test("draw the direct line between pages, over no text, on a wide window only", async ({
