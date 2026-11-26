@@ -139,6 +139,13 @@ const challengeSchema = z.discriminatedUnion("purpose", [
     member: newcomer,
   }),
   z.strictObject({ hash: text, challenge: text, expiresAt: time, purpose: z.literal("login") }),
+  z.strictObject({
+    hash: text,
+    challenge: text,
+    expiresAt: time,
+    purpose: z.literal("add"),
+    member: newcomer,
+  }),
 ]) satisfies z.ZodType<Challenge>;
 
 const familySchema = z.strictObject({ name: z.string() }) satisfies z.ZodType<Family>;

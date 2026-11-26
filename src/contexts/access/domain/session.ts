@@ -16,7 +16,14 @@ const lifetimes: Record<Credential["kind"], number> = { passkey: 30 * day, devic
 export type StaleCounter = { code: "stale-counter" };
 
 /** Who a session is. */
-export type Signed = { member: MemberId; role: Role; person: PersonId | null; expiresAt: number };
+export type Signed = {
+  member: MemberId;
+  role: Role;
+  person: PersonId | null;
+  expiresAt: number;
+  /** What signed in: a reader's linked browser cannot come back without a new link. */
+  via: Credential["kind"];
+};
 
 export function signIn(
   reader: AccessReader,
@@ -80,7 +87,7 @@ export function slide(
   const moved = end - session.expiresAt >= day ? { ...session, expiresAt: end } : session;
   const { id, role, person } = member;
   return {
-    signed: { member: id, role, person, expiresAt: moved.expiresAt },
+    signed: { member: id, role, person, expiresAt: moved.expiresAt, via: credential.kind },
     change: writes("session", hash, session, moved),
   };
 }

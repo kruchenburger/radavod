@@ -1,6 +1,12 @@
 import type { Hono } from "hono";
 import type { MemberId } from "../../kernel/id";
-import { inviteInput, type LinkAnswer, roleInput, versionInput } from "../../shared/access";
+import {
+  answerInput,
+  inviteInput,
+  type LinkAnswer,
+  roleInput,
+  versionInput,
+} from "../../shared/access";
 import {
   accessOf,
   allow,
@@ -14,6 +20,7 @@ import {
   sessionCookie,
 } from "../auth";
 import { hashOf, newSecret } from "../secrets";
+import { madePasskey, registration, taken } from "./passkeys";
 
 /** Who is signed in, the members of the family, and one's own account. Each needs a session. */
 export function memberRoutes(app: Hono<Api>): void {
@@ -90,6 +97,43 @@ export function memberRoutes(app: Hono<Api>): void {
       Date.now(),
     );
     return done.ok ? c.body(null, 204) : refused(c, done.error);
+  });
+
+  // What a member may take away of their own account: who they are and what they sign in with.
+  app.get("/api/account", allow("own-account"), async (c) => {
+    const account = await accessOf(c).account(c.get("signed").member);
+    return account.ok ? c.json(account.value) : refused(c, account.error);
+  });
+
+  // One more passkey for one's own account, made the way the first one was.
+  app.post("/api/passkey/add/options", allow("own-account"), async (c) => {
+    const access = accessOf(c);
+    const { member: id } = c.get("signed");
+    const account = await access.account(id);
+    if (!account.ok) return refused(c, account.error);
+    const member = { id, name: account.value.member.name };
+    const family = (await access.family()) ?? c.env.RP_ID ?? "";
+    return registration(c, family, member, (hash, challenge) => ({
+      hash,
+      challenge,
+      purpose: "add",
+      member,
+    }));
+  });
+
+  app.post("/api/passkey/add/verify", allow("own-account"), async (c) => {
+    const input = await bodyOf(c, answerInput);
+    if (input === null) return badRequest(c);
+    const step = await taken(c, input.flow, "add");
+    if (!step.ok) return refused(c, step.error);
+    // A step begun by another member is not this member's to finish.
+    if (step.value.purpose !== "add" || step.value.member.id !== c.get("signed").member) {
+      return badRequest(c);
+    }
+    const passkey = await madePasskey(c, step.value.challenge, input.response, input.label ?? "");
+    if (passkey === null) return c.json({ error: "passkey-refused" }, 400);
+    const done = await accessOf(c).addCredential(step.value.member.id, passkey, Date.now());
+    return done.ok ? c.body(null, 201) : refused(c, done.error);
   });
 
   app.delete("/api/account", allow("own-account"), async (c) => {

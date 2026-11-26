@@ -1,0 +1,73 @@
+.page {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  min-height: 100dvh;
+}
+
+.left {
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+  overflow: hidden;
+  border-right: 1px solid var(--edge);
+  background-color: var(--surface);
+}
+
+.blank {
+  width: min(100%, 36rem);
+  max-height: 88dvh;
+  fill: none;
+  stroke: var(--rule);
+  stroke-width: 1.2;
+}
+
+.blank path {
+  vector-effect: non-scaling-stroke;
+}
+
+.blank .direct {
+  stroke: var(--ink);
+  stroke-width: 3;
+}
+
+.right {
+  box-sizing: border-box;
+  max-width: 40rem;
+  padding: 4rem 3.5rem 2rem;
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  justify-content: center;
+}
+
+/* The name a link gave, at the end of the direct line, as if it had just been written in. */
+.family {
+  fill: var(--ink);
+  stroke: none;
+  font-family: var(--serif);
+  font-style: italic;
+}
+
+@media (max-width: 45em) {
+  .page {
+    display: block;
+  }
+
+  .left {
+    justify-content: center;
+    height: 10rem;
+    border: 0;
+  }
+
+  .blank {
+    height: 9rem;
+  }
+
+  .blank .direct {
+    stroke-width: 2.2;
+  }
+
+  .right {
+    padding: 1.5rem 1rem 2.5rem;
+  }
+}

@@ -7,6 +7,7 @@ export {
   accessOver,
   type Expected,
   type StaleVersion,
+  type Account,
   type NewChallenge,
   type Roster,
   type UnknownAggregate,

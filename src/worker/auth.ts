@@ -116,9 +116,9 @@ export const badRequest = (c: ApiContext) => c.json({ error: "bad-request" }, 40
 export async function sessionAnswerOf(c: ApiContext, signed: Signed): Promise<SessionAnswer> {
   const access = accessOf(c);
   const [members, family] = await Promise.all([access.members(), access.family()]);
-  const { member, role, person } = signed;
+  const { member, role, person, via } = signed;
   const name = members.find(({ id }) => id === member)?.name ?? "";
-  return { member, name, role, person, family };
+  return { member, name, role, person, family, via };
 }
 
 /** The country Cloudflare says a request came from, if any. */

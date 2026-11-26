@@ -65,6 +65,8 @@ export const sessionAnswer = z.strictObject({
   role: roleSchema,
   person: personIdSchema.nullable(),
   family: z.string().nullable(),
+  /** What signed in this browser: a passkey, or the browser itself, linked by a reader. */
+  via: z.enum(["passkey", "device"]),
 });
 
 /** What an invitation is, and nothing more. */

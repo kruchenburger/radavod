@@ -1,0 +1,150 @@
+.frame {
+  min-height: 100dvh;
+  display: flex;
+  flex-direction: column;
+}
+
+.lone {
+  display: flex;
+  min-height: 100dvh;
+}
+
+/* A page of the family is a column of type, set like the list of a family book. */
+.page {
+  box-sizing: border-box;
+  width: 100%;
+  max-width: 46rem;
+  padding: 2rem 1.75rem 4rem;
+}
+
+.title {
+  margin: 0;
+  font: 700 2.875rem/1.1 var(--serif);
+}
+
+.section {
+  margin-top: 2.5rem;
+}
+
+.heading {
+  margin: 0 0 0.75rem;
+  color: var(--muted);
+  font: italic 400 1.375rem/1.2 var(--serif);
+}
+
+.members {
+  margin: 1.25rem 0 0;
+  padding: 0;
+  list-style: none;
+}
+
+.member {
+  padding: 0.75rem 0;
+  border-bottom: 1px solid var(--edge);
+}
+
+.who {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  gap: 0 0.75rem;
+  margin: 0;
+}
+
+.name {
+  font: 400 1.0625rem/1.2 var(--serif);
+}
+
+.meta {
+  color: var(--muted);
+}
+
+.credentials,
+.list {
+  margin: 0.5rem 0 0;
+  padding: 0;
+  list-style: none;
+}
+
+.credential,
+.row {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0.25rem 0.75rem;
+  padding: 0.25rem 0;
+}
+
+/* A name the member gave may be long: it wraps, and never pushes the button off the line. */
+.label {
+  min-width: 0;
+  overflow-wrap: anywhere;
+}
+
+.actions {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 0.75rem;
+  margin-top: 0.75rem;
+}
+
+.role {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: flex-end;
+  gap: 0.75rem;
+}
+
+.buttons {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.75rem;
+}
+
+.confirm {
+  max-width: 34rem;
+  padding: 0.75rem 0 0.75rem 1rem;
+  border-left: 2px solid var(--warning);
+}
+
+.confirm p {
+  margin: 0 0 0.75rem;
+}
+
+.link {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 0.75rem;
+  max-width: 34rem;
+  margin-top: 1rem;
+}
+
+.link > :global(.mantine-TextInput-root) {
+  width: 100%;
+}
+
+.add {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 0.75rem;
+  max-width: 24rem;
+  margin-top: 1rem;
+}
+
+.problem {
+  margin: 0.5rem 0 0;
+  color: var(--warning);
+}
+
+@media (max-width: 45em) {
+  .page {
+    padding: 1.25rem 1rem 3rem;
+  }
+
+  .title {
+    font-size: 2rem;
+  }
+}

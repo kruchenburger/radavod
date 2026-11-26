@@ -10,6 +10,10 @@ import { go } from "./router";
 
 // Most people open the start page only.
 const Sample = lazy(async () => ({ default: (await import("../sample/sample")).Sample }));
+const Access = lazy(async () => ({ default: (await import("../access/screens")).AccessScreen }));
+
+/** The addresses of signing in and of the members; kept here, so the start page loads none of it. */
+const accessPaths = new Set(["/setup", "/join", "/sign-in", "/family", "/account"]);
 
 type PagesProps = { path: string; search: string };
 
@@ -18,6 +22,15 @@ export function Pages({ path, search }: PagesProps) {
   const { t } = useLanguage();
   const { data, isError } = useQuery(configQuery);
   const place = useMemo(() => readPlace(path, search), [path, search]);
+  if (accessPaths.has(path)) {
+    return (
+      <Boundary fallback={<Failed />}>
+        <Suspense fallback={<Waiting />}>
+          <Access path={path as never} />
+        </Suspense>
+      </Boundary>
+    );
+  }
   const waiting = (
     <main className={classes.page}>
       <Message text={t("tree.loading")} />
@@ -51,5 +64,27 @@ export function Pages({ path, search }: PagesProps) {
         <Sample place={place} />
       </Suspense>
     </Boundary>
+  );
+}
+
+function Waiting() {
+  const { t } = useLanguage();
+  return (
+    <main className={classes.page}>
+      <Message text={t("page.loading")} />
+    </main>
+  );
+}
+
+function Failed() {
+  const { t } = useLanguage();
+  return (
+    <main className={classes.page}>
+      <Message
+        text={t("page.failed")}
+        action={{ label: t("page.reload"), onClick: () => window.location.reload() }}
+        isProblem
+      />
+    </main>
   );
 }

@@ -27,6 +27,11 @@ export type Challenge = {
       member: { id: MemberId; name: string };
     }
   | { purpose: "login" }
+  | {
+      purpose: "add";
+      /** The member adding a passkey to their own account. */
+      member: { id: MemberId; name: string };
+    }
 );
 
 export type Purpose = Challenge["purpose"];

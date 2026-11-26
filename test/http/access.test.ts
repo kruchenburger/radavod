@@ -330,6 +330,47 @@ describe("an invitation", () => {
   });
 });
 
+describe("one's own account", () => {
+  it("shows its passkeys without keys, and takes one more passkey", async () => {
+    const { family, editor } = await Family.withRoles();
+    const own = await editor.json<{ member: { name: string }; credentials: object[] }>(
+      "GET",
+      "/api/account",
+    );
+    expect(own.body.member).toMatchObject({ name: "editor", role: "editor" });
+    expect(own.body.credentials).toHaveLength(1);
+    expect(JSON.stringify(own.body)).not.toMatch(/publicKey|counter/u);
+    const second = family.browser();
+    const options = await editor.json<{ flow: string; options: never }>(
+      "POST",
+      "/api/passkey/add/options",
+    );
+    const response = await second.passkey.register(options.body.options);
+    const added = await editor.call("POST", "/api/passkey/add/verify", {
+      body: { flow: options.body.flow, response, label: "laptop" },
+    });
+    expect(added.status).toBe(201);
+    expect(
+      (await editor.json<{ credentials: object[] }>("GET", "/api/account")).body.credentials,
+    ).toHaveLength(2);
+    Object.assign(second, { cookie: null });
+    expect((await second.signIn()).body).toMatchObject({ name: "editor", via: "passkey" });
+  });
+
+  it("does not let another member finish a step begun by somebody else", async () => {
+    const { family, editor, reader } = await Family.withRoles();
+    const options = await editor.json<{ flow: string; options: never }>(
+      "POST",
+      "/api/passkey/add/options",
+    );
+    const response = await family.browser().passkey.register(options.body.options);
+    const stolen = await reader.json("POST", "/api/passkey/add/verify", {
+      body: { flow: options.body.flow, response },
+    });
+    expect(stolen).toEqual({ status: 400, body: { error: "bad-request" } });
+  });
+});
+
 describe("the routes of members", () => {
   const table: [string, string, unknown, Record<"reader" | "editor" | "keeper", number>][] = [
     ["GET", "/api/session", undefined, { reader: 200, editor: 200, keeper: 200 }],

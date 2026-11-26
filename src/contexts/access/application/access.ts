@@ -75,6 +75,12 @@ export type AccessError =
   | Expired
   | StaleCounter;
 
+/** A member as they see themselves. */
+export type Account = {
+  member: Omit<Member, "version">;
+  credentials: Omit<Credential, "publicKey" | "counter">[];
+};
+
 /** The members as one of them sees them. */
 export type Roster = {
   members: (Pick<Member, "id" | "name" | "role"> &
@@ -116,6 +122,8 @@ export interface Access {
     now: number,
     fresh: { id: MemberId; name?: string | undefined },
   ): Result<NewMember, AccessError>;
+  /** A member's own account: who they are and what they sign in with, without keys. */
+  account(id: MemberId): Result<Account, AccessError>;
   /** The members as a member may see them: names for all, credentials and invitations for keepers. */
   roster(by: MemberId): Result<Roster, AccessError>;
   /** What a live invitation is, without spending it. */
@@ -203,6 +211,15 @@ export function accessOver(store: AccessStore): Access {
       if (!live.ok) return live;
       const member = newcomerOf(store, live.value, fresh);
       return member === null ? missing("member") : { ok: true, value: member };
+    },
+    account(id) {
+      const self = allowed(store, id, "own-account");
+      if (!self.ok) return self;
+      const { version: _version, ...member } = self.value;
+      const credentials = store
+        .credentialsOf(id)
+        .map(({ publicKey: _key, counter: _counter, ...credential }) => credential);
+      return { ok: true, value: { member, credentials } };
     },
     roster(by) {
       const reader = allowed(store, by, "see-members");

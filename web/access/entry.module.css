@@ -1,0 +1,64 @@
+.title {
+  font-size: 2.875rem;
+  line-height: 1.1;
+}
+
+.about {
+  margin: 0.75rem 0 0;
+  max-width: 32rem;
+  font-family: var(--serif);
+  font-size: 1.25rem;
+  line-height: 1.4;
+}
+
+.form {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 1.25rem;
+  width: 100%;
+  max-width: 24rem;
+  margin-top: 2rem;
+}
+
+.form > :global(.mantine-TextInput-root) {
+  width: 100%;
+}
+
+.note {
+  margin: 1.5rem 0 0;
+  max-width: 32rem;
+  color: var(--muted);
+}
+
+.problem {
+  margin: 0;
+  max-width: 32rem;
+  color: var(--warning);
+}
+
+/* The other way in, for a reader: below a rule, as a second thought, never beside the first. */
+.other {
+  margin-top: 2.5rem;
+  padding-top: 1.25rem;
+  border-top: 1px solid var(--edge);
+  max-width: 32rem;
+}
+
+.other p {
+  margin: 0;
+}
+
+.other .form {
+  margin-top: 1.25rem;
+}
+
+@media (max-width: 45em) {
+  .title {
+    font-size: 2rem;
+  }
+
+  .form {
+    max-width: none;
+  }
+}

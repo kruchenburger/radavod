@@ -8,6 +8,7 @@ import {
   type Invitation,
   type NewChallenge,
   type Purpose,
+  type Account,
   type Roster,
   type Expected,
   type StaleVersion,
@@ -74,6 +75,10 @@ export class FamilyAccess extends DurableObject<Env> {
   /** A live credential, with what checks a signature by it. */
   credential(id: string): Credential | null {
     return this.#access().credential(id);
+  }
+
+  account(id: MemberId): Result<Account, AccessError> {
+    return this.#access().account(id);
   }
 
   roster(by: MemberId): Result<Roster, AccessError> {

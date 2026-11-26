@@ -59,7 +59,7 @@ export function Frame({ place, sample, isSheet = false, children }: FrameProps) 
 }
 
 /** Both languages by their marks, the same in either; the radios are native, so are the keys. */
-function LanguageChoice() {
+export function LanguageChoice() {
   const { t, locale, setLocale } = useLanguage();
   const name = useId();
   return (
@@ -83,7 +83,7 @@ function LanguageChoice() {
   );
 }
 
-function ThemeButton() {
+export function ThemeButton() {
   const { t } = useLanguage();
   const { setColorScheme } = useMantineColorScheme();
   const other = useComputedColorScheme("light") === "dark" ? "light" : "dark";
