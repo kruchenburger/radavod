@@ -1,5 +1,5 @@
 import { fireEvent, render, screen, waitFor, within } from "@testing-library/react";
-import { beforeEach, describe, expect, it, vi } from "vitest";
+import { beforeAll, beforeEach, describe, expect, it, vi } from "vitest";
 import { App } from "../../web/app/app";
 
 const webauthn = vi.hoisted(() => ({
@@ -64,6 +64,12 @@ const type = (name: RegExp | string, value: string) =>
   fireEvent.change(field(name), { target: { value } });
 const press = (name: RegExp | string) => fireEvent.click(screen.getByRole("button", { name }));
 const alert = () => screen.findByRole("alert");
+
+// The screens load lazily: the first test would pay for their first load within the one second a
+// query waits, which a busy machine spends before anything renders. They load here instead.
+beforeAll(async () => {
+  await import("../../web/access/screens");
+});
 
 beforeEach(() => {
   webauthn.supports = true;
