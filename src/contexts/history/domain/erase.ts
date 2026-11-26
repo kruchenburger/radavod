@@ -83,34 +83,57 @@ function formsIn(value: unknown): NameForm[] {
   return Object.values(value).flatMap(formsIn);
 }
 
+/**
+ * The mark of the links named by one erased person, in the journal of one erasure: "erased-<token>".
+ * A link of a child is named by its parent, and two erased parents of one child must stay two links,
+ * so each erasure has a mark of its own that says nothing of whom it was.
+ */
+export function linkMark(token: string): string {
+  return `${erased}-${token}`;
+}
+
 /** The patches of an entry without a person: none about them, none that names them. */
-export function withoutPerson(patches: readonly Patch[], id: PersonId, words: Words): Patch[] {
+export function withoutPerson(
+  patches: readonly Patch[],
+  id: PersonId,
+  words: Words,
+  link: string,
+): Patch[] {
   return patches
     .filter(({ aggregate }) => !isOf(aggregate, id))
     .map(({ aggregate, path, before, after }) => ({
       aggregate,
-      path: pathWithout(path, id),
-      before: scrubbed(before, id, words),
-      after: scrubbed(after, id, words),
+      path: pathWithout(path, id, link),
+      before: scrubbed(before, id, words, link),
+      after: scrubbed(after, id, words, link),
     }));
 }
 
 /**
- * A path with the same mark as the values it leads to: a thing in a list is named by its identifier,
- * and a link of a child is named by the parent ("parents/<id>", "parents/<id>-2").
+ * A path with the same marks as the values it leads to. A thing in a list is named by its identifier,
+ * and one named by a person is a link of a child named by the parent ("parents/<id>", "parents/<id>-2").
  */
-export function pathWithout(path: string, id: PersonId): string {
+export function pathWithout(path: string, id: PersonId, link: string): string {
   return path
     .split("/")
-    .map((step) => (step === id ? erased : step.replaceAll(id, ERASED_IN_WORDS)))
+    .map((step) => markOf(step, id, link))
     .join("/");
 }
 
-/** A value with a mark in the place of a person and of the whole names. */
-export function scrubbed(value: unknown, id: PersonId, words: Words): unknown {
-  return inTexts(value, (text) =>
-    words.clean(text === id ? erased : text.replaceAll(id, ERASED_IN_WORDS)),
+/**
+ * A value with a mark in the place of a person and of the whole names. A field "id" or "parentage" that
+ * names them is a link named by them, and takes the mark of links.
+ */
+export function scrubbed(value: unknown, id: PersonId, words: Words, link = erased): unknown {
+  return inTexts(value, (text, key) =>
+    words.clean(markOf(text, id, key === "id" || key === "parentage" ? link : erased)),
   );
+}
+
+function markOf(text: string, id: PersonId, whole: string): string {
+  if (text === id) return whole;
+  if (whole !== erased && text.startsWith(`${id}-`)) return whole + text.slice(id.length);
+  return text.replaceAll(id, ERASED_IN_WORDS);
 }
 
 /** A value with a mark in the place of the whole names. */
@@ -118,11 +141,17 @@ export function withoutNames(value: unknown, words: Words): unknown {
   return inTexts(value, (text) => words.clean(text));
 }
 
-function inTexts(value: unknown, change: (text: string) => string): unknown {
-  if (typeof value === "string") return change(value);
+function inTexts(
+  value: unknown,
+  change: (text: string, key?: string) => string,
+  key?: string,
+): unknown {
+  if (typeof value === "string") return change(value, key);
   if (Array.isArray(value)) return value.map((one) => inTexts(one, change));
   if (typeof value !== "object" || value === null) return value;
-  return Object.fromEntries(Object.entries(value).map(([key, one]) => [key, inTexts(one, change)]));
+  return Object.fromEntries(
+    Object.entries(value).map(([field, one]) => [field, inTexts(one, change, field)]),
+  );
 }
 
 function isOf(aggregate: string, id: PersonId): boolean {

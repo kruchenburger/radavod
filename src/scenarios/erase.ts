@@ -1,5 +1,6 @@
 import type { Citation } from "../contexts/evidence";
 import {
+  linkMark,
   purge,
   scrubbed,
   type Words,
@@ -8,9 +9,9 @@ import {
   type Trashed,
   wholeNames,
 } from "../contexts/history";
-import type { Parentage, PersonWritten } from "../contexts/kinship";
+import type { PersonWritten } from "../contexts/kinship";
 import { factOf, type LifeEvent } from "../contexts/life";
-import type { EventId, MemberId, PersonId } from "../kernel/id";
+import type { EventId, MemberId, PersonId, UnionId } from "../kernel/id";
 import type { NameForm } from "../kernel/name-form";
 import type { Result } from "../kernel/result";
 import { type State, withoutErased } from "../shared/reverse";
@@ -66,6 +67,8 @@ export function eraseHere(
   id: PersonId,
   newId: () => EventId,
 ): Result<Erased, EraseError> {
+  // A token made outside, so the mark of this erasure says nothing of whom it was.
+  const link = linkMark(newId().slice("event_".length));
   let forms: NameForm[] = [];
   let others: NameForm[] = [];
   const done = unit.run(
@@ -82,21 +85,23 @@ export function eraseHere(
       const trashed = c.history.trash.get(id);
       if (trashed !== null) {
         c.history.trash.put(id, null);
-        // A link of a child to them never comes back, and neither do its citations.
-        for (const { child, parentage } of trashed.children) {
-          const fact = `parentage:${(parentage as Parentage).id}`;
-          for (const one of c.evidence.citationsOf(child).filter((it) => it.fact.fact === fact)) {
-            const taken = c.evidence.uncite(one.fact, one.id);
-            if (!taken.ok) return taken;
-          }
-        }
         // What goes over to others does not name the one who goes, in words either.
         for (const event of trashed.events as LifeEvent[]) {
           handOver(c, trashed, event, newId, (value) => withoutNames(value, words) as typeof value);
         }
       }
+      // No citation of a fact they name stays: of a link of a child, gone with them or taken back
+      // before. The fact is gone for good, so there is no certainty left to settle.
+      for (const aggregate of Object.keys(state).filter((one) => one.startsWith("cited/"))) {
+        const subject = aggregate.slice("cited/".length) as PersonId | UnionId;
+        for (const one of c.evidence.citationsOf(subject)) {
+          if (!one.fact.fact.includes(id)) continue;
+          const taken = c.evidence.uncite(one.fact, one.id);
+          if (!taken.ok) return taken;
+        }
+      }
       for (const other of c.history.trash.everybody()) {
-        c.history.trash.put(other.id, untied(other, id));
+        c.history.trash.put(other.id, untied(other, id, link));
       }
       // Somebody who went by an undo may have left rows with nothing in them.
       const left = c.life.putBack([{ kind: "life", id, value: null }]);
@@ -112,10 +117,10 @@ export function eraseHere(
           .filter((one) => one.id !== id)
           .map((one) => ({
             ...one,
-            before: scrubbed(one.before, id, wordsOf(wholeNames(forms, others))),
-            after: scrubbed(one.after, id, wordsOf(wholeNames(forms, others))),
+            before: scrubbed(one.before, id, wordsOf(wholeNames(forms, others)), link),
+            after: scrubbed(one.after, id, wordsOf(wholeNames(forms, others)), link),
           })),
-      last: (sql) => purge(sql, id, forms, others),
+      last: (sql) => purge(sql, id, forms, others, link),
     },
   );
   return done.ok ? { ok: true, value: done.value.value } : done;
@@ -209,8 +214,8 @@ function handOver(
 }
 
 /** Somebody in the trash without any link to an erased person, nor a citation of one. */
-function untied(trashed: Trashed, id: PersonId): Trashed {
+function untied(trashed: Trashed, id: PersonId, link: string): Trashed {
   const citations = (trashed.citations as Citation[]).filter(({ fact }) => !fact.fact.includes(id));
-  const marked = scrubbed({ ...trashed, citations }, id, wordsOf([])) as Trashed;
+  const marked = scrubbed({ ...trashed, citations }, id, wordsOf([]), link) as Trashed;
   return withoutErased(`trash/${trashed.id}`, marked) as Trashed;
 }

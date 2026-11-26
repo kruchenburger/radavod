@@ -95,6 +95,8 @@ export function withoutErased(aggregate: string, value: unknown): unknown {
       return { ...fields, events: eventsWithoutErased(fields.events) };
     case "trash":
       return trashWithoutErased(fields);
+    case "cited":
+      return { ...fields, citations: citationsWithoutErased(fields.citations) };
     default:
       return value;
   }
@@ -102,11 +104,13 @@ export function withoutErased(aggregate: string, value: unknown): unknown {
 
 /**
  * Links to somebody erased since are to a parent nobody knows. A link named by that parent carries the
- * mark in its name, and is named as a link to nobody known is, by a number when that is taken.
+ * mark in its name, and is named as a link to nobody known is, by a number when that is taken: the
+ * rule of `linkId` in src/scenarios/add-relative.ts, which this module cannot import.
  */
 function linksWithoutErased(links: unknown): Thing[] {
   const all = thingsOf(links);
-  const isMarked = (id: string) => id === ERASED || id.includes(ERASED_IN_WORDS);
+  const isMarked = (id: string) =>
+    id === ERASED || id.startsWith(`${ERASED}-`) || id.includes(ERASED_IN_WORDS);
   const taken = new Set(all.map(({ id }) => id).filter((id) => !isMarked(id)));
   return all.map((link) => {
     if (link.parent !== ERASED) return link;
@@ -149,7 +153,16 @@ function trashWithoutErased(trashed: Fields): Fields {
       .map((one) => ({ ...one, children: withoutMark(one.children, "child") })),
     events: eventsWithoutErased(trashed.events),
     guest: withoutMark(trashed.guest, "home"),
+    citations: citationsWithoutErased(trashed.citations),
   };
+}
+
+/** Citations of a fact that named somebody erased since: the fact is not there to cite. */
+function citationsWithoutErased(citations: unknown): unknown[] {
+  return listOf(citations).filter((one) => {
+    const fact = fieldsOf(fieldsOf(one)?.fact)?.fact;
+    return typeof fact !== "string" || !fact.includes(ERASED_IN_WORDS);
+  });
 }
 
 /** A list without those who are marked as erased, themselves or by a field. */
