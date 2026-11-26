@@ -5,7 +5,7 @@ import {
   type Challenge,
   type Change,
   type Credential,
-  type Invitation,
+  type Inspected,
   type NewChallenge,
   type Purpose,
   type Account,
@@ -102,7 +102,7 @@ export class FamilyAccess extends DurableObject<Env> {
   }
 
   /** What a live invitation is, without spending it. */
-  inspect(hash: string, now: number): Result<Invitation & { canLink: boolean }, AccessError> {
+  inspect(hash: string, now: number): Result<Inspected, AccessError> {
     return this.#access().inspect(hash, now);
   }
 
@@ -133,7 +133,15 @@ export class FamilyAccess extends DurableObject<Env> {
 
   invite(
     by: MemberId,
-    input: { id: string; hash: string; role: Role; person: PersonId | null; now: number },
+    input: {
+      id: string;
+      hash: string;
+      role: Role;
+      person: PersonId | null;
+      now: number;
+      name?: string | null;
+      seed: number;
+    },
   ): Promise<Done<{ expiresAt: number }>> {
     return this.#run({}, (access) => given(access, access.invite(by, input), input.id));
   }
@@ -144,6 +152,10 @@ export class FamilyAccess extends DurableObject<Env> {
     expected: Expected = {},
   ): Promise<Done<{ expiresAt: number }>> {
     return this.#run(expected, (access) => given(access, access.recover(by, input), input.id));
+  }
+
+  rename(id: MemberId, name: string): Promise<Done> {
+    return this.#change({}, (access) => access.rename(id, name));
   }
 
   revokeInvitation(by: MemberId, id: string): Promise<Done> {

@@ -5,6 +5,7 @@ import type { Result } from "../../../kernel/result";
 import type { Challenge } from "./challenge";
 import type { Credential } from "./credential";
 import type { Invitation } from "./invitation";
+import type { Nickname } from "./nickname";
 import { type Action, can, type Role } from "./rights";
 import type { Session } from "./session";
 
@@ -12,14 +13,17 @@ import type { Session } from "./session";
 export type Member = {
   id: MemberId;
   version: number;
+  /** What the member calls themselves; empty while they go by their nickname. */
   name: string;
+  /** Given when nobody gave a name, until the member writes one. */
+  nickname: Nickname | null;
   role: Role;
   person: PersonId | null;
   createdAt: number;
   revokedAt: number | null;
 };
 
-export type NewMember = Pick<Member, "id" | "name">;
+export type NewMember = Pick<Member, "id" | "name"> & { nickname?: Nickname | null };
 
 export type Change = (
   | Write<"member", MemberId, Member>
@@ -187,6 +191,25 @@ export function revokeMember(
   };
 }
 
+/** A member writes the name they go by; a nickname is theirs no more. */
+export function rename(
+  reader: AccessReader,
+  id: MemberId,
+  name: string,
+): Result<Change, Forbidden | NameRequired> {
+  const member = allowed(reader, id, "own-account");
+  if (!member.ok) return member;
+  const written = name.trim();
+  if (written === "") return nameRequired;
+  return {
+    ok: true,
+    value: writes("member", id, member.value, { ...member.value, name: written, nickname: null }),
+  };
+}
+
+export type NameRequired = { code: "name-required" };
+export const nameRequired = { ok: false, error: { code: "name-required" } } as const;
+
 /** A member deletes their own account: the journal calls them a former member. */
 export function deleteAccount(reader: AccessReader, id: MemberId): Result<Change, Forbidden> {
   const member = allowed(reader, id, "own-account");
@@ -201,7 +224,11 @@ export function deleteAccount(reader: AccessReader, id: MemberId): Result<Change
   };
 }
 
-/** Members and invitations tied to people erased from the tree are tied to nobody now. */
+/**
+ * Members and invitations tied to people erased from the tree are tied to nobody now. A link also
+ * forgets the name the keeper called her by; a member's name is the account's own and stays, even
+ * when it came from the link they joined by without writing one.
+ */
 export function withoutPeople(reader: AccessReader, people: readonly PersonId[]): Change {
   const gone = new Set<string>(people);
   return [
@@ -212,6 +239,6 @@ export function withoutPeople(reader: AccessReader, people: readonly PersonId[])
     ...reader
       .invitations()
       .filter(({ person }) => person !== null && gone.has(person))
-      .flatMap((one) => writes("invitation", one.id, one, { ...one, person: null })),
+      .flatMap((one) => writes("invitation", one.id, one, { ...one, person: null, name: null })),
   ];
 }

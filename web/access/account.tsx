@@ -5,12 +5,13 @@ import { type AccountAnswer, accountAnswer, type SessionAnswer } from "../../src
 import { useLanguage } from "../app/language";
 import { go } from "../app/router";
 import { call, canUsePasskeys, makePasskey, type Refusal, sessionQuery } from "./api";
-import { isInApp, LabelInput } from "./entry";
+import { isInApp, LabelInput, NameInput } from "./entry";
 import { asRefusal } from "./errors";
 import { SignedIn } from "./frame";
 import { Confirm, CredentialLine, Problem, Section, Title } from "./members";
 import { read } from "./session";
 import classes from "./members.module.css";
+import { nameOf } from "./nickname";
 
 const accountKey = ["account"];
 
@@ -39,12 +40,16 @@ function Details({ account, session }: { account: AccountAnswer; session: Sessio
   const { t } = useLanguage();
   const { member, credentials, canAddPasskey } = account;
   const passkeys = credentials.filter(({ kind }) => kind === "passkey");
+  // Said here, not in the form: the form goes once the nickname does.
+  const [renamed, setRenamed] = useState<string | null>(null);
   return (
     <>
       <p className={classes.who}>
-        <span className={classes.name}>{member.name}</span>
+        <span className={classes.name}>{nameOf(t, member)}</span>
         <span className={classes.meta}>{t(`role.${member.role}`)}</span>
       </p>
+      {member.nickname !== null && <Rename onDone={setRenamed} />}
+      {renamed !== null && <p role="status">{t("account.renamed", { name: renamed })}</p>}
       <Section title={t("account.credentials")}>
         <ul className={classes.credentials}>
           {credentials.map((credential) => (
@@ -114,6 +119,43 @@ function AddPasskey() {
         {state.isWorking === true ? t("passkey.working") : t("account.add")}
       </Button>
       {state.isDone === true && <p role="status">{t("account.added")}</p>}
+      {state.refusal !== undefined && <Problem refusal={state.refusal} />}
+    </div>
+  );
+}
+
+/** A member called by a nickname writes the name they go by. */
+function Rename({ onDone }: { onDone: (name: string) => void }) {
+  const { t } = useLanguage();
+  const client = useQueryClient();
+  const [name, setName] = useState("");
+  const [state, setState] = useState<{ isWorking?: boolean; refusal?: Refusal }>({});
+  const written = name.trim();
+  const save = async () => {
+    setState({ isWorking: true });
+    const answer = await call("POST", "/api/account/name", { name: written });
+    if (!answer.ok) return setState({ refusal: answer.error });
+    setState({});
+    onDone(written);
+    // The name shows in the session and in the account: both are asked again.
+    await Promise.all([
+      client.invalidateQueries({ queryKey: sessionQuery.queryKey }),
+      client.invalidateQueries({ queryKey: accountKey }),
+    ]);
+  };
+  return (
+    <div className={classes.add}>
+      <p>{t("account.nickname")}</p>
+      <NameInput value={name} onChange={setName} />
+      <Button
+        size="md"
+        variant="outline"
+        disabled={written === ""}
+        loading={state.isWorking === true}
+        onClick={() => void save()}
+      >
+        {t("account.rename")}
+      </Button>
       {state.refusal !== undefined && <Problem refusal={state.refusal} />}
     </div>
   );

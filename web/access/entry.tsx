@@ -18,6 +18,7 @@ import {
 } from "./api";
 import classes from "./entry.module.css";
 import { asRefusal, textOf } from "./errors";
+import { nameOf } from "./nickname";
 
 /** Where a member goes once signed in. */
 const home = "/family";
@@ -97,11 +98,20 @@ export function Join() {
 
 function Invitation({ secret, invitation }: { secret: string; invitation: InvitationAnswer }) {
   const { t } = useLanguage();
-  const [name, setName] = useState("");
+  // The name the keeper wrote stands in the field; whoever joins may change it.
+  const [name, setName] = useState(invitation.name ?? "");
   const [label, setLabel] = useState("");
   const [passkeyLabel, setPasskeyLabel] = useState("");
   const signed = useSignedIn();
   const isNew = invitation.kind === "join";
+  // The server says whether a name may stay unwritten; the field only says what stands then.
+  const isOptional = invitation.nameOptional;
+  const written = name.trim();
+  const named = isNew && written !== "" ? { name: written } : {};
+  const isReady = isOptional || written !== "";
+  const nameInput = (
+    <NameInput value={name} onChange={setName} isOptional={isOptional} {...hintOf(t, invitation)} />
+  );
   // A messenger's own browser often says it can and then cannot: it goes to a real one.
   const hasPasskeys = canUsePasskeys() && !isInApp();
   const canBind = invitation.canLink;
@@ -123,15 +133,15 @@ function Invitation({ secret, invitation }: { secret: string; invitation: Invita
             makePasskey<SessionAnswer>(
               "/api/passkey/register/options",
               "/api/passkey/register/verify",
-              isNew ? { secret, name: name.trim() } : { secret },
+              { secret, ...named },
               passkeyLabel.trim(),
             )
           }
           onDone={signed}
-          isReady={!isNew || name.trim() !== ""}
+          isReady={isReady}
           working={t("passkey.working")}
         >
-          {isNew && <NameInput value={name} onChange={setName} />}
+          {isNew && nameInput}
           <LabelInput value={passkeyLabel} onChange={setPasskeyLabel} />
         </Form>
       ) : (
@@ -148,14 +158,14 @@ function Invitation({ secret, invitation }: { secret: string; invitation: Invita
               call<SessionAnswer>("POST", "/api/device/bind", {
                 secret,
                 label: label.trim(),
-                ...(isNew ? { name: name.trim() } : {}),
+                ...named,
               })
             }
             onDone={signed}
-            isReady={!isNew || name.trim() !== ""}
+            isReady={isReady}
             working={t("join.binding")}
           >
-            {!hasPasskeys && isNew && <NameInput value={name} onChange={setName} />}
+            {!hasPasskeys && isNew && nameInput}
             <TextInput
               label={t("join.deviceLabel")}
               description={t("join.deviceHint")}
@@ -297,20 +307,42 @@ function Form<T>({
   );
 }
 
-function NameInput({ value, onChange }: { value: string; onChange: (value: string) => void }) {
+/** Where the name in the field comes from, or what an empty field leaves: the nickname. */
+function hintOf(
+  t: ReturnType<typeof useLanguage>["t"],
+  { name, nickname }: InvitationAnswer,
+): { hint?: string } {
+  if (name !== null && name !== "") return { hint: t("join.keeperName") };
+  const called = nickname === null ? "" : nameOf(t, { name: "", nickname });
+  return called === "" ? {} : { hint: t("join.nickname", { nickname: called }) };
+}
+
+/** The name one goes by. It may stay empty only where a link already has a name or a nickname. */
+export function NameInput({
+  value,
+  onChange,
+  isOptional = false,
+  hint,
+}: {
+  value: string;
+  onChange: (value: string) => void;
+  isOptional?: boolean;
+  hint?: string;
+}) {
   const { t } = useLanguage();
   const [isTouched, setTouched] = useState(false);
+  const isMissing = !isOptional && isTouched && value.trim() === "";
   return (
     <TextInput
       label={t("field.name")}
-      description={t("field.nameHint")}
+      description={hint ?? t("field.nameHint")}
       value={value}
       onChange={(event) => onChange(event.currentTarget.value)}
       onBlur={() => setTouched(true)}
-      error={isTouched && value.trim() === "" ? t("field.nameRequired") : undefined}
+      error={isMissing ? t("field.nameRequired") : undefined}
       autoComplete="name"
       maxLength={200}
-      required
+      required={!isOptional}
     />
   );
 }

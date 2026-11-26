@@ -10,6 +10,17 @@ import {
 import type { MemberId } from "../../src/kernel/id";
 import { idOf, person } from "../storage/tree";
 import { openChallenge, takeChallenge } from "../../src/contexts/access/domain/challenge";
+import { invite } from "../../src/contexts/access/domain/invitation";
+import {
+  NICKNAME_ADJECTIVES,
+  NICKNAME_CREATURES,
+  nicknameFor,
+} from "../../src/contexts/access/domain/nickname";
+import { writes } from "../../src/kernel/change";
+import {
+  NICKNAME_ADJECTIVES as SHARED_ADJECTIVES,
+  NICKNAME_CREATURES as SHARED_CREATURES,
+} from "../../src/shared/nickname";
 import { MemoryAccess } from "./memory-access";
 
 const day = 86_400_000;
@@ -51,6 +62,7 @@ function joined(
     role,
     person: null,
     now: start,
+    seed: 0,
   });
   expect(invited.ok).toBe(true);
   const done = access.redeem({
@@ -169,7 +181,14 @@ describe("an invitation", () => {
   it("is given by a keeper only", () => {
     const { access } = family();
     joined(access, "bob", "editor");
-    const input = { id: "i", hash: "h", role: "reader" as const, person: null, now: start };
+    const input = {
+      id: "i",
+      hash: "h",
+      role: "reader" as const,
+      person: null,
+      now: start,
+      seed: 0,
+    };
     expect(access.invite(member("bob"), input)).toEqual(refused("forbidden"));
     expect(access.invite(member("ann"), input).ok).toBe(true);
   });
@@ -182,6 +201,7 @@ describe("an invitation", () => {
       role: "editor" as const,
       person: person("ada"),
       now: start,
+      seed: 0,
     };
     expect(access.invite(member("ann"), input).ok).toBe(true);
     const redeem = {
@@ -202,7 +222,14 @@ describe("an invitation", () => {
 
   it("lives 14 days, and a revoked one is gone", () => {
     const { access } = family();
-    const input = { id: "i", hash: "h", role: "reader" as const, person: null, now: start };
+    const input = {
+      id: "i",
+      hash: "h",
+      role: "reader" as const,
+      person: null,
+      now: start,
+      seed: 0,
+    };
     expect(access.invite(member("ann"), input).ok).toBe(true);
     const redeem = {
       hash: "h",
@@ -216,7 +243,14 @@ describe("an invitation", () => {
 
   it("is not spent by a credential that is refused", () => {
     const { access } = family();
-    const input = { id: "i", hash: "h", role: "editor" as const, person: null, now: start };
+    const input = {
+      id: "i",
+      hash: "h",
+      role: "editor" as const,
+      person: null,
+      now: start,
+      seed: 0,
+    };
     expect(access.invite(member("ann"), input).ok).toBe(true);
     const redeem = { hash: "h", now: start, member: { id: member("bob"), name: "Bob" } };
     expect(access.redeem({ ...redeem, credential: device("d") })).toEqual(
@@ -230,7 +264,14 @@ describe("a link of a keeper who was lowered or revoked since", () => {
   it("lets nobody in", () => {
     const { access } = family();
     joined(access, "bob", "keeper");
-    const input = { id: "i", hash: "h", role: "keeper" as const, person: null, now: start };
+    const input = {
+      id: "i",
+      hash: "h",
+      role: "keeper" as const,
+      person: null,
+      now: start,
+      seed: 0,
+    };
     expect(access.invite(member("bob"), input).ok).toBe(true);
     expect(access.changeRole(member("ann"), member("bob"), "reader", start).ok).toBe(true);
     const redeem = { hash: "h", now: start, member: { id: member("dan"), name: "Dan" } };
@@ -429,6 +470,7 @@ describe("a member", () => {
         role: "reader",
         person: null,
         now: start,
+        seed: 0,
       }),
     ).toEqual(refused("forbidden"));
     expect(access.revoke(member("ann"), member("bob"), start)).toEqual(refused("missing"));
@@ -533,5 +575,120 @@ describe("one more passkey", () => {
     expect(access.signIn({ hash: "s3", credential: "ann-1", now: start, counter: 1 })).toEqual(
       refused("stale-counter"),
     );
+  });
+});
+
+describe("a nickname", () => {
+  const link = (id: string, extra: { name?: string } = {}) => ({
+    id,
+    hash: id,
+    role: "reader" as const,
+    person: null,
+    now: start,
+    seed: 0,
+    ...extra,
+  });
+
+  it("is one nobody in the family has", () => {
+    const { access, store } = family();
+    expect(access.invite(member("ann"), link("a")).ok).toBe(true);
+    expect(access.invite(member("ann"), link("b")).ok).toBe(true);
+    const nicknames = ["a", "b"].map((id) => store.invitation(id)?.nickname);
+    expect(nicknames[0]).not.toBeNull();
+    expect(nicknames[0]).not.toEqual(nicknames[1]);
+  });
+
+  it("with none left is refused by its own code, and a name still lets somebody in", () => {
+    const { store } = family();
+    const given = invite(store, member("ann"), link("first"));
+    if (!given.ok) throw new Error("no invitation");
+    store.save(given.value);
+    const first = store.invitation("first");
+    if (first === null) throw new Error("no invitation");
+    // Every other pair goes to a link of its own, at once.
+    const all = NICKNAME_ADJECTIVES.flatMap((adjective) =>
+      NICKNAME_CREATURES.map((creature) => ({ adjective, creature })),
+    ).filter(({ adjective, creature }) => {
+      const { nickname } = first;
+      return adjective !== nickname?.adjective || creature !== nickname.creature;
+    });
+    store.save(
+      all.flatMap((nickname, i) => {
+        const id = `i${i}`;
+        return writes("invitation", id, null, { ...first, id, hash: id, nickname });
+      }),
+    );
+    expect(invite(store, member("ann"), link("over"))).toEqual(refused("nicknames-spent"));
+    expect(invite(store, member("ann"), link("named", { name: "Vera" })).ok).toBe(true);
+  });
+
+  it("stays taken by a revoked member, whom a keeper still sees, and not by a spent link", () => {
+    const { access, store } = family();
+    expect(access.invite(member("ann"), link("a")).ok).toBe(true);
+    const redeem = {
+      hash: "a",
+      now: start,
+      member: { id: member("bob"), name: "" },
+      credential: passkey("b"),
+    };
+    expect(access.redeem(redeem).ok).toBe(true);
+    const nickname = access.member(member("bob"))?.nickname;
+    if (nickname == null) throw new Error("no nickname");
+    expect(access.revoke(member("ann"), member("bob"), start).ok).toBe(true);
+    const only = { adjectives: [nickname.adjective], creatures: [nickname.creature] };
+    expect(nicknameFor(store, 0, only)).toBeNull();
+  });
+
+  it("is chosen from what is free, by the seed", () => {
+    const { store: reader } = family();
+    const words = { adjectives: ["brave", "sly"], creatures: ["owl"] };
+    expect(nicknameFor(reader, 0, words)).toEqual({ adjective: "brave", creature: "owl" });
+    expect(nicknameFor(reader, 1, words)).toEqual({ adjective: "sly", creature: "owl" });
+    expect(nicknameFor(reader, 7, { adjectives: [], creatures: ["owl"] })).toBeNull();
+  });
+
+  it("is made of the words the browser knows: its copy of the lists is the domain's", () => {
+    expect([...SHARED_ADJECTIVES]).toEqual([...NICKNAME_ADJECTIVES]);
+    expect([...SHARED_CREATURES]).toEqual([...NICKNAME_CREATURES]);
+  });
+});
+
+describe("a name", () => {
+  it("written blank is refused as a name required", () => {
+    const { access } = family();
+    expect(access.rename(member("ann"), "  ")).toEqual(refused("name-required"));
+    expect(access.rename(member("ann"), " Anna ").ok).toBe(true);
+    expect(access.member(member("ann"))).toMatchObject({ name: "Anna", nickname: null });
+  });
+
+  it("may be left unwritten on joining only where the link has a name or a nickname", () => {
+    const { access, store } = family();
+    expect(access.invite(member("ann"), { ...invitation("named"), name: "Vera" }).ok).toBe(true);
+    expect(access.invite(member("ann"), invitation("nicknamed")).ok).toBe(true);
+    // A link written before links had names or nicknames.
+    const old = store.invitation("nicknamed");
+    if (old === null) throw new Error("no invitation");
+    store.save(
+      writes("invitation", "old", null, { ...old, id: "old", hash: "old", nickname: null }),
+    );
+    const optional = (hash: string) => {
+      const found = access.inspect(hash, start);
+      return found.ok ? found.value.nameOptional : null;
+    };
+    expect(optional("named")).toBe(true);
+    expect(optional("nicknamed")).toBe(true);
+    expect(optional("old")).toBe(false);
+    expect(access.newcomer("old", start, { id: member("eve"), name: "" })).toEqual(
+      refused("missing"),
+    );
+  });
+
+  const invitation = (id: string) => ({
+    id,
+    hash: id,
+    role: "reader" as const,
+    person: null,
+    now: start,
+    seed: 0,
   });
 });

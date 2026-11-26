@@ -13,6 +13,7 @@ import {
   type NewMember,
   signedOut,
 } from "./member";
+import { type Nickname, nicknameFor, type NicknamesSpent, nicknamesSpent } from "./nickname";
 import type { Role } from "./rights";
 
 /**
@@ -30,6 +31,10 @@ export type Invitation = {
   kind: "join" | "recovery";
   /** Whose account a recovery is for. */
   member: MemberId | null;
+  /** What the keeper called whom they invite, if they did: shown when the link is opened. */
+  name: string | null;
+  /** Given when the keeper gave no name. */
+  nickname: Nickname | null;
 };
 
 const day = 86_400_000;
@@ -84,20 +89,42 @@ export function newcomerOf(
   fresh: { id: MemberId; name?: string | undefined },
 ): NewMember | null {
   if (invitation.kind === "join") {
-    return fresh.name === undefined ? null : { id: fresh.id, name: fresh.name };
+    // The name they write, else the one the keeper gave, else the nickname of the link.
+    const name = fresh.name?.trim() || invitation.name || "";
+    const nickname = name === "" ? invitation.nickname : null;
+    return name === "" && nickname === null ? null : { id: fresh.id, name, nickname };
   }
   const member = invitation.member === null ? null : reader.member(invitation.member);
-  return isLive(member) ? { id: member.id, name: member.name } : null;
+  return isLive(member) ? { id: member.id, name: member.name, nickname: member.nickname } : null;
+}
+
+/** Whether whom an invitation lets in may join without writing a name: the link has one for them. */
+export function isNameOptional(reader: AccessReader, invitation: Invitation): boolean {
+  return newcomerOf(reader, invitation, { id: "" as MemberId }) !== null;
 }
 
 export function invite(
   reader: AccessReader,
   by: MemberId,
-  input: { id: string; hash: string; role: Role; person: PersonId | null; now: number },
-): Result<Change, Forbidden | Duplicate | Missing> {
+  input: {
+    id: string;
+    hash: string;
+    role: Role;
+    person: PersonId | null;
+    now: number;
+    /** What to call whom the link lets in; without it, a nickname nobody has. */
+    name?: string | null;
+    /** A random number made outside, to pick the nickname. */
+    seed: number;
+  },
+): Result<Change, Forbidden | Duplicate | Missing | NicknamesSpent> {
   const keeper = allowed(reader, by, "manage-members");
   if (!keeper.ok) return keeper;
   const { id, hash, role, person, now } = input;
+  const name = input.name?.trim() || null;
+  const nickname = name === null ? nicknameFor(reader, input.seed) : null;
+  // One link lets one person in, called by a name or a nickname.
+  if (name === null && nickname === null) return nicknamesSpent;
   if (person !== null && reader.isErased(person)) return missing(person);
   if (reader.invitation(id) !== null || reader.invitationByHash(hash) !== null) return duplicate;
   const invitation: Invitation = {
@@ -110,6 +137,8 @@ export function invite(
     spentAt: null,
     kind: "join",
     member: null,
+    name,
+    nickname,
   };
   return { ok: true, value: writes("invitation", id, null, invitation) };
 }
@@ -139,6 +168,8 @@ export function recover(
     spentAt: null,
     kind: "recovery",
     member: whose,
+    name: null,
+    nickname: null,
   };
   return {
     ok: true,
@@ -214,13 +245,19 @@ function withoutRecoveries(reader: AccessReader, member: MemberId): Change {
 
 function joined(
   reader: AccessReader,
-  member: Pick<Member, "id" | "name" | "role" | "person">,
+  member: Pick<Member, "id" | "name" | "role" | "person"> & { nickname?: Nickname | null },
   credential: NewCredential,
   now: number,
 ): Result<Change, Duplicate | CredentialError> {
   if (reader.member(member.id) !== null) return duplicate;
   const added = credentialFor(reader, member, credential, now);
   if (!added.ok) return added;
-  const after: Member = { ...member, version: 0, createdAt: now, revokedAt: null };
+  const after: Member = {
+    ...member,
+    nickname: member.nickname ?? null,
+    version: 0,
+    createdAt: now,
+    revokedAt: null,
+  };
   return { ok: true, value: [...writes("member", member.id, null, after), ...added.value] };
 }

@@ -16,6 +16,7 @@ import { read } from "./session";
 import { asRefusal, textOf } from "./errors";
 import { SignedIn } from "./frame";
 import classes from "./members.module.css";
+import { nameOf } from "./nickname";
 
 type Role = (typeof roleSchema.options)[number];
 type Member = RosterAnswer["members"][number];
@@ -49,7 +50,11 @@ function Lists({ roster, you }: { roster: RosterAnswer; you: string }) {
   const { members, invitations } = roster;
   // Only a keeper is sent the invitations: what the server sends says what may be done.
   const isKeeper = invitations !== undefined;
-  const nameOf = (id: string | null) => members.find((one) => one.id === id)?.name ?? "";
+  const { t } = useLanguage();
+  const whoIs = (id: string | null) => {
+    const member = members.find((one) => one.id === id);
+    return member === undefined ? "" : nameOf(t, member);
+  };
   return (
     <>
       <ul className={classes.members}>
@@ -65,8 +70,8 @@ function Lists({ roster, you }: { roster: RosterAnswer; you: string }) {
       {isKeeper && (
         <>
           <Invite />
-          <Invitations invitations={invitations} nameOf={nameOf} />
-          <Log nameOf={nameOf} />
+          <Invitations invitations={invitations} whoIs={whoIs} />
+          <Log whoIs={whoIs} />
         </>
       )}
     </>
@@ -87,7 +92,7 @@ function MemberLine({
   return (
     <li className={classes.member}>
       <p className={classes.who}>
-        <span className={classes.name}>{member.name}</span>
+        <span className={classes.name}>{nameOf(t, member)}</span>
         <span className={classes.meta}>
           {t(`role.${member.role}`)}
           {isYou && ` · ${t("members.you")}`}
@@ -172,6 +177,7 @@ function MemberActions({ member }: { member: Member }) {
   const [link, setLink] = useState<LinkAnswer | null>(null);
   const [state, setState] = useState<{ done?: string; refusal?: Refusal }>({});
   const version = member.version ?? 0;
+  const name = nameOf(t, member);
   const after = async (answer: { ok: boolean; error?: Refusal }, done: string) => {
     setAsked(null);
     if (!answer.ok) return setState({ refusal: answer.error ?? { code: "unknown" } });
@@ -193,10 +199,7 @@ function MemberActions({ member }: { member: Member }) {
           disabled={role === member.role}
           onClick={() =>
             void call("POST", `/api/members/${member.id}/role`, { role, version }).then((answer) =>
-              after(
-                answer,
-                t("members.roleChanged", { name: member.name, role: t(`role.${role}`) }),
-              ),
+              after(answer, t("members.roleChanged", { name, role: t(`role.${role}`) })),
             )
           }
         >
@@ -230,11 +233,11 @@ function MemberActions({ member }: { member: Member }) {
       )}
       {asked === "revoke" && (
         <Confirm
-          cost={t("members.revokeCost", { name: member.name })}
+          cost={t("members.revokeCost", { name })}
           action={t("members.revoke")}
           onConfirm={() =>
             void call("POST", `/api/members/${member.id}/revoke`, { version }).then((answer) =>
-              after(answer, t("members.revokedDone", { name: member.name })),
+              after(answer, t("members.revokedDone", { name })),
             )
           }
           onCancel={() => setAsked(null)}
@@ -280,20 +283,35 @@ function Invite() {
   const { t } = useLanguage();
   const client = useQueryClient();
   const [role, setRole] = useState<Role>("reader");
+  const [name, setName] = useState("");
   const [link, setLink] = useState<LinkAnswer | null>(null);
   const [refusal, setRefusal] = useState<Refusal | null>(null);
   const create = async () => {
     setRefusal(null);
+    const written = name.trim();
+    // Without a name the server gives the link a nickname.
     const answer = await call<LinkAnswer>("POST", "/api/members/invitations", {
       role,
       person: null,
+      ...(written === "" ? {} : { name: written }),
     });
     if (!answer.ok) return setRefusal(answer.error);
     setLink(answer.value);
+    setName("");
     await client.invalidateQueries({ queryKey: rosterKey });
   };
   return (
     <Section title={t("invite.title")}>
+      <p>{t("invite.onePerson")}</p>
+      <div className={classes.add}>
+        <TextInput
+          label={t("invite.name")}
+          description={t("invite.nameHint")}
+          value={name}
+          onChange={(event) => setName(event.currentTarget.value)}
+          maxLength={200}
+        />
+      </div>
       <div className={classes.role}>
         <NativeSelect
           label={t("role.label")}
@@ -344,16 +362,18 @@ function GivenLink({ link, text }: { link: LinkAnswer; text: string }) {
 
 function Invitations({
   invitations,
-  nameOf,
+  whoIs,
 }: {
   invitations: Invitation[];
-  nameOf: (id: string | null) => string;
+  whoIs: (id: string | null) => string;
 }) {
   const { t, locale } = useLanguage();
   const client = useQueryClient();
+  const [asked, setAsked] = useState<string | null>(null);
   const [refusal, setRefusal] = useState<Refusal | null>(null);
   const [done, setDone] = useState<string | null>(null);
   const withdraw = async ({ id, kind }: Invitation) => {
+    setAsked(null);
     const answer = await call("DELETE", `/api/members/invitations/${encodeURIComponent(id)}`);
     if (!answer.ok) return setRefusal(answer.error);
     setDone(t(kind === "recovery" ? "invite.recoveryWithdrawn" : "invite.withdrawn"));
@@ -368,11 +388,19 @@ function Invitations({
         <ul className={classes.list}>
           {sorted.map((one) => (
             <li key={one.id} className={classes.row}>
-              <span>{invitationText(one, nameOf, t, locale)}</span>
-              {one.spentAt === null && (
-                <Button variant="outline" size="xs" onClick={() => void withdraw(one)}>
+              <span className={classes.label}>{invitationText(one, whoIs, t, locale)}</span>
+              {one.spentAt === null && asked !== one.id && (
+                <Button variant="outline" size="xs" onClick={() => setAsked(one.id)}>
                   {t("invite.withdraw")}
                 </Button>
+              )}
+              {one.spentAt === null && asked === one.id && (
+                <Confirm
+                  cost={t("invite.withdrawCost")}
+                  action={t("invite.withdraw")}
+                  onConfirm={() => void withdraw(one)}
+                  onCancel={() => setAsked(null)}
+                />
               )}
             </li>
           ))}
@@ -386,23 +414,31 @@ function Invitations({
 
 function invitationText(
   one: Invitation,
-  nameOf: (id: string | null) => string,
+  whoIs: (id: string | null) => string,
   t: ReturnType<typeof useLanguage>["t"],
   locale: string,
 ): string {
   const role = t(`role.${one.role}`);
-  const name = nameOf(one.member);
+  const name = whoIs(one.member);
   if (one.kind === "recovery") {
     return one.spentAt === null
       ? t("invite.recoveryFor", { name, date: dateOf(locale, one.expiresAt) })
       : t("invite.recoverySpent", { name, date: dateOf(locale, one.spentAt) });
   }
+  // Whom a link to join is for: the name the keeper wrote, else its nickname.
+  // An old link has neither, and a link whose person was erased forgot the name: its role says it.
+  const who = nameOf(t, { name: one.name ?? "", nickname: one.nickname });
+  if (who === "") {
+    return one.spentAt === null
+      ? t("invite.untilUnnamed", { role, date: dateOf(locale, one.expiresAt) })
+      : t("invite.spentUnnamed", { role, date: dateOf(locale, one.spentAt) });
+  }
   return one.spentAt === null
-    ? t("invite.until", { role, date: dateOf(locale, one.expiresAt) })
-    : t("invite.spent", { role, date: dateOf(locale, one.spentAt) });
+    ? t("invite.until", { who, role, date: dateOf(locale, one.expiresAt) })
+    : t("invite.spent", { who, role, date: dateOf(locale, one.spentAt) });
 }
 
-function Log({ nameOf }: { nameOf: (id: string | null) => string }) {
+function Log({ whoIs }: { whoIs: (id: string | null) => string }) {
   const { t, locale } = useLanguage();
   const log = useQuery({
     queryKey: ["log"],
@@ -420,14 +456,14 @@ function Log({ nameOf }: { nameOf: (id: string | null) => string }) {
               entry.country === null
                 ? t("log.noCountry")
                 : (countries.of(entry.country) ?? entry.country);
-            const name = nameOf(entry.member);
+            const name = whoIs(entry.member);
             return (
               <li key={`${entry.at} ${i}`} className={classes.row}>
                 <span className={classes.meta}>{dateOf(locale, entry.at)}</span>
                 <span>
                   {entry.kind === "sign-in"
                     ? t("log.signIn", { name, country })
-                    : t("log.recovery", { name, by: nameOf(entry.by) })}
+                    : t("log.recovery", { name, by: whoIs(entry.by) })}
                 </span>
               </li>
             );

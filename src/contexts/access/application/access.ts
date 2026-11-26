@@ -21,6 +21,7 @@ import {
 import {
   type Invitation,
   invite,
+  isNameOptional,
   liveInvitation,
   maySetUp,
   newcomerOf,
@@ -45,8 +46,11 @@ import {
   type Member,
   type NewMember,
   revokeMember,
+  type NameRequired,
+  rename,
   withoutPeople,
 } from "../domain/member";
+import type { NicknamesSpent } from "../domain/nickname";
 import { can, type Role } from "../domain/rights";
 import { type Signed, signIn, signOut, slide, type StaleCounter } from "../domain/session";
 import {
@@ -76,7 +80,15 @@ export type AccessError =
   | CredentialError
   | RedeemError
   | Expired
-  | StaleCounter;
+  | StaleCounter
+  | NameRequired
+  | NicknamesSpent;
+
+/**
+ * A live invitation as it is opened: whether whom it lets in may link a browser, and may join without
+ * writing a name.
+ */
+export type Inspected = Invitation & { canLink: boolean; nameOptional: boolean };
 
 /** A member as they see themselves. */
 export type Account = {
@@ -88,7 +100,7 @@ export type Account = {
 
 /** The members as one of them sees them. */
 export type Roster = {
-  members: (Pick<Member, "id" | "name" | "role"> &
+  members: (Pick<Member, "id" | "name" | "nickname" | "role"> &
     Partial<Member> & { credentials?: Omit<Credential, "publicKey" | "counter">[] })[];
   invitations?: Omit<Invitation, "hash">[];
 };
@@ -134,7 +146,7 @@ export interface Access {
   /** The members as a member may see them: names for all, credentials and invitations for keepers. */
   roster(by: MemberId): Result<Roster, AccessError>;
   /** What a live invitation is, without spending it, and whether whom it lets in may link a browser. */
-  inspect(hash: string, now: number): Result<Invitation & { canLink: boolean }, AccessError>;
+  inspect(hash: string, now: number): Result<Inspected, AccessError>;
   /** Begins a step of signing in. */
   openChallenge(input: NewChallenge, now: number): void;
   /** Ends a step of signing in: it is answered once, whatever the answer. */
@@ -145,8 +157,20 @@ export interface Access {
   ): Result<Extract<Challenge, { purpose: P }>, AccessError>;
   invite(
     by: MemberId,
-    input: { id: string; hash: string; role: Role; person: PersonId | null; now: number },
+    input: {
+      id: string;
+      hash: string;
+      role: Role;
+      person: PersonId | null;
+      now: number;
+      /** What to call whom the link lets in; without it, a nickname nobody in the family has. */
+      name?: string | null;
+      /** A random number made outside, to pick the nickname. */
+      seed: number;
+    },
   ): Result<Change, AccessError>;
+  /** A member writes the name they go by, in place of a nickname or of the old name. */
+  rename(id: MemberId, name: string): Result<Change, AccessError>;
   recover(
     by: MemberId,
     input: { id: string; hash: string; member: MemberId; now: number },
@@ -245,7 +269,7 @@ export function accessOver(store: AccessStore): Access {
       if (!can(reader.value.role, "manage-members")) {
         const names = members
           .filter((one) => isLive(one))
-          .map(({ id, name, role }) => ({ id, name, role }));
+          .map(({ id, name, nickname, role }) => ({ id, name, nickname, role }));
         return { ok: true, value: { members: names } };
       }
       return {
@@ -265,7 +289,14 @@ export function accessOver(store: AccessStore): Access {
     inspect(hash, now) {
       const live = liveInvitation(store, hash, now);
       return live.ok
-        ? { ok: true, value: { ...live.value, canLink: mayLinkBrowser(live.value.role) } }
+        ? {
+            ok: true,
+            value: {
+              ...live.value,
+              canLink: mayLinkBrowser(live.value.role),
+              nameOptional: isNameOptional(store, live.value),
+            },
+          }
         : live;
     },
     openChallenge: (input, now) => store.save(openChallenge(input, now)),
@@ -283,6 +314,7 @@ export function accessOver(store: AccessStore): Access {
       if (done.ok) store.tried("invite", by, input.now);
       return done;
     },
+    rename: (id, name) => saved(rename(store, id, name)),
     recover(by, input) {
       const tries = store.triesOf("invite", by, windowStart("invite", input.now));
       const room = allowance("invite", tries, input.now);
