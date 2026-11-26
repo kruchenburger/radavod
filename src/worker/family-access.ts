@@ -71,7 +71,6 @@ export class FamilyAccess extends DurableObject<Env> {
     return this.#access().members();
   }
 
-  /** The credentials of a member, without the keys of passkeys: nobody outside needs them. */
   /** A live credential, with what checks a signature by it. */
   credential(id: string): Credential | null {
     return this.#access().credential(id);
@@ -100,10 +99,6 @@ export class FamilyAccess extends DurableObject<Env> {
   /** What a live invitation is, without spending it. */
   inspect(hash: string, now: number): Result<Invitation, AccessError> {
     return this.#access().inspect(hash, now);
-  }
-
-  invitations(by: MemberId): Result<Invitation[], AccessError> {
-    return this.#access().invitations(by);
   }
 
   openChallenge(input: NewChallenge, now: number): Promise<Done> {

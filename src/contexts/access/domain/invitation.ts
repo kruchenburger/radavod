@@ -175,20 +175,21 @@ export function redeem(
   if (!live.ok) return live;
   const invitation = live.value;
   const spent = writes("invitation", invitation.id, invitation, { ...invitation, spentAt: now });
+  const fresh = input.member ?? { id: "" as MemberId, name: undefined };
+  const member = newcomerOf(reader, invitation, fresh);
+  if (member === null) return missing(invitation.member ?? "member");
   if (invitation.kind === "recovery") {
-    const member = invitation.member === null ? null : reader.member(invitation.member);
-    if (!isLive(member)) return missing(invitation.member ?? "member");
-    const added = credentialFor(reader, member, credential, now);
+    const role = reader.member(member.id)?.role ?? invitation.role;
+    const added = credentialFor(reader, { id: member.id, role }, credential, now);
     if (!added.ok) return added;
     const others = withoutRecoveries(reader, member.id).filter(({ id }) => id !== invitation.id);
     const change = [...spent, ...others, ...added.value];
     return { ok: true, value: { change, member: member.id } };
   }
-  if (input.member === undefined) return missing("member");
   const { role, person } = invitation;
-  const made = joined(reader, { ...input.member, role, person }, credential, now);
+  const made = joined(reader, { ...member, role, person }, credential, now);
   if (!made.ok) return made;
-  return { ok: true, value: { change: [...spent, ...made.value], member: input.member.id } };
+  return { ok: true, value: { change: [...spent, ...made.value], member: member.id } };
 }
 
 /** An invitation that still lets somebody in: not spent, not over, and of a giver who still may. */

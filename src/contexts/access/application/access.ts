@@ -120,8 +120,6 @@ export interface Access {
   roster(by: MemberId): Result<Roster, AccessError>;
   /** What a live invitation is, without spending it. */
   inspect(hash: string, now: number): Result<Invitation, AccessError>;
-  /** The invitations a keeper gave or may see. */
-  invitations(by: MemberId): Result<Invitation[], AccessError>;
   /** Begins a step of signing in. */
   openChallenge(input: NewChallenge, now: number): void;
   /** Ends a step of signing in: it is answered once, whatever the answer. */
@@ -230,10 +228,6 @@ export function accessOver(store: AccessStore): Access {
       };
     },
     inspect: (hash, now) => liveInvitation(store, hash, now),
-    invitations(by) {
-      const keeper = allowed(store, by, "manage-members");
-      return keeper.ok ? { ok: true, value: store.invitations() } : keeper;
-    },
     openChallenge: (input, now) => store.save(openChallenge(input, now)),
     takeChallenge(hash, purpose, now) {
       const { change, taken } = takeChallenge(store, hash, purpose, now);

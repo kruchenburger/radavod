@@ -83,8 +83,9 @@ export function signInRoutes(app: Hono<Api>): void {
       id: newId("member"),
       name: input.name,
     });
-    if (!member.ok) return refused(c, member.error);
-    const family = (await access.family()) ?? "";
+    if (!member.ok) return nobody(c, member.error);
+    // A family set up before it had a name is called by its domain.
+    const family = (await access.family()) ?? c.env.RP_ID ?? "";
     return registration(c, family, member.value, (flow, challenge) => ({
       hash: flow,
       challenge,
@@ -145,7 +146,7 @@ export function signInRoutes(app: Hono<Api>): void {
     const hash = await hashOf(input.secret);
     const now = Date.now();
     const member = await access.newcomer(hash, now, { id: newId("member"), name: input.name });
-    if (!member.ok) return refused(c, member.error);
+    if (!member.ok) return nobody(c, member.error);
     const device = { id: `device_${newSecret()}`, kind: "device" as const, label: input.label };
     const done = await access.redeem({ hash, now, member: member.value, credential: device });
     if (!done.ok) return refused(c, done.error);
@@ -157,6 +158,11 @@ export function signInRoutes(app: Hono<Api>): void {
 async function setupCodeOf(c: ApiContext): Promise<string | null> {
   const code = c.env.SETUP_CODE ?? "";
   return code.length < shortestCode ? null : hashOf(code);
+}
+
+/** An invitation to join asks for the name of who joins: without it the request is incomplete. */
+function nobody(c: ApiContext, error: { code: string; id?: string }): Response {
+  return error.code === "missing" && error.id === "member" ? badRequest(c) : refused(c, error);
 }
 
 const setupRefused = (c: ApiContext) => c.json({ error: "setup-refused" }, 403);
