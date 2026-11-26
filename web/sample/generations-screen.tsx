@@ -1,6 +1,5 @@
 import {
   type CSSProperties,
-  type KeyboardEvent,
   useEffect,
   useId,
   useLayoutEffect,
@@ -22,9 +21,10 @@ import {
 import { kinOf } from "../tree/layout/kin";
 import { generationsKeys } from "../tree/layout/keys";
 import { Legend, Lines } from "../tree/lines";
-import { cssFont, measure, rem } from "../tree/type";
+import { measure, rem } from "../tree/type";
 import { type Words, wordsOf } from "../tree/words";
-import { arrows, holdCentre } from "./centre";
+import { ApartLinks, useCardLabel } from "./card-parts";
+import { holdCentre, useArrowKeys } from "./centre";
 import { useData } from "./data";
 import classes from "./generations-screen.module.css";
 import { rememberTree } from "./last-tree";
@@ -93,7 +93,6 @@ function Window({ layout, hint, words }: WindowProps) {
   const size = useSize(scroller);
   const focus = layout.cards.find(({ key }) => key === layout.focus);
   const room = roomAround(layout, focus, size);
-  const [cameFrom, setCameFrom] = useState<string | null>(null);
   const move = useMemo(() => generationsKeys(layout), [layout]);
 
   // The chosen person comes to the middle; a new window keeps them there.
@@ -105,18 +104,7 @@ function Window({ layout, hint, words }: WindowProps) {
     element.scrollTop = (room.top + focus.y + focus.h / 2) * unit - element.clientHeight / 2;
   }, [layout, focus, room.left, room.top, room.right, room.bottom]);
 
-  const onKeyDown = (event: KeyboardEvent): void => {
-    const arrow = arrows[event.key];
-    const key = (event.target as HTMLElement).dataset["press"];
-    if (arrow === undefined || key === undefined) return;
-    const next = move(key, arrow, cameFrom);
-    if (next === null) return;
-    event.preventDefault();
-    setCameFrom(key);
-    const card = scroller.current?.querySelector<HTMLElement>(`[data-press="${CSS.escape(next)}"]`);
-    card?.focus();
-    card?.scrollIntoView?.({ block: "nearest", inline: "nearest" });
-  };
+  const onKeyDown = useArrowKeys(move, scroller);
   const style: CSSProperties = {
     width: rem(layout.width),
     height: rem(layout.height),
@@ -187,8 +175,8 @@ function useSize(ref: React.RefObject<HTMLElement | null>): Size {
 type PersonCardProps = { card: GenerationsCard; words: Words; isFocus: boolean };
 
 function PersonCard({ card, words, isFocus }: PersonCardProps) {
-  const { t } = useLanguage();
   const { snapshot } = useData();
+  const labelOf = useCardLabel();
   const person = kinOf(snapshot).person(card.person);
   if (person === undefined) return null;
   const { key, x, y, w, h, direct, lines } = card;
@@ -198,12 +186,7 @@ function PersonCard({ card, words, isFocus }: PersonCardProps) {
     height: rem(h),
     "--branch": words.ink(person.branch),
   } as CSSProperties;
-  const label = [
-    words.name(person),
-    words.years(person),
-    words.branch(person.branch),
-    ...(direct ? [t("tree.direct")] : []),
-  ].join(", ");
+  const label = labelOf(person, words, { direct });
   const href = isFocus
     ? hrefOf({ screen: "person", person: person.id })
     : hrefOf({ screen: "generations", person: person.id });
@@ -223,21 +206,11 @@ function PersonCard({ card, words, isFocus }: PersonCardProps) {
       >
         <CardLines label={label} lines={lines} words={words} person={person} />
       </Link>
-      {lines.map((line) => {
-        const other = line.to === undefined ? undefined : kinOf(snapshot).person(line.to);
-        if (line.part !== "apart" || other === undefined) return null;
-        return (
-          <Link
-            key={`apart ${other.id}`}
-            className={classes.apart}
-            href={hrefOf({ screen: "generations", person: other.id })}
-            aria-label={words.apart(other)}
-            style={{ left: rem(line.x), top: rem(line.y), font: cssFont(line.style, line.h) }}
-          >
-            {line.text}
-          </Link>
-        );
-      })}
+      <ApartLinks
+        lines={lines}
+        className={classes.apart}
+        hrefOf={(other) => hrefOf({ screen: "generations", person: other.id })}
+      />
     </div>
   );
 }

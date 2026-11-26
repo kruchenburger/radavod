@@ -72,7 +72,7 @@ async function open(href: string): Promise<void> {
 }
 
 const address = () => window.location.pathname + window.location.search;
-const tree = () => screen.getByRole("region", { name: /^Древо, в центре/ });
+const tree = () => screen.getByRole("region", { name: /^Родословная, в центре/ });
 const centre = () => tree().querySelector("[data-focus]") as HTMLElement;
 const press = (element: HTMLElement) => fireEvent.click(element);
 
@@ -302,7 +302,7 @@ describe("around a person", () => {
   it("has a heading for a screen reader", async () => {
     await open("/sample");
     expect(screen.getByRole("heading", { level: 1 }).textContent).toBe(
-      `Древо, в центре ${name(start)}`,
+      `Родословная, в центре ${name(start)}`,
     );
   });
 

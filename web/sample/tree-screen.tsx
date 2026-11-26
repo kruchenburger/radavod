@@ -1,4 +1,4 @@
-import { type KeyboardEvent, useEffect, useId, useMemo, useRef } from "react";
+import { useEffect, useId, useMemo, useRef } from "react";
 import { useArrival } from "../app/arrival";
 import { useLanguage } from "../app/language";
 import { Link } from "../app/router";
@@ -13,9 +13,10 @@ import { relativesOf } from "../tree/layout/relatives";
 import { personKey } from "../tree/layout/types";
 import { Legend, Lines } from "../tree/lines";
 import { Moving } from "../tree/moving";
-import { cssFont, measure, rem } from "../tree/type";
+import { measure, rem } from "../tree/type";
 import { wordsOf } from "../tree/words";
-import { arrows, holdCentre } from "./centre";
+import { ApartLinks, useCardLabel } from "./card-parts";
+import { holdCentre, useArrowKeys } from "./centre";
 import { useData } from "./data";
 import { rememberTree } from "./last-tree";
 import { branchesPlace, type Half, hrefOf, type TreePlace, treePlace } from "./places";
@@ -164,20 +165,7 @@ function Sheet({ layout, isWhole, place, words, relatives }: SheetProps) {
     if (layout.as === "wide") return aroundKeys(layout.tree);
     return listKeys(layout.tree.order);
   }, [layout]);
-  const cameFrom = useRef<string | null>(null);
-
-  const onKeyDown = (event: KeyboardEvent): void => {
-    const arrow = arrows[event.key];
-    const key = (event.target as HTMLElement).dataset["press"];
-    if (arrow === undefined || key === undefined) return;
-    const next = move(key, arrow, cameFrom.current);
-    if (next === null) return;
-    event.preventDefault();
-    cameFrom.current = key;
-    const card = root.current?.querySelector<HTMLElement>(`[data-press="${CSS.escape(next)}"]`);
-    card?.focus();
-    card?.scrollIntoView?.({ block: "nearest", inline: "nearest" });
-  };
+  const onKeyDown = useArrowKeys(move, root);
   const byKey = new Map(tree.cards.map((card) => [card.key, card]));
   return (
     <div className={classes.body} style={as === "wide" ? balance(layout.tree) : undefined}>
@@ -272,8 +260,8 @@ type PersonCardProps = Omit<SheetProps, "layout" | "isWhole"> & {
 };
 
 function PersonCard({ card, as, open, place, words, relatives }: PersonCardProps) {
-  const { t } = useLanguage();
   const { snapshot } = useData();
+  const labelOf = useCardLabel();
   const { key, x, y, w, h, role, isSpouse, folded, direct } = card;
   const style = { transform: `translate(${rem(x)}, ${rem(y)})`, width: rem(w), height: rem(h) };
   const person = card.person === null ? undefined : kinOf(snapshot).person(card.person);
@@ -285,14 +273,7 @@ function PersonCard({ card, as, open, place, words, relatives }: PersonCardProps
   const href = isFocus
     ? hrefOf({ screen: "person", person: person.id })
     : hrefOf({ ...treePlace(person.id), half: place.half });
-  const name = words.name(person);
-  const label = [
-    isSpouse ? t("tree.partner", { name }) : name,
-    words.person(person).years,
-    words.branch(person.branch),
-    ...(direct ? [t("tree.direct")] : []),
-    ...(folded === undefined ? [] : [t("tree.folded", { number: folded })]),
-  ].join(", ");
+  const label = labelOf(person, words, { direct, isSpouse, folded });
   const isInStrip = as === "wide" && card.generation === 0;
   const isPartner = (isInStrip || as === "narrow") && role === "partner" && open !== null;
   return (
@@ -323,21 +304,11 @@ function PersonCard({ card, as, open, place, words, relatives }: PersonCardProps
           </span>
         )}
       </Link>
-      {card.lines.map((line) => {
-        const other = line.to === undefined ? undefined : kinOf(snapshot).person(line.to);
-        if (line.part !== "apart" || other === undefined) return null;
-        return (
-          <Link
-            key={`apart ${other.id}`}
-            className={classes.apart}
-            href={hrefOf({ ...treePlace(other.id), half: place.half })}
-            aria-label={words.apart(other)}
-            style={{ left: rem(line.x), top: rem(line.y), font: cssFont(line.style, line.h) }}
-          >
-            {line.text}
-          </Link>
-        );
-      })}
+      <ApartLinks
+        lines={card.lines}
+        className={classes.apart}
+        hrefOf={(other) => hrefOf({ ...treePlace(other.id), half: place.half })}
+      />
       {isFocus && <Actions as={as} place={place} relatives={relatives} />}
       {isPartner && (
         <Children card={card} as={as} open={open} place={place} relatives={relatives} />

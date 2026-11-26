@@ -75,7 +75,7 @@ export const ru = {
   "generations.name": "Древо по поколениям, в центре {name}",
   "generations.keys":
     "Стрелки ведут к родителям, детям и вдоль ряда, Enter ставит человека в центр, Backspace возвращает назад.",
-  "tree.name": "Древо, в центре {name}",
+  "tree.name": "Родословная, в центре {name}",
   "tree.apart": "Ещё союз: {name}",
   "tree.keys": "Стрелки ведут по древу, Enter ставит человека в центр, Backspace возвращает назад.",
   "tree.grandparents": "Деды и бабушки",

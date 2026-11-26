@@ -58,10 +58,10 @@ export const en = {
   "year.unread": "“{text}”",
 
   "tree.loading": "Opening the tree",
-  "generations.name": "Tree by generations with {name} in the center",
+  "generations.name": "Tree by generations, {name} in the center",
   "generations.keys":
-    "Arrow keys move to parents, children and along a row, Enter puts a person in the center, Backspace goes back.",
-  "tree.name": "Tree with {name} in the center",
+    "Arrow keys go to parents and children and along the row, Enter puts a person in the center, Backspace goes back.",
+  "tree.name": "Pedigree with {name} in the center",
   "tree.apart": "Also in a union with {name}",
   "tree.keys":
     "Arrow keys move through the tree, Enter puts a person in the center, Backspace goes back.",

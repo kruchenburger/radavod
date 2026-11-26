@@ -2,7 +2,7 @@ import calcTree from "relatives-tree";
 import type { Node as RelativeNode } from "relatives-tree/lib/types";
 import type { TreeSnapshot, TreeUnion } from "../../../src/shared/tree";
 import { bottomOf, detailRuns, nameRuns } from "./around-text";
-import { type Kin, kinOf, leastSure, listOf, type ParentSet } from "./kin";
+import { isOfLine, type Kin, kinOf, leastSure, listOf, type ParentSet } from "./kin";
 import { flow, nameLines, type Run } from "./text";
 import {
   type Card,
@@ -467,7 +467,7 @@ function parentageLinks(
       kind: set.kind,
       main: set.main,
       tree: isTree,
-      direct: set.main && set.kind === "blood" && line.has(child.person),
+      direct: isOfLine(set) && line.has(child.person),
       points: straight(edge === undefined ? down : [edge, ...down]),
     };
   }
