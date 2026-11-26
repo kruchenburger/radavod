@@ -11,6 +11,8 @@ export class MemoryAccess implements AccessStore {
     credential: new Map<string, Saved<"credential">>(),
     session: new Map<string, Saved<"session">>(),
     setup: new Map<string, Saved<"setup">>(),
+    challenge: new Map<string, Saved<"challenge">>(),
+    family: new Map<string, Saved<"family">>(),
   };
   saves = 0;
 
@@ -39,6 +41,14 @@ export class MemoryAccess implements AccessStore {
   }
 
   readonly erased = new Set<string>();
+
+  challenge(hash: string) {
+    return copy(this.rows.challenge.get(hash));
+  }
+
+  family() {
+    return copy(this.rows.family.get("family"));
+  }
 
   isErased(person: string) {
     return this.erased.has(person);

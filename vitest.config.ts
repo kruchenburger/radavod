@@ -12,7 +12,15 @@ export default defineConfig({
             // Tests never reach Cloudflare.
             remoteBindings: false,
             // Local workerd has no jurisdictions.
-            miniflare: { bindings: { JURISDICTION: "none" } },
+            // The address of a site for tests, and a setup code nobody uses anywhere else.
+            miniflare: {
+              bindings: {
+                JURISDICTION: "none",
+                RP_ID: "family.test",
+                ORIGIN: "https://family.test",
+                SETUP_CODE: "a setup code for tests",
+              },
+            },
           }),
         ],
         test: { name: "worker", include: ["test/**/*.test.ts"], exclude: ["test/web/**"] },

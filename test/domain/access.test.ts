@@ -9,6 +9,7 @@ import {
 } from "../../src/contexts/access";
 import type { MemberId } from "../../src/kernel/id";
 import { idOf, person } from "../storage/tree";
+import { openChallenge, takeChallenge } from "../../src/contexts/access/domain/challenge";
 import { MemoryAccess } from "./memory-access";
 
 const day = 86_400_000;
@@ -431,5 +432,44 @@ describe("a member", () => {
       }),
     ).toEqual(refused("forbidden"));
     expect(access.revoke(member("ann"), member("bob"), start)).toEqual(refused("missing"));
+  });
+});
+
+describe("a step of signing in", () => {
+  const open = (store: MemoryAccess, now: number) =>
+    store.save(openChallenge({ hash: "h", purpose: "login", challenge: "c" }, now));
+
+  it("is answered once, by its purpose, within five minutes", () => {
+    const store = new MemoryAccess();
+    open(store, start);
+    const late = takeChallenge(store, "h", "login", start + 5 * 60_000);
+    expect(late.taken).toEqual(refused("expired"));
+    store.save(late.change);
+    expect(takeChallenge(store, "h", "login", start).taken).toEqual(refused("missing"));
+    open(store, start);
+    const other = takeChallenge(store, "h", "setup", start);
+    expect(other.taken).toEqual(refused("missing"));
+    store.save(other.change);
+    expect(store.rows.challenge.size).toBe(0);
+    open(store, start);
+    const done = takeChallenge(store, "h", "login", start + 5 * 60_000 - 1);
+    expect(done.taken).toMatchObject({ ok: true, value: { challenge: "c" } });
+  });
+});
+
+describe("a passkey that signs in", () => {
+  it("counts on, and one that counts the same or back is refused", () => {
+    const { access } = family();
+    expect(access.signIn({ hash: "s1", credential: "ann-1", now: start, counter: 5 }).ok).toBe(
+      true,
+    );
+    for (const counter of [5, 4]) {
+      expect(
+        access.signIn({ hash: `s${counter}x`, credential: "ann-1", now: start, counter }),
+      ).toEqual(refused("stale-counter"));
+    }
+    expect(access.signIn({ hash: "s2", credential: "ann-1", now: start, counter: 6 }).ok).toBe(
+      true,
+    );
   });
 });

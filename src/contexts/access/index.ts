@@ -7,8 +7,11 @@ export {
   accessOver,
   type Expected,
   type StaleVersion,
+  type NewChallenge,
+  type Roster,
   type UnknownAggregate,
 } from "./application/access";
+export type { Challenge, Purpose } from "./domain/challenge";
 export type { ErasureLedger } from "./application/ledger";
 export type { AccessStore } from "./application/ports";
 export type { Credential, NewCredential } from "./domain/credential";

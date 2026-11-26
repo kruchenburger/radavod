@@ -47,14 +47,47 @@ export type RedeemError = Spent | Expired | Missing | Duplicate | CredentialErro
 // The caller checks that the code is the setup code of the installation now; here each code counts once.
 export function setUp(
   reader: AccessReader,
-  input: { member: NewMember; credential: NewCredential; now: number; code: string },
+  input: {
+    member: NewMember;
+    credential: NewCredential;
+    now: number;
+    code: string;
+    /** The name of the family, kept when it is set up first. */
+    family?: string;
+  },
 ): Result<Change, SetUp | Duplicate | CredentialError> {
   const { member, credential, now, code } = input;
-  if (reader.isCodeUsed(code)) return { ok: false, error: { code: "set-up" } };
+  if (!maySetUp(reader, code)) return { ok: false, error: { code: "set-up" } };
   const made = joined(reader, { ...member, role: "keeper", person: null }, credential, now);
   if (!made.ok) return made;
   const used = writes("setup", code, null, { hash: code, usedAt: now });
-  return { ok: true, value: [...made.value, ...used] };
+  const family = reader.family();
+  const named =
+    family === null && input.family !== undefined
+      ? writes("family", "family" as const, null, { name: input.family })
+      : [];
+  return { ok: true, value: [...made.value, ...used, ...named] };
+}
+
+/** Whether a setup code, by its hash, may still let a keeper in: each does so once. */
+export function maySetUp(reader: AccessReader, code: string): boolean {
+  return !reader.isCodeUsed(code);
+}
+
+/**
+ * Who an invitation lets in: somebody new, with the name they give and an identifier made for them,
+ * or the member a recovery link is for.
+ */
+export function newcomerOf(
+  reader: AccessReader,
+  invitation: Invitation,
+  fresh: { id: MemberId; name?: string | undefined },
+): NewMember | null {
+  if (invitation.kind === "join") {
+    return fresh.name === undefined ? null : { id: fresh.id, name: fresh.name };
+  }
+  const member = invitation.member === null ? null : reader.member(invitation.member);
+  return isLive(member) ? { id: member.id, name: member.name } : null;
 }
 
 export function invite(
@@ -138,27 +171,40 @@ export function redeem(
   input: { hash: string; now: number; member?: NewMember; credential: NewCredential },
 ): Result<{ change: Change; member: MemberId }, RedeemError> {
   const { hash, now, credential } = input;
+  const live = liveInvitation(reader, hash, now);
+  if (!live.ok) return live;
+  const invitation = live.value;
+  const spent = writes("invitation", invitation.id, invitation, { ...invitation, spentAt: now });
+  const fresh = input.member ?? { id: "" as MemberId, name: undefined };
+  const member = newcomerOf(reader, invitation, fresh);
+  if (member === null) return missing(invitation.member ?? "member");
+  if (invitation.kind === "recovery") {
+    const role = reader.member(member.id)?.role ?? invitation.role;
+    const added = credentialFor(reader, { id: member.id, role }, credential, now);
+    if (!added.ok) return added;
+    const others = withoutRecoveries(reader, member.id).filter(({ id }) => id !== invitation.id);
+    const change = [...spent, ...others, ...added.value];
+    return { ok: true, value: { change, member: member.id } };
+  }
+  const { role, person } = invitation;
+  const made = joined(reader, { ...member, role, person }, credential, now);
+  if (!made.ok) return made;
+  return { ok: true, value: { change: [...spent, ...made.value], member: member.id } };
+}
+
+/** An invitation that still lets somebody in: not spent, not over, and of a giver who still may. */
+export function liveInvitation(
+  reader: AccessReader,
+  hash: string,
+  now: number,
+): Result<Invitation, Missing | Spent | Expired> {
   const invitation = reader.invitationByHash(hash);
   if (invitation === null) return missing("invitation");
   if (invitation.spentAt !== null) return { ok: false, error: { code: "spent" } };
   if (now >= invitation.expiresAt) return { ok: false, error: { code: "expired" } };
   // A link is worth what its giver may still do: one lowered or revoked since gives nothing.
   if (!allowed(reader, invitation.by, "manage-members").ok) return missing("invitation");
-  const spent = writes("invitation", invitation.id, invitation, { ...invitation, spentAt: now });
-  if (invitation.kind === "recovery") {
-    const member = invitation.member === null ? null : reader.member(invitation.member);
-    if (!isLive(member)) return missing(invitation.member ?? "member");
-    const added = credentialFor(reader, member, credential, now);
-    if (!added.ok) return added;
-    const others = withoutRecoveries(reader, member.id).filter(({ id }) => id !== invitation.id);
-    const change = [...spent, ...others, ...added.value];
-    return { ok: true, value: { change, member: member.id } };
-  }
-  if (input.member === undefined) return missing("member");
-  const { role, person } = invitation;
-  const made = joined(reader, { ...input.member, role, person }, credential, now);
-  if (!made.ok) return made;
-  return { ok: true, value: { change: [...spent, ...made.value], member: input.member.id } };
+  return { ok: true, value: invitation };
 }
 
 /** Recovery links of a member not yet spent go: only the last one given, or used, counts. */

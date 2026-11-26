@@ -10,7 +10,8 @@ import type { Credential } from "../domain/credential";
 import type { Invitation } from "../domain/invitation";
 import type { Limit } from "../domain/limits";
 import type { LogEntry } from "../domain/log";
-import type { Change, Member, SetupCode } from "../domain/member";
+import type { Challenge } from "../domain/challenge";
+import type { Change, Family, Member, SetupCode } from "../domain/member";
 import type { Session } from "../domain/session";
 
 /** The steps every database of the access of a family goes through. */
@@ -47,6 +48,17 @@ export const accessSteps: Migration[] = [
         number INTEGER PRIMARY KEY AUTOINCREMENT, limit_of TEXT NOT NULL, key TEXT NOT NULL,
         at INTEGER NOT NULL
       )`);
+    },
+  },
+  {
+    number: 2,
+    up(sql) {
+      sql.exec(`CREATE TABLE access_challenge (
+        hash TEXT PRIMARY KEY, expires_at INTEGER NOT NULL, data TEXT NOT NULL
+      ) WITHOUT ROWID`);
+      sql.exec(
+        "CREATE TABLE access_family (id INTEGER PRIMARY KEY CHECK (id = 1), data TEXT NOT NULL)",
+      );
     },
   },
 ];
@@ -105,6 +117,31 @@ const sessionSchema = z.strictObject({
   credential: text,
   expiresAt: time,
 }) satisfies z.ZodType<Session>;
+
+const newcomer = z.strictObject({ id: memberIdSchema, name: z.string() });
+
+const challengeSchema = z.discriminatedUnion("purpose", [
+  z.strictObject({
+    hash: text,
+    challenge: text,
+    expiresAt: time,
+    purpose: z.literal("setup"),
+    code: text,
+    family: z.string(),
+    member: newcomer,
+  }),
+  z.strictObject({
+    hash: text,
+    challenge: text,
+    expiresAt: time,
+    purpose: z.literal("register"),
+    invitation: text,
+    member: newcomer,
+  }),
+  z.strictObject({ hash: text, challenge: text, expiresAt: time, purpose: z.literal("login") }),
+]) satisfies z.ZodType<Challenge>;
+
+const familySchema = z.strictObject({ name: z.string() }) satisfies z.ZodType<Family>;
 
 const logSchema = z.strictObject({
   at: time,
@@ -269,8 +306,43 @@ export function sqliteAccess(sql: SqlStorage): AccessStore {
           case "setup":
             saveSetup(write.id, write.after);
             break;
+          case "challenge": {
+            const { id, after } = write;
+            if (after === null) sql.exec("DELETE FROM access_challenge WHERE hash = ?", id);
+            else {
+              const data = written(challengeSchema, "challenge", after);
+              sql.exec(
+                "INSERT INTO access_challenge (hash, expires_at, data) VALUES (?, ?, ?)",
+                id,
+                after.expiresAt,
+                data,
+              );
+            }
+            break;
+          }
+          case "family": {
+            const { after } = write;
+            if (after === null) sql.exec("DELETE FROM access_family");
+            else {
+              const data = written(familySchema, "family", after);
+              sql.exec(
+                `INSERT INTO access_family (id, data) VALUES (1, ?)
+                  ON CONFLICT (id) DO UPDATE SET data = excluded.data`,
+                data,
+              );
+            }
+            break;
+          }
         }
       }
+    },
+    challenge(hash) {
+      const [row] = rows<Row>("SELECT data FROM access_challenge WHERE hash = ?", hash);
+      return row === undefined ? null : parsed(challengeSchema, "challenge", row.data);
+    },
+    family() {
+      const [row] = rows<Row>("SELECT data FROM access_family");
+      return row === undefined ? null : parsed(familySchema, "family", row.data);
     },
     triesOf: (limit, key, since) =>
       sql
@@ -298,12 +370,14 @@ export function sqliteAccess(sql: SqlStorage): AccessStore {
       sql.exec("DELETE FROM access_session WHERE expires_at <= ?", now);
       sql.exec("DELETE FROM access_invitation WHERE expires_at <= ?", now);
       sql.exec("DELETE FROM access_attempt WHERE at <= ?", triesBefore);
+      sql.exec("DELETE FROM access_challenge WHERE expires_at <= ?", now);
     },
     isWaiting: () =>
       sql
         .exec<{ waiting: number }>(
           `SELECT EXISTS (SELECT 1 FROM access_session) OR EXISTS (SELECT 1 FROM access_invitation)
-            OR EXISTS (SELECT 1 FROM access_attempt) AS waiting`,
+            OR EXISTS (SELECT 1 FROM access_attempt) OR EXISTS (SELECT 1 FROM access_challenge)
+            AS waiting`,
         )
         .one().waiting === 1,
   };

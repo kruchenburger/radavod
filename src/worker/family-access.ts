@@ -2,6 +2,13 @@ import { DurableObject } from "cloudflare:workers";
 import {
   type Access,
   type AccessError,
+  type Challenge,
+  type Change,
+  type Credential,
+  type Invitation,
+  type NewChallenge,
+  type Purpose,
+  type Roster,
   type Expected,
   type StaleVersion,
   type UnknownAggregate,
@@ -64,11 +71,57 @@ export class FamilyAccess extends DurableObject<Env> {
     return this.#access().members();
   }
 
+  /** A live credential, with what checks a signature by it. */
+  credential(id: string): Credential | null {
+    return this.#access().credential(id);
+  }
+
+  roster(by: MemberId): Result<Roster, AccessError> {
+    return this.#access().roster(by);
+  }
+
+  newcomer(
+    hash: string,
+    now: number,
+    fresh: { id: MemberId; name?: string | undefined },
+  ): Result<NewMember, AccessError> {
+    return this.#access().newcomer(hash, now, fresh);
+  }
+
+  maySetUp(code: string): boolean {
+    return this.#access().maySetUp(code);
+  }
+
+  family(): string | null {
+    return this.#access().family();
+  }
+
+  /** What a live invitation is, without spending it. */
+  inspect(hash: string, now: number): Result<Invitation, AccessError> {
+    return this.#access().inspect(hash, now);
+  }
+
+  openChallenge(input: NewChallenge, now: number): Promise<Done> {
+    return this.#change({}, (access) => {
+      access.openChallenge(input, now);
+      return { ok: true, value: null };
+    });
+  }
+
+  takeChallenge<P extends Purpose>(
+    hash: string,
+    purpose: P,
+    now: number,
+  ): Result<Extract<Challenge, { purpose: P }>, AccessError> {
+    return this.ctx.storage.transactionSync(() => this.#access().takeChallenge(hash, purpose, now));
+  }
+
   setUp(input: {
     member: NewMember;
     credential: NewCredential;
     now: number;
     code: string;
+    family?: string;
   }): Promise<Done> {
     return this.#change({}, (access) => access.setUp(input));
   }
@@ -76,16 +129,16 @@ export class FamilyAccess extends DurableObject<Env> {
   invite(
     by: MemberId,
     input: { id: string; hash: string; role: Role; person: PersonId | null; now: number },
-  ): Promise<Done> {
-    return this.#change({}, (access) => access.invite(by, input));
+  ): Promise<Done<{ expiresAt: number }>> {
+    return this.#run({}, (access) => given(access, access.invite(by, input), input.id));
   }
 
   recover(
     by: MemberId,
     input: { id: string; hash: string; member: MemberId; now: number },
     expected: Expected = {},
-  ): Promise<Done> {
-    return this.#change(expected, (access) => access.recover(by, input));
+  ): Promise<Done<{ expiresAt: number }>> {
+    return this.#run(expected, (access) => given(access, access.recover(by, input), input.id));
   }
 
   revokeInvitation(by: MemberId, id: string): Promise<Done> {
@@ -133,6 +186,7 @@ export class FamilyAccess extends DurableObject<Env> {
     credential: string;
     now: number;
     country: unknown;
+    counter?: number;
   }): Promise<Done> {
     return this.#change({}, (access) => access.signIn(input));
   }
@@ -199,4 +253,14 @@ export class FamilyAccess extends DurableObject<Env> {
       await this.ctx.storage.setAlarm(Date.now() + day);
     }
   }
+}
+
+/** The link a command gave, and when it is over. */
+function given<E extends { code: string }>(
+  access: Access,
+  done: Result<Change, E>,
+  id: string,
+): Result<{ expiresAt: number }, E> {
+  if (!done.ok) return done;
+  return { ok: true, value: { expiresAt: access.invitation(id)?.expiresAt ?? 0 } };
 }

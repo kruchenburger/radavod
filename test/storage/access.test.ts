@@ -278,8 +278,10 @@ describe("the tables of access", () => {
       expect(Object.keys(rows).sort()).toEqual(
         [
           "access_attempt",
+          "access_challenge",
           "access_credential",
           "access_erased",
+          "access_family",
           "access_invitation",
           "access_log",
           "access_member",
