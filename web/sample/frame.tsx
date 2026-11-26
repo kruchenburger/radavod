@@ -21,6 +21,7 @@ export function Frame({ place, sample, isSheet = false, children }: FrameProps) 
   const { t } = useLanguage();
   const person = "person" in place ? place.person : null;
   const tree = hrefOf(treePlace(person));
+  const generations = hrefOf({ screen: "generations", person });
   const branches = hrefOf(branchesPlace({ person }));
   return (
     <div className={classes.frame} data-screen={place.screen} data-sheet={isSheet || undefined}>
@@ -38,6 +39,12 @@ export function Frame({ place, sample, isSheet = false, children }: FrameProps) 
             {t("view.around")}
           </Link>
           <Link
+            href={generations}
+            aria-current={place.screen === "generations" ? "page" : undefined}
+          >
+            {t("view.generations")}
+          </Link>
+          <Link
             href={branches}
             aria-current={
               place.screen === "branches" || place.screen === "list" ? "page" : undefined
@@ -53,8 +60,8 @@ export function Frame({ place, sample, isSheet = false, children }: FrameProps) 
         </div>
       </header>
       <main className={classes.main}>{children}</main>
-      {/* The map and the pages name the branches themselves. */}
-      {sample !== null && place.screen !== "branches" && place.screen !== "list" && (
+      {/* The map and the pages name the branches themselves; the tree by generations has no room. */}
+      {sample !== null && !["branches", "list", "generations"].includes(place.screen) && (
         <Foot person={person ?? sample.start} />
       )}
     </div>

@@ -27,6 +27,8 @@ export type BranchesPlace = {
 export type Place =
   | TreePlace
   | BranchesPlace
+  /** The tree by generations. Null for the one the example begins with. */
+  | { screen: "generations"; person: string | null }
   | { screen: "person"; person: string }
   | { screen: "list"; person: string };
 

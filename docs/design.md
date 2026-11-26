@@ -79,7 +79,7 @@ Widths: the phone is below 720 px (`sm`), the spread needs 1400 px (`lg`). Betwe
 
 ## Screen frame
 
-A single row: the name of the family in Alegreya italic, the two views as words underlined when current, then search, language and theme. The language is two marks, RU and EN, the same in both languages. The current one is marked as a chosen word (see States). Each mark is a radio button named by its mark and its language, "RU, Русский". On the phone the views take a second row. Under the tree a running foot lists the branches in their inks with the number of people; the branch of the chosen person is underlined; the foot opens the map.
+A single row: the name of the family in Alegreya italic, the three views (the pedigree, the tree, all branches) as words underlined when current, then search, language and theme. The language is two marks, RU and EN, the same in both languages. The current one is marked as a chosen word (see States). Each mark is a radio button named by its mark and its language, "RU, Русский". On the phone the views take a second row. Under the tree a running foot lists the branches in their inks with the number of people; the branch of the chosen person is underlined; the foot opens the map.
 
 ## The pedigree: the tree around a person
 
@@ -129,6 +129,32 @@ The same entries as an indented outline, ancestors above and descendants below. 
   │ ⚭ Given Surname            1934–2011  Branch
   │ └ Given Surname            1961–      Branch
 ```
+
+## The tree by generations
+
+The family as a relative draws it with a pencil: older generations above, each in a row of its own.
+
+```
+        ┌──────────────┐  ┌──────────────┐
+        ▌Given Surname │──│Given Surname │
+        ▌1845–1905 · Br│  │1847–1929 · Br│
+        └──────────────┘┬ └──────────────┘
+        ┌───────────────┴──────────┬───────────────────┐
+┌─────────────┐  ┌──────────────┐  ┌──────────────┐  ┌──────────────┐
+│Second wife  │──│ the chosen   │──│ First wife   │  │ Brother      │
+└─────────────┘  └──────────────┘  └──────────────┘  └──────────────┘
+```
+
+- **Who stands there**: the chosen person, three generations of ancestors by the parents that decide where a person stands, the siblings, two generations of descendants, the partners of all of them, and the other parent of every child. The address names the person; without one it is the person the example begins with.
+- **A person is a box**, 176 px wide on the desktop and 148 px on the phone, all boxes of one screen as high as the tallest: the given name in `ink` and the surname in the branch ink (17 px), years and the branch below (14 px), a 3 px rule of the branch ink on the left, a 1 px border of `edge`, square corners, `paper` inside. People of the direct line are set in 700 with a border of `ink`. The chosen person stands in `ink` with the text in `paper`.
+- **A couple** stands side by side, joined by a `rule` line at the middle of their height. Two partners of one person stand on either side of them; a line runs over empty room to a partner who stands further off. A partner with somebody between is named under the years, as in the pedigree, and the name leads there.
+- **Children** hang from one bar, 28 px above them; the line to the bar leaves the middle of the couple's line, or the bottom of a parent who has no partner of record beside. Bars of different families in one gap lie 6 px apart. Adoption and guardianship are dashed, as in the pedigree.
+- **The direct line** is `ink` 2.6 px from a child of the line up to the couple and along the line of a couple on it, whoever is in the centre.
+- **relatives-tree** (MIT) says in which row and column every box stands. Everything else, the boxes, texts, lines and keys, is ours. The layout is fed a tree: a family that loops (a man married to the mother of his wife, an ancestor by two lines) has every person once, and the tie that would cross the drawing is left to the pedigree.
+- **The window**: the tree scrolls inside its window both ways, the page never sideways. The chosen person stands in the middle of the window however far the family reaches to one side; there is room left around the drawing for it.
+- **Pressing a box** puts the person in the centre; pressing the centre opens the card. Under the window stand the legend, links to the pedigree and to all branches of the same person, and the keys.
+- **Keys**: the person in the centre takes the focus, as in the pedigree. Up leads to a parent (the one on the direct line first, then the nearest), down to a child (back where up came from), left and right along the row. Enter puts a person in the centre, Backspace goes back. The mark of focus is the tint with the `action` bar, as in the pedigree.
+- **Phone**: the same tree with narrower boxes and gaps of 20 and 48 px; the window takes the height of the screen under the frame.
 
 ## All branches
 
@@ -238,7 +264,7 @@ Under the strip a legend explains the cap, the dashes and the "?". Adoption is a
 ## Forbidden
 
 - Coats of arms, parchment, vignettes, fake ageing, ornament, portraits made up for people without a photograph.
-- Cards with borders or shadows around people, coloured fills for branches, colour as the only sign of anything.
+- Shadows, borders around people outside the tree by generations, coloured fills for branches, colour as the only sign of anything.
 - A line over a person, a person twice on one screen, a guessed year drawn as a known one.
 - Fonts, pictures or scripts from another site.
 - Text in an image or a drawing that the catalogs do not know.

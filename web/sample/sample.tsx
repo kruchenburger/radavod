@@ -10,6 +10,7 @@ import { wordsOf } from "../tree/words";
 import { DataContext, sampleQuery, useData } from "./data";
 import { FanScreen } from "./fan-screen";
 import { Frame } from "./frame";
+import { GenerationsScreen } from "./generations-screen";
 import { PagesScreen } from "./pages-screen";
 import { PersonScreen } from "./person-screen";
 import { hrefOf, type Place, treePlace } from "./places";
@@ -53,6 +54,7 @@ function Screens({ place, sample }: { place: Place; sample: TreeSample }) {
   // The map may have a chosen person and is still the map.
   if (place.screen === "branches" && !isUnknown) title = t("view.branches");
   if (place.screen === "list" && name !== null) title = `${name}, ${t("view.list")}`;
+  if (place.screen === "generations" && name !== null) title = `${name}, ${t("view.generations")}`;
   useEffect(() => {
     document.title = t("app.title", { page: title });
     return () => {
@@ -78,6 +80,7 @@ function Screens({ place, sample }: { place: Place; sample: TreeSample }) {
 
 const titles = {
   tree: "view.around",
+  generations: "view.generations",
   branches: "view.branches",
   person: "person.unknown",
   list: "view.list",
@@ -88,6 +91,8 @@ function Screen({ place }: { place: Place }) {
   switch (place.screen) {
     case "tree":
       return <TreeScreen place={{ ...place, person: place.person ?? start }} />;
+    case "generations":
+      return <GenerationsScreen person={place.person ?? start} />;
     case "branches":
       return place.as === "fan" ? (
         <FanScreen place={place} />

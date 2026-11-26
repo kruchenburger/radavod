@@ -72,7 +72,7 @@ async function open(href: string): Promise<void> {
 }
 
 const address = () => window.location.pathname + window.location.search;
-const tree = () => screen.getByRole("region", { name: /^Древо, в центре/ });
+const tree = () => screen.getByRole("region", { name: /^Родословная, в центре/ });
 const centre = () => tree().querySelector("[data-focus]") as HTMLElement;
 const press = (element: HTMLElement) => fireEvent.click(element);
 
@@ -98,18 +98,21 @@ describe("the start page", () => {
 });
 
 describe("where the example is off", () => {
-  it.each(["/sample", "/sample/branches", `/sample/person/${start}`, `/sample/list/${start}`])(
-    "%s is an unknown page",
-    async (href) => {
-      answers["/config"] = () => Promise.resolve(Response.json({ sample: false }));
-      window.history.replaceState(null, "", href);
-      render(<App />);
-      expect(await screen.findByText("Такой страницы нет")).toBeTruthy();
-      expect(document.body.textContent).not.toContain("Пример");
-      press(screen.getByRole("button", { name: "На стартовую" }));
-      expect(address()).toBe("/");
-    },
-  );
+  it.each([
+    "/sample",
+    "/sample/generations",
+    "/sample/branches",
+    `/sample/person/${start}`,
+    `/sample/list/${start}`,
+  ])("%s is an unknown page", async (href) => {
+    answers["/config"] = () => Promise.resolve(Response.json({ sample: false }));
+    window.history.replaceState(null, "", href);
+    render(<App />);
+    expect(await screen.findByText("Такой страницы нет")).toBeTruthy();
+    expect(document.body.textContent).not.toContain("Пример");
+    press(screen.getByRole("button", { name: "На стартовую" }));
+    expect(address()).toBe("/");
+  });
 });
 
 it.each([
@@ -151,15 +154,18 @@ describe("the tree that cannot be opened", () => {
 });
 
 describe("every screen", () => {
-  it.each(["/sample", "/sample/branches", `/sample/person/${start}`, `/sample/list/${start}`])(
-    "%s carries the mark and a way out",
-    async (href) => {
-      await open(href);
-      expect(screen.getAllByText("Пример").length).toBeGreaterThan(0);
-      press(screen.getByRole("link", { name: "Закрыть пример" }));
-      expect(address()).toBe("/");
-    },
-  );
+  it.each([
+    "/sample",
+    "/sample/generations",
+    "/sample/branches",
+    `/sample/person/${start}`,
+    `/sample/list/${start}`,
+  ])("%s carries the mark and a way out", async (href) => {
+    await open(href);
+    expect(screen.getAllByText("Пример").length).toBeGreaterThan(0);
+    press(screen.getByRole("link", { name: "Закрыть пример" }));
+    expect(address()).toBe("/");
+  });
 
   it("has the views, the language and the theme", async () => {
     await open("/sample");
@@ -296,7 +302,7 @@ describe("around a person", () => {
   it("has a heading for a screen reader", async () => {
     await open("/sample");
     expect(screen.getByRole("heading", { level: 1 }).textContent).toBe(
-      `Древо, в центре ${name(start)}`,
+      `Родословная, в центре ${name(start)}`,
     );
   });
 
@@ -402,6 +408,82 @@ describe("around a person", () => {
       wordsOf(sample.snapshot, "ru").branch(kinOf(sample.snapshot).person(start)?.branch ?? null),
     );
     expect(own?.getAttribute("href")).toMatch(new RegExp(`^/sample/list/${start}#page-`));
+  });
+});
+
+describe("the tree by generations", () => {
+  const generations = () => screen.getByRole("region", { name: /^Древо по поколениям/ });
+  const middle = () => generations().querySelector("[data-focus]") as HTMLElement;
+  const card = (id: string) => generations().querySelector(`[data-press="p:${id}"]`) as HTMLElement;
+  const parent = relativesOf(sample.snapshot, start)?.parents[0]?.person ?? "";
+
+  it("stands between the pedigree and all branches, on the same person", async () => {
+    await open(`/sample/tree/${parent}`);
+    const views = screen.getByRole("navigation", { name: "Виды древа" });
+    expect(
+      within(views)
+        .getAllByRole("link")
+        .map((link) => link.textContent),
+    ).toEqual(["Родословная", "Древо", "Все ветви"]);
+    press(within(views).getByText("Древо"));
+    expect(address()).toBe(`/sample/generations/${parent}`);
+    expect(within(views).getByText("Древо").getAttribute("aria-current")).toBe("page");
+    expect(middle().dataset["key"]).toBe(`p:${parent}`);
+    expect(document.title).toBe(`${name(parent)}, Древо. Radavod`);
+  });
+
+  it("begins with the person of the example, the parents above and the children below", async () => {
+    await open("/sample/generations");
+    expect(middle().dataset["key"]).toBe(`p:${start}`);
+    const top = (id: string) =>
+      Number(
+        /translate\([^,]+, ([\d.]+)rem\)/u.exec(card(id).parentElement?.style.transform ?? "")?.[1],
+      );
+    expect(top(parent)).toBeLessThan(top(start));
+    const child = relativesOf(sample.snapshot, start)?.unions[0]?.children[0]?.person;
+    if (child !== undefined) expect(top(child)).toBeGreaterThan(top(start));
+  });
+
+  it("puts whoever is pressed in the centre, the centre opens the card, and links lead on", async () => {
+    await open("/sample/generations");
+    press(card(parent));
+    expect(address()).toBe(`/sample/generations/${parent}`);
+    expect(middle().dataset["key"]).toBe(`p:${parent}`);
+    press(card(parent));
+    expect(address()).toBe(`/sample/person/${parent}`);
+    act(() => window.history.back());
+    await waitFor(() => expect(middle().dataset["key"]).toBe(`p:${parent}`));
+    const links = within(generations())
+      .getAllByRole("link")
+      .filter((link) => !link.dataset["press"]);
+    expect(links.map((link) => [link.textContent, link.getAttribute("href")])).toEqual(
+      expect.arrayContaining([
+        ["Родословная", `/sample/tree/${parent}`],
+        ["Все ветви", `/sample/list/${parent}`],
+      ]),
+    );
+  });
+
+  it("is walked by the keys: up to a parent, down again, along the row", async () => {
+    await open("/sample/generations");
+    const focused = () => (document.activeElement as HTMLElement).dataset["press"];
+    await waitFor(() => expect(focused()).toBe(`p:${start}`));
+    fireEvent.keyDown(document.activeElement as HTMLElement, { key: "ArrowUp" });
+    const up = focused() ?? "";
+    expect(
+      relativesOf(sample.snapshot, start)?.parents.map(({ person }) => `p:${person}`),
+    ).toContain(up);
+    fireEvent.keyDown(document.activeElement as HTMLElement, { key: "ArrowDown" });
+    expect(focused()).toBe(`p:${start}`);
+    fireEvent.keyDown(document.activeElement as HTMLElement, { key: "ArrowRight" });
+    expect(focused()).not.toBe(`p:${start}`);
+    fireEvent.keyDown(document.activeElement as HTMLElement, { key: "ArrowLeft" });
+    expect(focused()).toBe(`p:${start}`);
+  });
+
+  it("says so when there is no such person", async () => {
+    await open("/sample/generations/nobody");
+    expect(screen.getByText("Такого человека в примере нет")).toBeTruthy();
   });
 });
 
