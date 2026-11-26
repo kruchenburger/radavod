@@ -74,11 +74,16 @@ export function MapView(props: MapViewProps) {
     [map, colors],
   );
 
-  // From the thirteenth branch on the inks repeat, and the head gets a double rule.
-  const double = useMemo(
-    () => new Set(snapshot.branches.slice(12).map(({ id }) => id)),
-    [snapshot],
-  );
+  // A branch whose ink another branch had before gets a double rule under its head.
+  const double = useMemo(() => {
+    const seen = new Set<number>();
+    const found = new Set<string>();
+    for (const { id, color } of snapshot.branches) {
+      if (seen.has(color)) found.add(id);
+      seen.add(color);
+    }
+    return found;
+  }, [snapshot]);
   const view = useRef<View | null>(null);
   const state = useRef({ map, size, drawing, colors, onRest });
   state.current = { map, size, drawing, colors, onRest };
@@ -233,7 +238,8 @@ export function MapView(props: MapViewProps) {
         size={size}
         glide={request}
         settle={() => {
-          if (view.current !== null) rest(view.current);
+          const { size: window } = state.current;
+          if (view.current !== null && window !== null) rest(hold(view.current, map, window));
         }}
       />
       <div

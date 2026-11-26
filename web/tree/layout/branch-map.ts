@@ -194,18 +194,23 @@ export function branchMap(snapshot: TreeSnapshot, options: MapOptions): BranchMa
     const holder = fromAbove.get(`${rowOf(node)} ${own}`);
     return holder === undefined || holder === family ? own : own + step / 2;
   };
+  // Where the direct line leaves a reference, fixed before any line comes into a gap: it goes on
+  // down into the gap under the row, and nothing comes up there in its place.
+  const starts = new Map(
+    wires.map((wire) => [
+      wire,
+      wire.start.node.isList
+        ? entryOf(wire.start.node, familyAbove(wire.start.node))
+        : slot(wire.start.node, wire.crossing.family),
+    ]),
+  );
+  const startOf = (wire: (typeof wires)[number]): number => starts.get(wire) ?? 0;
+  for (const wire of wires) fromAbove.set(`${wire.gapFrom} ${startOf(wire)}`, wire.crossing.family);
   for (const { from, to, family } of model.links) {
     const track = busTracks[rowOf(to.node)] as Track;
     track.touch(family, exitOf(from.node, family));
     track.touch(family, entryOf(to.node, family));
   }
-  const startOf = ({ start, crossing }: (typeof wires)[number]): number =>
-    start.node.isList
-      ? entryOf(start.node, familyAbove(start.node))
-      : slot(start.node, crossing.family);
-  // The direct line goes on down from its reference into the gap under the row: nothing comes up
-  // there in its place.
-  for (const wire of wires) fromAbove.set(`${wire.gapFrom} ${startOf(wire)}`, wire.crossing.family);
   for (const wire of wires) {
     const { crossing, end, gapFrom, gapTo, gutter } = wire;
     const target = slot(end.node, crossing.family);
