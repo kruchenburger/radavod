@@ -1,7 +1,7 @@
 import type { Hono } from "hono";
 import type { MemberId } from "../../kernel/id";
 import {
-  answerInput,
+  addInput,
   inviteInput,
   type LinkAnswer,
   roleInput,
@@ -18,16 +18,26 @@ import {
   refused,
   sessionAnswerOf,
   sessionCookie,
+  signedOf,
 } from "../auth";
+import { can } from "../../contexts/access";
 import { hashOf, newSecret } from "../secrets";
-import { madePasskey, registration, taken } from "./passkeys";
+import { madePasskey, registration, signedBy, taken } from "./passkeys";
 
 /** Who is signed in, the members of the family, and one's own account. Each needs a session. */
 export function memberRoutes(app: Hono<Api>): void {
   // Each time the app opens, the cookie is given again for as long as the session now lasts.
-  app.get("/api/session", allow("own-account"), async (c) => {
-    const signed = c.get("signed");
-    c.header("set-cookie", sessionCookie(c.get("token"), signed.expiresAt - Date.now()));
+  app.get("/api/session", async (c) => {
+    const found = await signedOf(c);
+    if (found === null) {
+      // A cookie of a session that is over goes too.
+      if (c.req.header("cookie")?.includes("__Host-session="))
+        c.header("set-cookie", clearedCookie());
+      return c.json(null);
+    }
+    const { signed, token } = found;
+    if (!can(signed.role, "own-account")) return c.json({ error: "forbidden" }, 403);
+    c.header("set-cookie", sessionCookie(token, signed.expiresAt - Date.now()));
     return c.json(await sessionAnswerOf(c, signed));
   });
 
@@ -106,23 +116,29 @@ export function memberRoutes(app: Hono<Api>): void {
   });
 
   // One more passkey for one's own account, made the way the first one was.
+  // A passkey of the account signs first: a linked browser or a stolen session makes no passkey.
   app.post("/api/passkey/add/options", allow("own-account"), async (c) => {
     const access = accessOf(c);
     const { member: id } = c.get("signed");
     const account = await access.account(id);
     if (!account.ok) return refused(c, account.error);
+    const passkeys = account.value.credentials
+      .filter(({ kind, revokedAt }) => kind === "passkey" && revokedAt === null)
+      .map((one) => one.id);
+    if (passkeys.length === 0) return refused(c, { code: "passkey-required" });
     const member = { id, name: account.value.member.name };
     const family = (await access.family()) ?? c.env.RP_ID ?? "";
-    return registration(c, family, member, (hash, challenge) => ({
-      hash,
-      challenge,
-      purpose: "add",
+    return registration(
+      c,
+      family,
       member,
-    }));
+      (hash, challenge) => ({ hash, challenge, purpose: "add", member }),
+      passkeys,
+    );
   });
 
   app.post("/api/passkey/add/verify", allow("own-account"), async (c) => {
-    const input = await bodyOf(c, answerInput);
+    const input = await bodyOf(c, addInput);
     if (input === null) return badRequest(c);
     const step = await taken(c, input.flow, "add");
     if (!step.ok) return refused(c, step.error);
@@ -130,9 +146,14 @@ export function memberRoutes(app: Hono<Api>): void {
     if (step.value.purpose !== "add" || step.value.member.id !== c.get("signed").member) {
       return badRequest(c);
     }
+    const access = accessOf(c);
+    const by = await access.credential(input.proof.id);
+    const counter = by === null ? null : await signedBy(c, step.value.challenge, input.proof, by);
+    if (by === null || counter === null) return c.json({ error: "sign-in-refused" }, 401);
     const passkey = await madePasskey(c, step.value.challenge, input.response, input.label ?? "");
     if (passkey === null) return c.json({ error: "passkey-refused" }, 400);
-    const done = await accessOf(c).addCredential(step.value.member.id, passkey, Date.now());
+    const proof = { credential: by.id, counter };
+    const done = await access.addPasskey(step.value.member.id, passkey, Date.now(), proof);
     return done.ok ? c.body(null, 201) : refused(c, done.error);
   });
 

@@ -2,7 +2,9 @@ import { writes } from "../../../kernel/change";
 import type { MemberId, PersonId } from "../../../kernel/id";
 import { type Duplicate, duplicate, type Missing, missing } from "../../../kernel/refusal";
 import type { Result } from "../../../kernel/result";
-import type { Credential } from "./credential";
+import { type Credential, countsOn, type StaleCounter } from "./credential";
+
+export type { StaleCounter };
 import { type AccessReader, type Change, isLive } from "./member";
 import type { Role } from "./rights";
 
@@ -12,8 +14,6 @@ export type Session = { hash: string; member: MemberId; credential: string; expi
 const day = 86_400_000;
 /** Each use moves the end on: by 30 days after a passkey, by 180 after a bound device. */
 const lifetimes: Record<Credential["kind"], number> = { passkey: 30 * day, device: 180 * day };
-
-export type StaleCounter = { code: "stale-counter" };
 
 /** Who a session is. */
 export type Signed = {
@@ -41,13 +41,8 @@ export function signIn(
   if (!isLive(credential) || !isLive(reader.member(credential.member))) {
     return missing(input.credential);
   }
-  // A passkey that counts its uses never counts back: a lower count is a copy of it, or a replay.
   const { counter } = input;
-  if (
-    counter !== undefined &&
-    (credential.counter ?? 0) > 0 &&
-    counter <= (credential.counter ?? 0)
-  ) {
+  if (counter !== undefined && !countsOn(credential, counter)) {
     return { ok: false, error: { code: "stale-counter" } };
   }
   const session: Session = {

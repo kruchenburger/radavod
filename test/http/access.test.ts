@@ -1,7 +1,14 @@
 import { describe, expect, it } from "vitest";
-import { Family, SETUP_CODE } from "./family";
+import { type Browser, Family, SETUP_CODE } from "./family";
 
 const month = 30 * 86_400;
+
+/** Whether a browser is signed in, as the app asks whenever it opens. */
+const signedIn = async (browser: Browser): Promise<boolean> => {
+  const { status, body } = await browser.json("GET", "/api/session");
+  expect(status).toBe(200);
+  return body !== null;
+};
 
 describe("setting a family up", () => {
   it("makes the first keeper with a passkey, and signs them in with the cookie of the spec", async () => {
@@ -300,8 +307,8 @@ describe("an invitation", () => {
     expect(device?.country).toBe("PL");
     const revoked = await keeper.call("POST", `/api/credentials/${device?.credential}/revoke`);
     expect(revoked.status).toBe(204);
-    expect((await gran.call("GET", "/api/session")).status).toBe(401);
-    expect((await editor.call("GET", "/api/session")).status).toBe(200);
+    expect(await signedIn(gran)).toBe(false);
+    expect(await signedIn(editor)).toBe(true);
   });
 
   it("brings an account back, and the old sign-ins of that member only end", async () => {
@@ -312,8 +319,8 @@ describe("an invitation", () => {
       `/api/members/${session.body.member}/recovery`,
     );
     expect(link.status).toBe(201);
-    expect((await editor.call("GET", "/api/session")).status).toBe(401);
-    expect((await reader.call("GET", "/api/session")).status).toBe(200);
+    expect(await signedIn(editor)).toBe(false);
+    expect(await signedIn(reader)).toBe(true);
     const back = family.browser();
     const options = await back.json<{ flow: string; options: never }>(
       "POST",
@@ -331,7 +338,7 @@ describe("an invitation", () => {
 });
 
 describe("one's own account", () => {
-  it("shows its passkeys without keys, and takes one more passkey", async () => {
+  it("shows its passkeys without keys, and takes one more passkey proven by one of them", async () => {
     const { family, editor } = await Family.withRoles();
     const own = await editor.json<{ member: { name: string }; credentials: object[] }>(
       "GET",
@@ -341,13 +348,23 @@ describe("one's own account", () => {
     expect(own.body.credentials).toHaveLength(1);
     expect(JSON.stringify(own.body)).not.toMatch(/publicKey|counter/u);
     const second = family.browser();
-    const options = await editor.json<{ flow: string; options: never }>(
+    const options = await editor.json<{ flow: string; options: never; proof: never }>(
       "POST",
       "/api/passkey/add/options",
     );
     const response = await second.passkey.register(options.body.options);
+    const unproven = await editor.json("POST", "/api/passkey/add/verify", {
+      body: { flow: options.body.flow, response, proof: response },
+    });
+    expect(unproven.status).toBe(401);
+    const again = await editor.json<{ flow: string; options: never; proof: never }>(
+      "POST",
+      "/api/passkey/add/options",
+    );
+    const proof = await editor.passkey.signIn(again.body.proof);
+    const made = await second.passkey.register(again.body.options);
     const added = await editor.call("POST", "/api/passkey/add/verify", {
-      body: { flow: options.body.flow, response, label: "laptop" },
+      body: { flow: again.body.flow, response: made, proof, label: "laptop" },
     });
     expect(added.status).toBe(201);
     expect(
@@ -357,15 +374,28 @@ describe("one's own account", () => {
     expect((await second.signIn()).body).toMatchObject({ name: "editor", via: "passkey" });
   });
 
+  it("makes no passkey for a browser a reader linked", async () => {
+    const { family, keeper } = await Family.withRoles();
+    const gran = family.browser();
+    await gran.call("POST", "/api/device/bind", {
+      body: { secret: await keeper.invite("reader"), name: "Gran", label: "tablet" },
+    });
+    expect(await gran.json("POST", "/api/passkey/add/options")).toEqual({
+      status: 409,
+      body: { error: "passkey-required" },
+    });
+  });
+
   it("does not let another member finish a step begun by somebody else", async () => {
     const { family, editor, reader } = await Family.withRoles();
-    const options = await editor.json<{ flow: string; options: never }>(
+    const options = await editor.json<{ flow: string; options: never; proof: never }>(
       "POST",
       "/api/passkey/add/options",
     );
+    const proof = await editor.passkey.signIn(options.body.proof);
     const response = await family.browser().passkey.register(options.body.options);
     const stolen = await reader.json("POST", "/api/passkey/add/verify", {
-      body: { flow: options.body.flow, response },
+      body: { flow: options.body.flow, response, proof },
     });
     expect(stolen).toEqual({ status: 400, body: { error: "bad-request" } });
   });
@@ -373,7 +403,6 @@ describe("one's own account", () => {
 
 describe("the routes of members", () => {
   const table: [string, string, unknown, Record<"reader" | "editor" | "keeper", number>][] = [
-    ["GET", "/api/session", undefined, { reader: 200, editor: 200, keeper: 200 }],
     ["GET", "/api/members", undefined, { reader: 200, editor: 200, keeper: 200 }],
     [
       "POST",
@@ -429,8 +458,9 @@ describe("the routes of members", () => {
     }
   });
 
-  it("answer 401 to everybody without a session", async () => {
+  it("answer 401 to everybody without a session, who is told so", async () => {
     const stranger = new Family().browser();
+    expect(await stranger.json("GET", "/api/session")).toEqual({ status: 200, body: null });
     for (const [method, path, body] of table) {
       const response = await stranger.call(method, path, body === undefined ? {} : { body });
       expect(response.status, `${method} ${path}`).toBe(401);
@@ -477,8 +507,8 @@ describe("the routes of members", () => {
     const statuses = both.map(({ status }) => status);
     expect(statuses.filter((status) => status === 204)).toHaveLength(1);
     expect(statuses.filter((status) => status === 401 || status === 403)).toHaveLength(1);
-    const left = await Promise.all([keeper, bob].map((one) => one.call("GET", "/api/session")));
-    expect(left.map(({ status }) => status).sort()).toEqual([200, 401]);
+    const left = await Promise.all([keeper, bob].map(signedIn));
+    expect(left.sort()).toEqual([false, true]);
   });
 
   it("keep the last keeper whatever is asked", async () => {
@@ -498,9 +528,9 @@ describe("the routes of members", () => {
     expect(editor.lastSetCookie).toMatch(/^__Host-session=; Max-Age=0;/u);
     const old = family.browser();
     old.cookie = cookie;
-    expect((await old.call("GET", "/api/session")).status).toBe(401);
+    expect(await signedIn(old)).toBe(false);
     expect((await editor.signIn()).status).toBe(200);
     expect((await editor.call("DELETE", "/api/account")).status).toBe(204);
-    expect((await editor.call("GET", "/api/session")).status).toBe(401);
+    expect(await signedIn(editor)).toBe(false);
   });
 });

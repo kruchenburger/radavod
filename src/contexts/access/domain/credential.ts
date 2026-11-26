@@ -95,3 +95,33 @@ export function revokeCredential(
     ],
   };
 }
+
+/** A passkey that counts its uses never counts back: a lower count is a copy of it, or a replay. */
+export function countsOn(credential: Credential, counter: number): boolean {
+  const stored = credential.counter ?? 0;
+  return stored === 0 || counter > stored;
+}
+
+export type StaleCounter = { code: "stale-counter" };
+
+/**
+ * One more passkey for one's own account, proven by a passkey of the same account just now: a session
+ * alone, or a linked browser, does not make a passkey that outlives it.
+ */
+export function addPasskey(
+  reader: AccessReader,
+  id: MemberId,
+  credential: NewCredential,
+  now: number,
+  proof: { credential: string; counter: number },
+): Result<Change, CredentialError | Forbidden | PasskeyRequired | StaleCounter> {
+  const by = reader.credential(proof.credential);
+  if (!isLive(by) || by.member !== id || by.kind !== "passkey" || credential.kind !== "passkey") {
+    return passkeyRequired;
+  }
+  if (!countsOn(by, proof.counter)) return { ok: false, error: { code: "stale-counter" } };
+  const added = addCredential(reader, id, credential, now);
+  if (!added.ok) return added;
+  const used = { ...by, lastUsedAt: now, counter: proof.counter };
+  return { ok: true, value: [...writes("credential", by.id, by, used), ...added.value] };
+}

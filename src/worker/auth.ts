@@ -22,6 +22,8 @@ const open = new Set([
   "POST /api/passkey/login/options",
   "POST /api/passkey/login/verify",
   "POST /api/device/bind",
+  // Who is signed in: nobody is an answer too, so the app asks it whenever it opens.
+  "GET /api/session",
 ]);
 
 export function accessOf(c: ApiContext) {
@@ -53,6 +55,14 @@ export const gate: MiddlewareHandler<Api> = async (c, next) => {
   c.set("token", token);
   await next();
 };
+
+/** The session of a request, if its cookie still has one. */
+export async function signedOf(c: ApiContext): Promise<{ signed: Signed; token: string } | null> {
+  const token = tokenOf(c.req.header("cookie"));
+  if (token === null) return null;
+  const signed = await accessOf(c).session(await hashOf(token), Date.now());
+  return signed === null ? null : { signed, token };
+}
 
 /** A route for those whose role may do an action, by the table of rights and nothing else. */
 export function allow(action: Action): MiddlewareHandler<Api> {

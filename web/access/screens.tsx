@@ -1,12 +1,10 @@
+import type { AccessPage } from "../../src/shared/access";
 import { Account } from "./account";
 import { Join, Setup, SignIn } from "./entry";
 import { Members } from "./members";
 
 /** The pages of signing in and of the members, by their addresses. */
-export const accessPaths = ["/setup", "/join", "/sign-in", "/family", "/account"] as const;
-export type AccessPath = (typeof accessPaths)[number];
-
-export function AccessScreen({ path }: { path: AccessPath }) {
+export function AccessScreen({ path }: { path: AccessPage }) {
   switch (path) {
     case "/setup":
       return <Setup />;

@@ -25,11 +25,17 @@ export async function makePasskey<T>(
   body: object,
   label: string,
 ): Promise<Answer<T>> {
-  const options = await call<Flow<PublicKeyCredentialCreationOptionsJSON>>("POST", start, body);
+  const options = await call<
+    Flow<PublicKeyCredentialCreationOptionsJSON> & { proof?: PublicKeyCredentialRequestOptionsJSON }
+  >("POST", start, body);
   if (!options.ok) return options;
+  const { flow, proof } = options.value;
   try {
+    // A passkey of the account signs first, where the server asks for it.
+    const signed =
+      proof === undefined ? {} : { proof: await startAuthentication({ optionsJSON: proof }) };
     const response = await startRegistration({ optionsJSON: options.value.options });
-    return call<T>("POST", finish, { flow: options.value.flow, response, label });
+    return call<T>("POST", finish, { flow, response, label, ...signed });
   } catch (error) {
     return { ok: false, error: { code: refusalOf(error) } };
   }

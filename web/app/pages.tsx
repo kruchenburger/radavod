@@ -1,5 +1,6 @@
 import { useQuery } from "@tanstack/react-query";
 import { lazy, Suspense, useMemo } from "react";
+import { ACCESS_PAGES } from "../../src/shared/access";
 import { readPlace } from "../sample/places";
 import { Boundary } from "./boundary";
 import { configQuery } from "./config";
@@ -12,8 +13,8 @@ import { go } from "./router";
 const Sample = lazy(async () => ({ default: (await import("../sample/sample")).Sample }));
 const Access = lazy(async () => ({ default: (await import("../access/screens")).AccessScreen }));
 
-/** The addresses of signing in and of the members; kept here, so the start page loads none of it. */
-const accessPaths = new Set(["/setup", "/join", "/sign-in", "/family", "/account"]);
+/** The addresses of signing in and of the members; their screens load only there. */
+const accessPaths = new Set<string>(ACCESS_PAGES);
 
 type PagesProps = { path: string; search: string };
 

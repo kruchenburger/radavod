@@ -1,3 +1,4 @@
+import { ACCESS_PAGES } from "../src/shared/access";
 import { expect, it } from "vitest";
 import raw from "../wrangler.jsonc?raw";
 
@@ -23,8 +24,8 @@ it.each(["account_id", "route", "routes", "env", "zone_id", "secrets_store_secre
   },
 );
 
-it("sends every API, health, config and example request to the Worker, not to the assets", () => {
+it("sends every API, health, config, example and sign-in request to the Worker, not to the assets", () => {
   expect(config.assets).toMatchObject({
-    run_worker_first: ["/api/*", "/health", "/config", "/sample/*"],
+    run_worker_first: ["/api/*", "/health", "/config", "/sample/*", ...ACCESS_PAGES],
   });
 });

@@ -38,10 +38,15 @@ export async function registration(
     hash: string,
     challenge: string,
   ) => Parameters<ReturnType<typeof accessOf>["openChallenge"]>[0],
+  /** Passkeys of the account that must sign the same challenge before a new one is made. */
+  proving?: string[],
 ) {
   const site = siteOf(c);
   if (site === null) return notConfigured(c);
+  // One challenge for both: the proof and the new passkey answer the same step.
+  const challenge = crypto.getRandomValues(new Uint8Array(32));
   const options = await generateRegistrationOptions({
+    challenge,
     rpName: family,
     rpID: site.rpID,
     userName: member.name,
@@ -56,7 +61,14 @@ export async function registration(
     Date.now(),
   );
   if (!opened.ok) return refused(c, opened.error);
-  return c.json({ flow, options });
+  if (proving === undefined) return c.json({ flow, options });
+  const proof = await generateAuthenticationOptions({
+    rpID: site.rpID,
+    challenge,
+    userVerification: "required",
+    allowCredentials: proving.map((id) => ({ id })),
+  });
+  return c.json({ flow, options, proof });
 }
 
 /** The passkey a browser made, if it answered the challenge of its step. */

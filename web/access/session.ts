@@ -45,7 +45,7 @@ export const sessionQuery = queryOptions({
   queryKey: ["session"],
   queryFn: async (): Promise<SessionAnswer | null> => {
     const answer = await call("GET", "/api/session");
-    if (answer.ok) return sessionAnswer.parse(answer.value);
+    if (answer.ok) return answer.value === null ? null : sessionAnswer.parse(answer.value);
     if (answer.error.code === "unauthorized") return null;
     throw new Error(answer.error.code);
   },

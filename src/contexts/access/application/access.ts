@@ -3,6 +3,7 @@ import { type Duplicate, type Missing, missing } from "../../../kernel/refusal";
 import type { Result } from "../../../kernel/result";
 import {
   addCredential,
+  addPasskey,
   type Credential,
   type CredentialError,
   type NewCredential,
@@ -153,6 +154,13 @@ export interface Access {
     credential: NewCredential;
   }): Result<MemberId, AccessError>;
   addCredential(id: MemberId, credential: NewCredential, now: number): Result<Change, AccessError>;
+  /** One more passkey, proven by a passkey of the same account just now. */
+  addPasskey(
+    id: MemberId,
+    credential: NewCredential,
+    now: number,
+    proof: { credential: string; counter: number },
+  ): Result<Change, AccessError>;
   revokeCredential(by: MemberId, id: string, now: number): Result<Change, AccessError>;
   changeRole(by: MemberId, id: MemberId, role: Role, now: number): Result<Change, AccessError>;
   revoke(by: MemberId, id: MemberId, now: number): Result<Change, AccessError>;
@@ -280,6 +288,8 @@ export function accessOver(store: AccessStore): Access {
       return done.ok ? { ok: true, value: redeemed.value.member } : done;
     },
     addCredential: (id, credential, now) => saved(addCredential(store, id, credential, now)),
+    addPasskey: (id, credential, now, proof) =>
+      saved(addPasskey(store, id, credential, now, proof)),
     revokeCredential: (by, id, now) => saved(revokeCredential(store, by, id, now)),
     changeRole: (by, id, role, now) => saved(changeRole(store, by, id, role, now)),
     revoke: (by, id, now) => saved(revokeMember(store, by, id, now)),

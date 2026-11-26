@@ -37,8 +37,8 @@ function serve(routes: Record<string, Route | ((body: unknown) => Route)>) {
       if (url === "/health")
         return Response.json({ status: "ok", version: "1", tree: "ok", access: "ok" });
       if (url === "/config") return Response.json({ sample: false });
-      if (key === "GET /api/session")
-        return Response.json({ error: "unauthorized" }, { status: 401 });
+      // Nobody is signed in, and the server says so.
+      if (key === "GET /api/session") return Response.json(null);
       throw new TypeError("Failed to fetch");
     }
     const {

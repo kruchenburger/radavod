@@ -6,6 +6,10 @@ import { memberIdSchema, personIdSchema } from "./values";
  * Each request is strict. A refusal is a code.
  */
 
+/** The pages of signing in and of the members: the Worker serves the app at them. */
+export const ACCESS_PAGES = ["/setup", "/join", "/sign-in", "/family", "/account"] as const;
+export type AccessPage = (typeof ACCESS_PAGES)[number];
+
 export const roleSchema = z.enum(["reader", "editor", "keeper"]);
 
 /** 256 bits in base64url, from after the "#" of a link. */
@@ -31,6 +35,9 @@ export const answerInput = z.strictObject({
   /** What the member calls the device: "phone", "laptop". */
   label: z.string().max(100).optional(),
 });
+
+/** One more passkey: what the browser made, and the proof by a passkey of the account. */
+export const addInput = answerInput.extend({ proof: passkeyAnswerSchema });
 
 export const setupInput = z.strictObject({
   code: z.string().min(1).max(500),

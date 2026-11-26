@@ -1,4 +1,5 @@
 import { Hono } from "hono";
+import { ACCESS_PAGES } from "../shared/access";
 import type { Config } from "../shared/config";
 import type { Health } from "../shared/health";
 import { parseSamplePath, SAMPLE_FILE } from "../shared/sample-path";
@@ -44,6 +45,11 @@ app.on("GET", ["/sample", "/sample/*"], (c) => {
   if (parseSamplePath(url.pathname) === null) return c.notFound();
   return c.env.ASSETS.fetch(new Request(new URL("/", url), c.req.raw));
 });
+
+// The pages of signing in are one page of the app, which reads the address itself.
+app.on("GET", [...ACCESS_PAGES], (c) =>
+  c.env.ASSETS.fetch(new Request(new URL("/", c.req.url), c.req.raw)),
+);
 
 /** Anything but "on" is off, a typo too: the example never opens by chance. */
 function hasSample({ SAMPLE }: Pick<Env, "SAMPLE">): boolean {
