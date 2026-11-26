@@ -3,6 +3,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { generateFamily } from "../../examples/generate.ts";
 import { sampleOf } from "../../examples/snapshot.ts";
 import { App } from "../../web/app/app";
+import { labelsOf } from "../../web/sample/fan-screen";
 import { kinOf } from "../../web/tree/layout/kin";
 import { relativesOf } from "../../web/tree/layout/relatives";
 import { wordsOf } from "../../web/tree/words";
@@ -551,6 +552,29 @@ describe("the pages of branches", () => {
     expect(address()).toBe(`/sample/list/${start}`);
     press(screen.getAllByRole("link", { name: "Родословная" }).at(-1) as HTMLElement);
     expect(address()).toBe(`/sample/tree/${start}`);
+  });
+});
+
+describe("the words of the choices of the centre", () => {
+  const forms: Record<string, [string, string, string]> = {
+    a: ["Анна", "Анна Ольхунич", "1900–1950"],
+    b: ["Анна", "Анна Мятлик", "1901–1960"],
+    c: ["Анна", "Анна Мятлик", "1930–2000"],
+    d: ["Иван", "Иван Мятлик", "1899–1970"],
+  };
+  const label = (ids: string[]) => labelsOf(ids, (id) => forms[id] ?? ["", "", ""]);
+
+  it("are the given name, the whole name when two share it, and the years when two share that", () => {
+    expect(["a", "d"].map(label(["a", "d"]))).toEqual(["Анна", "Иван"]);
+    expect(["a", "b", "d"].map(label(["a", "b", "d"]))).toEqual([
+      "Анна Ольхунич",
+      "Анна Мятлик",
+      "Иван",
+    ]);
+    expect(["b", "c"].map(label(["b", "c"]))).toEqual([
+      "Анна Мятлик, 1901–1960",
+      "Анна Мятлик, 1930–2000",
+    ]);
   });
 });
 

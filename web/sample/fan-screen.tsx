@@ -43,11 +43,15 @@ export function FanScreen({ place }: { place: BranchesPlace }) {
   );
   useEffect(() => rememberTree(hrefOf(place)), [place]);
 
-  const nameOf = (id: string): string => {
-    const one = kin.person(id);
-    return one === undefined ? "" : words.person(one).given || words.name(one);
-  };
   const choices = choicesOf(kin, person, partner);
+  const nameOf = labelsOf(
+    [...new Set(choices.flat().filter((id): id is string => id !== null))],
+    (id) => {
+      const one = kin.person(id);
+      if (one === undefined) return ["", "", ""];
+      return [words.person(one).given || words.name(one), words.name(one), words.years(one)];
+    },
+  );
   const at = (one: string, other: string | null) =>
     hrefOf(branchesPlace({ as: "fan", person: one, partner: other }));
   const names = centre.map((id) => {
@@ -130,4 +134,22 @@ function choicesOf(
   }
   if (partner !== null) own.push([partner, person], [partner, null]);
   return own;
+}
+
+/**
+ * The shortest words that tell the people of the choices apart: the given name, the whole name
+ * when two share the given one, and the years too when two share the whole name.
+ */
+export function labelsOf(
+  ids: string[],
+  forms: (id: string) => [given: string, whole: string, years: string],
+): (id: string) => string {
+  const words = new Map(ids.map((id) => [id, forms(id)]));
+  const shared = (at: 0 | 1, id: string): boolean =>
+    ids.some((other) => other !== id && words.get(other)?.[at] === words.get(id)?.[at]);
+  return (id) => {
+    const [given, whole, years] = words.get(id) ?? forms(id);
+    if (!shared(0, id)) return given;
+    return shared(1, id) ? `${whole}, ${years}` : whole;
+  };
 }
