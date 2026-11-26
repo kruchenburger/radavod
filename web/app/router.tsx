@@ -24,8 +24,11 @@ function subscribe(listener: () => void): () => void {
 
 /** Whether the last step was one back or forward, when the browser puts the page where it was. */
 let isReturn = false;
+/** A step back is on its way: until it lands, the state still names the step it leaves. */
+let isLeaving = false;
 window.addEventListener("popstate", () => {
   isReturn = true;
+  isLeaving = false;
 });
 
 export const cameBack = (): boolean => isReturn;
@@ -54,7 +57,9 @@ function stepOf(state: unknown): number {
 
 /** One step back, never out of the site. Says whether there was a step to take. */
 export function goBack(): boolean {
-  if (stepOf(window.history.state) === 0) return false;
+  if (isLeaving || stepOf(window.history.state) === 0) return false;
+  // A held key repeats faster than a step may land; a second one would leave the site.
+  isLeaving = true;
   window.history.back();
   return true;
 }

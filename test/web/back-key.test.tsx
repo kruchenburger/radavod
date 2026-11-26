@@ -36,6 +36,17 @@ it("goes one step back inside the app", async () => {
   await waitFor(() => expect(path()).toBe("/sample"));
 });
 
+it("takes one step for keys that come before the first lands", async () => {
+  render(<Keys />);
+  go("/sample/tree/a");
+  expect(backspace()).toBe(false);
+  expect(backspace(document.body, { repeat: true })).toBe(true);
+  expect(backspace()).toBe(true);
+  await waitFor(() => expect(path()).toBe("/sample"));
+  await new Promise((resolve) => setTimeout(resolve, 20));
+  expect(path()).toBe("/sample");
+});
+
 it("never leaves the site from the first page of a visit", async () => {
   render(<Keys />);
   expect(backspace()).toBe(true);

@@ -60,7 +60,7 @@ export const en = {
   "tree.loading": "Opening the tree",
   "tree.name": "Tree with {name} in the center",
   "tree.keys":
-    "Arrow keys move through the tree, Enter puts a person in the center, Backspace goes one step back.",
+    "Arrow keys move through the tree, Enter puts a person in the center, Backspace goes back.",
   "tree.grandparents": "Grandparents",
   "tree.greatGrandparents": "Great-grandparents",
   "tree.grandchildren": "Grandchildren",
