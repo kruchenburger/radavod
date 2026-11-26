@@ -1,75 +1,36 @@
-import type { BranchMap, MapLevel } from "../layout/branch-map";
-import { carry, distanceTo } from "../layout/carry";
+import type { BranchMap } from "../layout/branch-map";
+import { distanceTo } from "../layout/carry";
 import { personKey } from "../layout/types";
 
-export type Maps = Record<MapLevel, BranchMap>;
 export type Size = { w: number; h: number };
 
-/** What the window shows: a point of the map in the middle of it, and how large the map is. */
-export type View = { level: MapLevel; x: number; y: number; k: number };
+/** What the window shows: a point of the canvas in the middle of it, and how large it is. */
+export type View = { x: number; y: number; k: number };
 
 /** The middle of the window told by the nearest person, the same on every screen. */
 export type Spot = { person: string; dx: number; dy: number };
 
-/** The scales at which a level may rest: names are never smaller than they are meant to be. */
-const rest: Record<MapLevel, { least: number; most: number }> = {
-  far: { least: 0, most: 2 },
-  closer: { least: 1, most: 1.3 },
-  near: { least: 1, most: 2 },
-};
+/** Names of 19 px are never smaller than 14 px, and never larger than half as much again. */
+export const scales = { least: 14 / 19, most: 1.5 };
 
-/** Around the map. */
+/** Around the canvas. */
 const margin = 16;
-const largest = 1.5;
 
-/** Under the fingers levels change where a person is this wide, so that a name is never a bar. */
-const changes = { farToCloser: 92, closerToFar: 84, closerToNear: 180, nearToCloser: 170 };
+export const isNarrow = ({ w }: Size): boolean => w < 720;
 
-/** The whole map on a wide window; on a narrow one as wide as the window, and on downwards. */
-export function fit({ width, height }: BranchMap, window: Size, isNarrow: boolean): View {
-  const across = (window.w - 2 * margin * (isNarrow ? 0.5 : 1)) / Math.max(1, width);
-  const down = (window.h - 2 * margin) / Math.max(1, height);
-  const k = Math.min(isNarrow ? across : Math.min(across, down), largest);
-  const isWhole = height * k <= window.h;
-  const y = isWhole ? height / 2 : window.h / 2 / k - margin / 2 / k;
-  return { level: "far", x: width / 2, y, k };
-}
+/** A scale the canvas may stand at, whatever an address or a pinch asks for. */
+export const restingScale = (k: number): number => Math.min(Math.max(k, scales.least), scales.most);
 
-/** Whether this is the whole map from far, which is the same on every screen. */
-export function isWhole(view: View, maps: Pick<Maps, "far">, window: Size): boolean {
-  if (view.level !== "far") return false;
-  const whole = fit(maps.far, window, isNarrow(window));
-  return (
-    Math.abs(whole.k / view.k - 1) < 0.01 &&
-    Math.hypot(view.x - whole.x, view.y - whole.y) * view.k < 4
-  );
-}
-
-type Shown = { maps: Maps; window: Size };
-
-/** The same place after the map or the window has changed. */
-export function kept(view: View, before: Shown, now: Shown): View {
-  if (isWhole(view, before.maps, before.window)) {
-    return fit(now.maps.far, now.window, isNarrow(now.window));
-  }
-  const spot = spotOf(view, before.maps[view.level]);
-  const same = spot && viewOfSpot(spot, view.level, view.k, now.maps[view.level]);
-  return same ?? view;
-}
-
-/** A scale the level may rest at, whatever an address asks for. */
-export const restingScale = (level: MapLevel, k: number): number =>
-  Math.min(Math.max(k, rest[level].least), rest[level].most);
-
-/** The same view, with the map not further away than it has to be. */
-export function hold(view: View, map: BranchMap, window: Size): View {
+/** The same view, with the canvas not further away than it has to be. */
+export function hold(view: View, map: Pick<BranchMap, "width" | "height">, window: Size): View {
   const along = (at: number, length: number, room: number): number => {
     const half = room / 2 / view.k;
     const edge = margin / view.k;
     if (length + 2 * edge <= 2 * half) return length / 2;
     return Math.min(Math.max(at, half - edge), length + edge - half);
   };
-  return { ...view, x: along(view.x, map.width, window.w), y: along(view.y, map.height, window.h) };
+  const k = restingScale(view.k);
+  return { k, x: along(view.x, map.width, window.w), y: along(view.y, map.height, window.h) };
 }
 
 export const pan = (view: View, dx: number, dy: number): View => ({
@@ -78,67 +39,20 @@ export const pan = (view: View, dx: number, dy: number): View => ({
   y: view.y - dy / view.k,
 });
 
-/** The point of the map under a point of the window, both counted from their corners. */
+/** The point of the canvas under a point of the window, both counted from their corners. */
 export const pointAt = (view: View, window: Size, px: number, py: number): [number, number] => [
   view.x + (px - window.w / 2) / view.k,
   view.y + (py - window.h / 2) / view.k,
 ];
 
-/** Puts a point of the map under a point of the window. */
-const put = (
-  [x, y]: readonly [number, number],
-  view: View,
-  window: Size,
-  px: number,
-  py: number,
-): View => ({
-  ...view,
-  x: x - (px - window.w / 2) / view.k,
-  y: y - (py - window.h / 2) / view.k,
-});
-
-type About = { maps: Maps; window: Size; px: number; py: number };
-
-/** Another level at another scale: what is under the point stays under it. */
-export function toLevel(view: View, level: MapLevel, k: number, about: About): View {
-  const { maps, window, px, py } = about;
-  const here = pointAt(view, window, px, py);
-  const there = level === view.level ? here : carry(here, maps[view.level], maps[level]);
-  return put(there, { ...view, level, k }, window, px, py);
+/** Larger or smaller by a factor, under the fingers: the point under them stays there. */
+export function zoom(view: View, factor: number, window: Size, px: number, py: number): View {
+  const k = restingScale(view.k * factor);
+  const [x, y] = pointAt(view, window, px, py);
+  return { k, x: x - (px - window.w / 2) / k, y: y - (py - window.h / 2) / k };
 }
 
-/** Closer or further by a factor, under the fingers: levels change on the way. */
-export function zoom(view: View, factor: number, about: About): View {
-  const { maps, window } = about;
-  const widthOf = (level: MapLevel): number => maps[level].metrics.w;
-  const least = fit(maps.far, window, isNarrow(window)).k * widthOf("far");
-  const wanted = view.k * factor * widthOf(view.level);
-  const person = Math.min(Math.max(wanted, least), rest.near.most * widthOf("near"));
-  let { level } = view;
-  if (level === "far" && person > changes.farToCloser) level = "closer";
-  if (level === "closer" && person > changes.closerToNear) level = "near";
-  if (level === "near" && person < changes.nearToCloser) level = "closer";
-  if (level === "closer" && person < changes.closerToFar) level = "far";
-  return toLevel(view, level, person / widthOf(level), about);
-}
-
-/**
- * Where a zoom comes to rest. A scale at which nothing can be read goes on in the direction it came
- * from, so that a single notch of a wheel leads somewhere.
- */
-export function settle(view: View, direction: "in" | "out", about: About): View {
-  const { least, most } = rest[view.level];
-  if (view.k >= least && view.k <= most) return view;
-  if (view.level === "closer" && view.k < least && direction === "out") {
-    return toLevel(view, "far", rest.far.most, about);
-  }
-  if (view.level === "far" && direction === "in") return toLevel(view, "closer", 1, about);
-  return toLevel(view, view.level, Math.min(Math.max(view.k, least), most), about);
-}
-
-export const isNarrow = ({ w }: Size): boolean => w < 720;
-
-export function spotOf(view: View, { cards }: BranchMap): Spot | null {
+export function spotOf(view: View, { cards }: Pick<BranchMap, "cards">): Spot | null {
   let nearest: BranchMap["cards"][number] | null = null;
   let distance = Infinity;
   for (const card of cards) {
@@ -154,42 +68,44 @@ export function spotOf(view: View, { cards }: BranchMap): Spot | null {
   };
 }
 
-/** Null for somebody who is not on the map. */
-export function viewOfSpot(spot: Spot, level: MapLevel, k: number, map: BranchMap): View | null {
+/** Null for somebody who is not on the canvas. */
+export function viewOfSpot(spot: Spot, k: number, map: Pick<BranchMap, "cards">): View | null {
   const card = cardOf(map, spot.person);
-  return card === undefined ? null : { level, x: card.x + spot.dx, y: card.y + spot.dy, k };
+  return card === undefined ? null : { x: card.x + spot.dx, y: card.y + spot.dy, k };
 }
 
-export function viewOfPerson(person: string, level: MapLevel, map: BranchMap): View | null {
+/** The person in the middle of the window, a little above it: the ancestors stand over them. */
+export function viewOfPerson(
+  person: string,
+  map: Pick<BranchMap, "cards">,
+  window: Size,
+  k = 1,
+): View | null {
   const card = cardOf(map, person);
   if (card === undefined) return null;
-  return { level, x: card.x + card.w / 2, y: card.y + card.h / 2, k: 1 };
+  return { x: card.x + card.w / 2, y: card.y + card.h / 2 - window.h / 8 / k, k };
 }
 
-/** A page in the middle; the beginning of one that is larger than the window. */
-export function viewOfPage(
-  page: number,
-  level: MapLevel,
-  map: BranchMap,
-  window: Size,
-): View | null {
+/** The beginning of a page, its first generation in the middle of the window. */
+export function viewOfPage(page: number, map: BranchMap, window: Size, k = 1): View | null {
   const own = map.pages[page];
   if (own === undefined) return null;
-  const [first] = map.cards.filter((card) => card.page === page);
-  const isWide = own.w > window.w;
-  const isHigh = own.h > window.h;
-  return {
-    level,
-    x: isWide && first !== undefined ? first.x + first.w / 2 : own.x + own.w / 2,
-    y: isHigh ? own.y + window.h / 2 - margin : own.y + own.h / 2,
-    k: 1,
-  };
+  const cards = map.cards.filter((card) => card.page === page && card.person !== null);
+  const first = cards.reduce<(typeof cards)[number] | undefined>(
+    (best, card) =>
+      best === undefined || card.row < best.row || (card.row === best.row && card.x < best.x)
+        ? card
+        : best,
+    undefined,
+  );
+  if (first === undefined) return { x: own.x + own.w / 2, y: window.h / 2 / k, k };
+  return { x: first.x + first.w / 2, y: first.y + window.h / 4 / k, k };
 }
 
-const cardOf = (map: BranchMap, person: string) =>
+const cardOf = (map: Pick<BranchMap, "cards">, person: string) =>
   map.cards.find(({ key }) => key === personKey(person));
 
-/** The least movement that brings a box into the window. */
+/** The least movement that brings a box into the window, below the heads of the pages. */
 export function reveal(
   view: View,
   box: { x: number; y: number; w: number; h: number },
@@ -216,15 +132,29 @@ export function reveal(
   };
 }
 
-/** A step on the way from one view to another on the same level: `at` from 0 to 1. */
+/** A step on the way from one view to another: `at` from 0 to 1. */
 export function between(from: View, to: View, at: number): View {
   // Scales grow by factors, and the middle follows the scale.
   const k = from.k * (to.k / from.k) ** at;
   const share = from.k === to.k ? at : (1 / from.k - 1 / k) / (1 / from.k - 1 / to.k);
-  return {
-    level: to.level,
-    x: from.x + (to.x - from.x) * share,
-    y: from.y + (to.y - from.y) * share,
-    k,
-  };
+  return { x: from.x + (to.x - from.x) * share, y: from.y + (to.y - from.y) * share, k };
+}
+
+/** The window on the strip of the whole: where it stands, as shares of the canvas. */
+export function windowOnWhole(
+  view: View,
+  map: Pick<BranchMap, "width" | "height">,
+  window: Size,
+): {
+  x: number;
+  y: number;
+  w: number;
+  h: number;
+} {
+  const [left, top] = pointAt(view, window, 0, 0);
+  const [right, bottom] = pointAt(view, window, window.w, window.h);
+  const share = (value: number, length: number) =>
+    Math.min(1, Math.max(0, value / Math.max(1, length)));
+  const [x, y] = [share(left, map.width), share(top, map.height)];
+  return { x, y, w: share(right, map.width) - x, h: share(bottom, map.height) - y };
 }

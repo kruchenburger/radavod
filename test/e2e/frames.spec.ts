@@ -1,21 +1,17 @@
 import { expect, test } from "./page.ts";
 
-// How smoothly the map of 300 people moves. It tells and does not judge: a machine of CI is shared
+// How smoothly the canvas of 300 people moves. It tells and does not judge: a machine of CI is shared
 // and has no graphics card.
 
 const start = "p67";
-const places = [
-  ["far", `/sample/branches?person=${start}`],
-  ["closer", `/sample/branches?level=closer&person=${start}`],
-  ["near", `/sample/branches?level=near&person=${start}`],
-] as const;
+const places = [["the canvas", `/sample/branches?person=${start}`]] as const;
 
 type Frames = { frames: number; median: number; p95: number; worst: number; over20: number };
 
 for (const [level, path] of places) {
-  test(`frames of panning the map, ${level}`, async ({ page }, info) => {
+  test(`frames of panning ${level}`, async ({ page }, info) => {
     await page.goto(path);
-    const map = page.locator(`[data-level=${level}]`);
+    const map = page.locator("[data-canvas]");
     await expect(map).toBeVisible();
     await page.waitForTimeout(500);
     const box = await map.boundingBox();

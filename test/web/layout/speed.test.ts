@@ -16,7 +16,7 @@ it.each([
 ])("lays out the map of %i people within %i ms", (size, bound) => {
   const snapshot = bigSnapshot(size);
   const start = performance.now();
-  branchMap(snapshot, { level: "near", measure, headOf: ({ title }) => title.ru });
+  branchMap(snapshot, { measure, headOf: ({ title }) => title.ru });
   expect(performance.now() - start).toBeLessThan(bound);
 });
 

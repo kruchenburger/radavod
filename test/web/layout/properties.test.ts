@@ -166,9 +166,7 @@ describe("any family the contract allows", () => {
 
   it("is drawn right on the map of branches", () => {
     const options = fc.record({
-      level: fc.constantFrom("far" as const, "closer" as const, "near" as const),
       lineOf: fc.option(someone),
-      perRow: fc.integer({ min: 1, max: 4 }),
     });
     fc.assert(
       fc.property(snapshots, options, (snapshot, more) => {

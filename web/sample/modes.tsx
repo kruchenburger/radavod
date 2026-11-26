@@ -16,7 +16,7 @@ export function Modes({ place }: { place: BranchesPlace }) {
           href={hrefOf(branchesPlace({ as, person: place.person }))}
           aria-current={place.as === as ? "true" : undefined}
         >
-          {t(as === "map" ? "map.asMap" : "map.asFan")}
+          {t(as === "map" ? "map.asCanvas" : "map.asFan")}
         </Link>
       ))}
     </nav>

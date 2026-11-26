@@ -62,11 +62,11 @@ Alegreya (variable, upright and italic) for names, headings, dates of events, qu
 | Name on the person card       | 46, phone 32 | 1.1         | Alegreya 700                    |
 | The chosen person in the tree | 37, phone 30 | 1.02        | Alegreya 700                    |
 | ... with a double surname     | 30           | 1.02        | Alegreya 700                    |
-| Head of a map page            | 17, 24, 30   | 1           | Alegreya 700: far, closer, near |
+| Head of a page of the canvas  | 24           | 1           | Alegreya 700                    |
 | Section heading               | 22           | 1.2         | Alegreya italic 400             |
 | Event                         | 20           | 1.25        | Alegreya 600                    |
 | Person in the tree            | 17           | 1.2         | Alegreya 400, direct line 700   |
-| Person on the map             | 15.5, 19     | 19, 23 px   | Alegreya 400, direct line 700   |
+| Person on the canvas          | 19           | 23 px       | Alegreya 400, direct line 700   |
 | Text of the interface         | 16           | 1.45        | Alegreya Sans 400, stressed 500 |
 | Years and branch under a name | 14 to 15     | 1.25        | Alegreya Sans 400, branch 500   |
 
@@ -131,46 +131,47 @@ The same entries as an indented outline, ancestors above and descendants below. 
   │ └ Given Surname            1961–      Branch
 ```
 
-## The map of all branches
+## The canvas of all branches
 
-One page per branch: `surface`, a head with the name of the branch in its ink and the number of people, a 2 px rule in the same ink under the head. Five pages in a row for ten branches, eight for twenty-four; on the phone two and three.
+All branches on one wide canvas, as the book of a family draws them: a page for every branch, the pages side by side in one row, and the generations in rows across all of them. It is the first way of «Все ветви»; the fan is the other. It opens on a person: the one the address names, or the one the example begins with, a little below the middle, so that the ancestors stand over them.
 
 ```
- Branch 20                       Branch 23
- ═══════════════════════════     ═══════════════════════════
-        │Given Surname                  │Given Surname
-        │⚭ Given Surname                │⚭ Given Surname
-     ╭───────┴───────╮           ╔══════════╪═══ gutter ════
-  ╶Given Surname │Given Surname  ║   │Given Surname
-  ╶Given Surname │⚭ Given Surname║   ╚⚭ Given Surname
-  Given, see Branch ═════════════╝
+ the whole family: ▁▂▁ ▂▃▂ [▂▃▁] ▁▂ ▂▁ ...      (the strip, the frame is the window)
+ ─────────────────────────────────────────────────────────────
+ Kalinens 25            Olkhuniches 30            Zhuravens 20
+ ══════════════════     ══════════════════════    ════════════
+  │Given Surname           │Given Surname           │Given Surname
+  │⚭ Given Surname         │⚭ Given Surname         │⚭ Given Surname
+ ╭─────┴─────╮          ╭──────┴──────╮
+ ╶Given  ╶Given, see ═══╪══╗ │Given Surname         ...
+                        gutter╚⚭ Given Surname
 ```
 
-- Rows are generations, aligned inside a page. A couple is two lines joined by a thin vertical. Brothers and sisters without a union and children stand as a column; the order of birth stays. This keeps the far view between 2:1 and 2.5:1 for ten and twenty-four branches.
+- One page per branch: `surface`, a head with the name of the branch in its ink and the number of people, a 2 px rule in the same ink. Pages stand in one row, in the order the direct line goes through them, as on the pages by branch. Rows are generations, the same on every page.
+- A couple is two lines joined by a thin vertical. Brothers and sisters without a union and children stand as a column; the order of birth stays.
 - A person is shown once, on the page of the couple: the husband's branch, or the branch the couple was given. In the birth family stands a reference in italic: the given name and the branch to look in. On the other page a couple whose parents are elsewhere has the same kind of reference above it.
-- **Between pages only the direct line is drawn.** It leaves through the gap under its row, runs in the gutters, and enters through the gap above the row of the child. It never crosses a person. Lines in one gutter keep 6 to 8 px apart.
-- Far: every person is a bar as long as the name, in the branch ink, without a branch in `rule`, a reference is a hollow bar. Names of the pages do not shrink with the drawing. Closer: names. Near: names, years, and the branch when it differs from the page.
-- The chosen person is set in `paper` on `ink`.
-- Closer and near, the head of a page keeps to the edge of the window while its page is in it.
-- Pressing a page in the far view moves closer to it. The place on the map is in the address.
+- Every person is the name in 19 px with the years under it, and the branch when it differs from the page. The canvas may grow to half as large again and shrink until names are 14 px, never smaller.
+- **Between pages only the direct line is drawn.** It leaves through the gap under its row and runs along a band of its own at the foot of that gap, across other pages where nobody stands; to another row it goes up or down the gutter left of the page it comes to, and enters beside the person. It never crosses a person. Lines in one gutter or band keep 8 px apart.
+- The chosen person is set in `paper` on `ink`. The head of a page keeps to the top of the window, and to its left edge while the page is in it.
+- **The strip of the whole family** stands over the canvas: every page in proportion, every person a bar as long as the name in the ink of the branch, the direct line, and a 2 px frame in `ink` where the window is. A press or a drag on the strip moves the window there. The names of the branches over the strip are links to their pages; on the phone they do not fit and the strip is only a picture to drag.
+- The place on the canvas is in the address, as the nearest person and the scale. An address of the old map, with a level, opens the canvas on the same person.
 
 ### Keyboard and reading aloud
 
-The drawing is one group with a name, a description of the keys under it, and real links inside: pages in the far view, people in the others.
+The canvas is one group with a name, a description of the keys under it, and real links inside: people near the window, one of them in the order of Tab; the names of branches on the strip are links before it.
 
-| Key         | Far                           | Closer and near                                                                    |
-| ----------- | ----------------------------- | ---------------------------------------------------------------------------------- |
-| Left, right | Page before, after            | Along brothers, sisters and their spouses; the row stays while one walks it        |
-| Up          | Page above                    | A parent                                                                           |
-| Down        | Page below                    | Back to the child one came from, else the child on the direct line, else the first |
-| Enter       | Closer, centred on the branch | Opens the person                                                                   |
-| Esc         |                               | One step out                                                                       |
+| Key         | On the canvas                                                                      |
+| ----------- | ---------------------------------------------------------------------------------- |
+| Left, right | Along brothers, sisters and their spouses; the row stays while one walks it        |
+| Up          | A parent                                                                           |
+| Down        | Back to the child one came from, else the child on the direct line, else the first |
+| Enter       | Opens the person                                                                   |
 
 The person in the centre takes the focus when the tree opens and after every move, so the arrows and Backspace work at once; the focus stays where the visitor put it (the search, a link of the page). It shows no mark until a key is pressed. Focus moves the view with it. Beside the tree and the map a link opens **the branches page by page**, the same people in plain headings and lists. It is complete, so a screen reader never needs the drawing.
 
 ## The fan of ancestors
 
-A way of all branches beside the map: the ancestors of one person, or of a couple, as rings of generations around the centre. Without a choice it shows the couple of the person the direct line begins with, where the branches meet. The two of a couple share the half circle, the first on the left; on the phone one of them has a quarter, the corner of the window.
+A way of all branches beside the canvas: the ancestors of one person, or of a couple, as rings of generations around the centre. Without a choice it shows the couple of the person the direct line begins with, where the branches meet. The two of a couple share the half circle, the first on the left; on the phone one of them has a quarter, the corner of the window.
 
 ```
                  Myatliks │          │ Lazdutises
@@ -250,8 +251,8 @@ Under the strip a legend explains the cap, the dashes and the "?". Adoption is a
 
 ## States
 
-- Focus: 2 px `action` outline, 2 px away, 3 px on the map. Never removed, never clipped.
-- Focus on an entry of the tree, reached by the arrow keys on any width, on a name or a reference of the pages by branch, reached by Tab, and on a cell of the fan: no outline. A tint of `hover` under the entry, 4 px beyond it above and below, 6 px to the right and 8 px to the left, corners of 3 px, with a 3 px bar of `action` on its left edge. A cell of the fan is the tint itself, with the bar on its inner edge; the centre has it on the base line. It lies under the lines and the text, so it covers, clips and moves nothing, and the sheet keeps room for it beside the outer columns; the bar keeps 3:1 against `paper`, `surface` and `hover` in both themes. Only the keys show it (`:focus-visible`), never a press of the mouse. Where the system forces its own colours, the plain outline comes back. The map keeps its own.
+- Focus: 2 px `action` outline, 2 px away. Never removed, never clipped.
+- Focus on an entry of the tree, reached by the arrow keys on any width, on a name or a reference of the pages by branch, reached by Tab, on a person of the canvas and on a cell of the fan: no outline. A tint of `hover` under the entry, 4 px beyond it above and below, 6 px to the right and 8 px to the left, corners of 3 px, with a 3 px bar of `action` on its left edge. A cell of the fan is the tint itself, with the bar on its inner edge; the centre has it on the base line. It lies under the lines and the text, so it covers, clips and moves nothing, and the sheet keeps room for it beside the outer columns; the bar keeps 3:1 against `paper`, `surface` and `hover` in both themes. Only the keys show it (`:focus-visible`), never a press of the mouse. Where the system forces its own colours, the plain outline comes back.
 - Backspace: one step back inside the app on every screen, the person before in the centre or the screen before, so the tree can be walked by the keys alone. Never while somebody types (a field, a list to choose from, editable text, a composition in progress), never with a modifier, never for a key a screen already took. On the first page of a visit, or one reached from another site, it does nothing: it never leaves the site. The hint under the tree names it.
 - Hover: `hover` under a control, an underline for a name.
 - Filled button for the one main action of a screen, outlined for the rest. Disabled is `muted` text and a sentence that says why.

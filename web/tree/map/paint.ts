@@ -20,7 +20,7 @@ export type Drawing = { map: BranchMap; strokes: Stroke[]; joins: Stroke[]; bars
 
 const joinWidth = 1.2;
 
-/** Prepares what does not change while the map moves. `barOf` is the length of a bar from far. */
+/** Prepares what does not change while the canvas moves. `barOf` is the length of a bar on the strip. */
 export function drawingOf(
   map: BranchMap,
   { inkOf }: Pick<Paint, "inkOf">,
@@ -104,8 +104,8 @@ export function paint(
   for (const { x, y, w, h } of map.pages) {
     if (isSeen({ x0: x, y0: y, x1: x + w, y1: y + h })) brush.fillRect(x, y, w, h);
   }
-  // Lines keep their width, however large the map is.
-  const thickness = map.level === "far" ? 0.75 : 1;
+  // Lines keep their width, however large the canvas is.
+  const thickness = 1;
   brush.lineJoin = "round";
   const draw = ({ path, kind }: Stroke, width: number): void => {
     brush.lineWidth = (width * thickness) / view.k;
@@ -136,4 +136,43 @@ function grow(box: Box, x: number, y: number): void {
   box.y0 = Math.min(box.y0, y);
   box.x1 = Math.max(box.x1, x);
   box.y1 = Math.max(box.y1, y);
+}
+
+/**
+ * The strip of the whole: every page, every person a bar in the ink of their branch, and the
+ * direct line, all of it at once. `scale` is how many dots one unit of the canvas takes.
+ */
+export function paintWhole(
+  brush: Brush,
+  { map, strokes, bars }: Drawing,
+  {
+    size,
+    scale,
+    colors,
+  }: { size: { w: number; h: number; dots: number }; scale: [number, number]; colors: Paint },
+): void {
+  const [sx, sy] = scale;
+  brush.setTransform(1, 0, 0, 1, 0, 0);
+  brush.clearRect(0, 0, Math.ceil(size.w), Math.ceil(size.h));
+  brush.setTransform(sx, 0, 0, sy, 0, 0);
+  brush.fillStyle = colors.surface;
+  for (const { x, y, w, h } of map.pages) brush.fillRect(x, y, Math.max(0, w - 1 / sx), h);
+  for (const { ink, path, isHollow } of bars) {
+    if (isHollow) continue;
+    brush.fillStyle = ink;
+    brush.fill(path);
+  }
+  // The line is laid on the scale and stroked on the dots, so it is as wide across as down.
+  brush.setTransform(1, 0, 0, 1, 0, 0);
+  brush.lineJoin = "round";
+  brush.setLineDash([]);
+  brush.strokeStyle = colors.ink;
+  brush.lineWidth = size.dots * 2;
+  const matrix = { a: sx, b: 0, c: 0, d: sy, e: 0, f: 0 };
+  for (const stroke of strokes) {
+    if (stroke.kind !== "direct") continue;
+    const scaled = new Path2D();
+    scaled.addPath(stroke.path, matrix);
+    brush.stroke(scaled);
+  }
 }

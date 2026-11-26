@@ -60,7 +60,6 @@ describe.each(Object.entries(families))("%s", (_, spec) => {
   it("have a map", () => {
     const last = snapshot.people.at(-1)?.id ?? null;
     const map = branchMap(snapshot, {
-      level: "far",
       measure,
       headOf: ({ title }) => title.ru,
       lineOf: last,

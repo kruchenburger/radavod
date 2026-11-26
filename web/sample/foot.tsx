@@ -28,7 +28,7 @@ export function Foot({ person }: { person: string }) {
           {snapshot.branches.map(({ id }) => (
             <li key={id}>
               <Link
-                href={hrefOf(branchesPlace({ level: "closer", person, branch: id }))}
+                href={hrefOf(branchesPlace({ person, branch: id }))}
                 aria-current={id === own || undefined}
                 style={{ color: words.ink(id) }}
               >

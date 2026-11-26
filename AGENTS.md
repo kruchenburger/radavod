@@ -88,11 +88,11 @@ Every text a person reads is in `web/i18n/ru.ts` and `web/i18n/en.ts`, reached t
 
 ## Tree
 
-`src/shared/tree.ts` is the snapshot of the tree that the server sends. `web/tree/layout` turns it into places: `around` and `aroundNarrow` for the view around a person, `branchMap` for the map, following `docs/design.md`. These are pure functions with no DOM, no clock and no texts; they judge nothing and draw what the snapshot says. `web/tree/map-layouter.ts` runs the map in a worker.
+`src/shared/tree.ts` is the snapshot of the tree that the server sends. `web/tree/layout` turns it into places: `around` and `aroundNarrow` for the view around a person, `branchMap` for the canvas of all branches, `branchPages` for the pages by branch and `fanOf` for the fan, following `docs/design.md`. These are pure functions with no DOM, no clock and no texts; they judge nothing and draw what the snapshot says, fast enough to run on the main thread.
 
-`web/sample` holds the screens of the example and `web/sample/places.ts` their addresses: a place, a person and a zoom are in the address, and nothing a person would lose with a link is kept elsewhere. `web/tree/type.ts` measures names in the fonts of the page; lengths of the layout go to styles through `rem`, so the tree grows with the text. `web/tree/map/view.ts` is the math of the map, `paint.ts` its canvas, `map-view.tsx` the links over it.
+`web/sample` holds the screens of the example and `web/sample/places.ts` their addresses: a place, a person and a zoom are in the address, and nothing a person would lose with a link is kept elsewhere. `web/tree/type.ts` measures names in the fonts of the page; lengths of the layout go to styles through `rem`, so the tree grows with the text. `web/tree/map/view.ts` is the math of the canvas, `paint.ts` paints its lines and the strip of the whole, `map-view.tsx` the links over them.
 
-`test/e2e/frames.spec.ts` prints the frame times of panning the map and fails on none of them.
+`test/e2e/frames.spec.ts` prints the frame times of panning the canvas and fails on none of them.
 
 A layout is tested by `test/web/layout/geometry.ts`, not by snapshots of coordinates: nothing overlaps, no line enters a card, everybody stands once, every link is there. A new rule of drawing becomes a check there and a planted defect in `geometry.test.ts`. A family that is hard to draw goes to `cases.ts`.
 

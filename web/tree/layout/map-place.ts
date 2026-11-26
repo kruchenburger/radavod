@@ -6,11 +6,9 @@ import type { MapModel, MapNode } from "./map-model";
 export type Placed = {
   /** From the left edge of the contents of the page. */
   x: (node: MapNode) => number;
-  /** The row of the page; rows without anybody are left out. */
-  rowOf: (node: MapNode) => number;
   /** Room for lines beside a node. */
   room: (node: MapNode) => { left: number; right: number };
-  pages: { width: number; rowHeights: number[] }[];
+  pages: { width: number }[];
 };
 
 /** The outline of a tree: how far it reaches in every row, the deepest row first. */
@@ -85,28 +83,18 @@ export function placeNodes(model: MapModel, metrics: MapMetrics): Placed {
   }
 
   const bounds = model.pages.map(() => ({ left: Infinity, right: -Infinity }));
-  const heights: Map<number, number>[] = model.pages.map(() => new Map());
   for (const node of model.nodes) {
     const bound = bounds[node.page] as { left: number; right: number };
     const x = xs.get(node) ?? 0;
     bound.left = Math.min(bound.left, x - room(node).left);
     bound.right = Math.max(bound.right, x + w + room(node).right);
-    const page = heights[node.page] as Map<number, number>;
-    const height = node.rows.length * metrics.line;
-    page.set(node.generation, Math.max(page.get(node.generation) ?? 0, height));
   }
-  const rows = heights.map((page) => [...page.keys()].sort((a, b) => a - b));
-  const indexes = rows.map((page) => new Map(page.map((generation, i) => [generation, i])));
   return {
     room,
     x: (node) => (xs.get(node) ?? 0) - (bounds[node.page]?.left ?? 0),
-    rowOf: (node) => indexes[node.page]?.get(node.generation) ?? 0,
     pages: model.pages.map((_, i) => {
       const { left, right } = bounds[i] as { left: number; right: number };
-      return {
-        width: Math.max(0, right - left),
-        rowHeights: (rows[i] ?? []).map((generation) => heights[i]?.get(generation) ?? 0),
-      };
+      return { width: Math.max(0, right - left) };
     }),
   };
 

@@ -25,7 +25,7 @@ export function PersonScreen({ person: id }: { person: string }) {
   const { given, surname } = words.fullName(person.name);
   const place = words.place(person.place);
   const onTree = hrefOf(treePlace(id));
-  const onBranches = hrefOf(branchesPlace({ level: "near", person: id }));
+  const onBranches = hrefOf(branchesPlace({ person: id }));
   return (
     <article className={classes.card}>
       <Link className={classes.back} href={lastTree() ?? onTree}>
