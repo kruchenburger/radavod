@@ -52,8 +52,12 @@ it.each([
   [["en-GB", "ru"], "en"],
   [["pl-PL", "ru-RU", "en"], "ru"],
   [["EN"], "en"],
-  [["be", "pl"], "ru"],
-  [[], "ru"],
+  // No Belarusian or Ukrainian yet, and Russian is the nearer of the two.
+  [["be", "en"], "ru"],
+  [["pl", "uk-UA"], "ru"],
+  // Whoever reads neither gets English.
+  [["pl", "de"], "en"],
+  [[], "en"],
 ])("starts from the languages of the browser: %j", (languages, locale) => {
   expect(detectLocale(languages)).toBe(locale);
 });

@@ -1,0 +1,17 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 32 32">
+  <style>
+    .paper { fill: #faf8f1 }
+    .rule { stroke: #8a8172 }
+    .ink { stroke: #211d18 }
+    @media (prefers-color-scheme: dark) {
+      .paper { fill: #201b16 }
+      .rule { stroke: #80776a }
+      .ink { stroke: #ece5d8 }
+    }
+  </style>
+  <rect class="paper" width="32" height="32"/>
+  <g fill="none" stroke-width="2">
+    <path class="rule" d="M4 23h8M12 8q3 0 3 3v2q0 3 3 3q-3 0-3 3v2q0 3-3 3"/>
+    <path class="ink" stroke-width="3" d="M4 8h8M18 16h10"/>
+  </g>
+</svg>

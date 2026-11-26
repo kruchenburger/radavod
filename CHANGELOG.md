@@ -21,3 +21,13 @@ The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), and
 - The rules of access: roles and what each may do, invitations, recovery links, passkeys, a bound device for a reader, sliding sessions, and a keeper who can always sign in. They are kept in the object of sign-in with a sign-in log and limits of tries; nothing serves them over HTTP yet.
 - Guards for the architecture, the texts, licenses and a real family's data. The last one reads every commit of a pull request and, with the hook turned on, every commit before a push.
 - Checks on every pull request: browser tests, accessibility, secrets and known vulnerabilities.
+
+### Changed
+
+- The language is chosen with RU and EN, the same in either language. A first visit takes the first language of the browser that the site speaks; Belarusian and Ukrainian get Russian, anything else English. The theme follows the browser too until the visitor picks one.
+- The view around a person is called the pedigree.
+- A middle dot separates the years, a note and the branch under a name, so a date written in words no longer runs into the text after it.
+
+### Fixed
+
+- The site has an icon, and `/favicon.ico` no longer returns 404.

@@ -6,6 +6,7 @@ import { CertaintyMark } from "../tree/certainty";
 import { kinOf } from "../tree/layout/kin";
 import { type Relatives, relativesOf } from "../tree/layout/relatives";
 import { shareOneParent } from "../tree/siblings";
+import { apart } from "./apart";
 import { useData } from "./data";
 import classes from "./kin-list.module.css";
 import { hrefOf, type Place } from "./places";
@@ -167,13 +168,17 @@ export function PersonLine({ person, hrefFor, notes = [], without, children }: P
       >
         {words.name(one)}
       </Link>{" "}
-      <span className={classes.detail}>{words.years(one)}</span>{" "}
-      {notes.length > 0 && <span className={classes.detail}>{notes.join(", ")}</span>}{" "}
-      {isBranchShown && (
-        <b className={classes.detail} style={{ color: words.ink(one.branch) }}>
-          {words.branch(one.branch)}
-        </b>
-      )}{" "}
+      <span className={classes.detail}>
+        {apart([
+          words.years(one),
+          notes.length > 0 && notes.join(", "),
+          isBranchShown && (
+            <b key="branch" className={classes.detail} style={{ color: words.ink(one.branch) }}>
+              {words.branch(one.branch)}
+            </b>
+          ),
+        ])}
+      </span>{" "}
       {children}
     </span>
   );

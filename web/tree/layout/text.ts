@@ -124,7 +124,8 @@ export function nameLines(given: Run, surname: Run, options: FlowOptions): Line[
  * not worth looking at.
  */
 function wordsOf(text: string): { word: string; isApart: boolean }[] {
-  const words = text.slice(0, 2000).split(/\s+/u);
+  // A no-break space holds its neighbours together, as in "1893 ·".
+  const words = text.slice(0, 2000).split(/[^\S\u00a0]+/u);
   return words.flatMap((word) =>
     word
       .split(/(?<=\p{L}-)(?=\p{L})/u)

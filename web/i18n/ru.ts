@@ -8,6 +8,9 @@ export const ru = {
   "settings.theme": "Тема",
   "language.ru": "Русский",
   "language.en": "English",
+  // The marks are the same in every language on purpose: the switch looks the same in both.
+  "language.ru.mark": "RU",
+  "language.en.mark": "EN",
   "theme.light": "Светлая",
   "theme.dark": "Тёмная",
   "health.checking": "Проверяем связь с сервером",
@@ -28,7 +31,7 @@ export const ru = {
   "sample.leave": "Закрыть пример",
 
   "view.views": "Виды древа",
-  "view.around": "Вокруг человека",
+  "view.around": "Родословная",
   "view.branches": "Все ветви",
   "view.list": "Списком",
   "view.tree": "Древом",

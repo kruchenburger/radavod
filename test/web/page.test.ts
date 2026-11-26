@@ -1,4 +1,4 @@
-import { describe, expect, it } from "vitest";
+import { describe, expect, it, vi } from "vitest";
 import serif from "@fontsource-variable/alegreya/index.css?raw";
 import serifItalic from "@fontsource-variable/alegreya/wght-italic.css?raw";
 import sans from "@fontsource/alegreya-sans/400.css?raw";
@@ -42,17 +42,28 @@ it("is built where the Worker looks for it", () => {
 });
 
 it.each([
-  ["dark", "dark"],
-  ["light", null],
-  [null, null],
-])("starts with the remembered theme %s before the app does", (remembered, attribute) => {
-  const [, script = ""] = /<script>([\s\S]*?)<\/script>/.exec(page) ?? [];
-  document.documentElement.removeAttribute("data-mantine-color-scheme");
-  if (remembered) localStorage.setItem(THEME_KEY, remembered);
-  // oxlint-disable-next-line no-new-func -- the script stands in the page, not in a module
-  new Function(script)();
-  expect(document.documentElement.getAttribute("data-mantine-color-scheme")).toBe(attribute);
-});
+  ["dark", false, "dark"],
+  ["light", false, null],
+  [null, false, null],
+  // Until the visitor picks, the browser's theme holds.
+  [null, true, "dark"],
+  ["auto", true, "dark"],
+  ["light", true, null],
+])(
+  "starts with the theme %s, a dark browser %s, before the app does",
+  (remembered, isDark, attribute) => {
+    const [, script = ""] = /<script>([\s\S]*?)<\/script\s*>/i.exec(page) ?? [];
+    document.documentElement.removeAttribute("data-mantine-color-scheme");
+    vi.spyOn(window, "matchMedia").mockImplementation(
+      (query) =>
+        ({ matches: isDark && query === "(prefers-color-scheme: dark)" }) as MediaQueryList,
+    );
+    if (remembered) localStorage.setItem(THEME_KEY, remembered);
+    // oxlint-disable-next-line no-new-func -- the script stands in the page, not in a module
+    new Function(script)();
+    expect(document.documentElement.getAttribute("data-mantine-color-scheme")).toBe(attribute);
+  },
+);
 
 describe.each(faces)("the %s face", (_, face) => {
   it.each([

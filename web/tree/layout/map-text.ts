@@ -1,4 +1,5 @@
 import type { TreePerson } from "../../../src/shared/tree";
+import { detailRuns } from "./around-text";
 import { type BranchMap, type MapCard, mapMetrics } from "./branch-map";
 import { flow, type Run } from "./text";
 import type { CardText, Line, Measure, TextStyle, Wording } from "./types";
@@ -40,10 +41,7 @@ export function mapText(card: MapCard, options: MapTextOptions): Line[] {
   if (level === "closer") return lines;
   const page = options.map.pages[card.page];
   const branch = person.branch !== null && person.branch === page?.branch ? "" : text.branch;
-  const runs: Run[] = [
-    { text: text.years, part: "years", style: "nearDetail" },
-    { text: branch, part: "branch", style: "nearDetail" },
-  ];
+  const runs = detailRuns({ ...text, branch }, "nearDetail");
   const below = metrics.line * nameShare.near;
   return [...lines, ...flow(runs, { ...size, y: below, lineHeight: metrics.line - below })];
 }

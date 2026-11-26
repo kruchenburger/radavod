@@ -24,7 +24,7 @@ Use the token, never the value. In styles a token is a variable: `paper` is `--p
 | `edge`     | `#cdc5b5` | `#403a31` | Lines that only divide. Never the only sign of anything                      |
 | `noBranch` | `#696156` | `#a0978a` | The surname of a person without a branch                                     |
 
-Text is at least 4.5:1 on every background it stands on, meaningful lines at least 3:1. Light theme is the default. The dark theme is warm, never blue.
+Text is at least 4.5:1 on every background it stands on, meaningful lines at least 3:1. The theme follows the browser until the visitor picks one, and is light where the browser says nothing. The dark theme is warm, never blue.
 
 ### Branch inks
 
@@ -80,9 +80,9 @@ Widths: the phone is below 720 px (`sm`), the spread needs 1400 px (`lg`). Betwe
 
 ## Screen frame
 
-A single row: the name of the family in Alegreya italic, the two views as words underlined when current, then search, language and theme. On the phone the views take a second row. Under the tree a running foot lists the branches in their inks with the number of people; the branch of the chosen person is underlined; the foot opens the map.
+A single row: the name of the family in Alegreya italic, the two views as words underlined when current, then search, language and theme. The language is two marks, RU and EN, the same in both languages. The current one is marked as a chosen word (see States). Each mark is a radio button named by its mark and its language, "RU, Русский". On the phone the views take a second row. Under the tree a running foot lists the branches in their inks with the number of people; the branch of the chosen person is underlined; the foot opens the map.
 
-## The tree around a person
+## The pedigree: the tree around a person
 
 ```
  great-grand-    grand-       parents    | the strip |   children      grand-        great-
@@ -100,7 +100,7 @@ A single row: the name of the family in Alegreya italic, the two views as words 
 ```
 
 - Columns: an entry is 152 px wide, a gap of 34 px holds the brace; the strip is 236 px on `surface`, full height.
-- An entry is the given name in `ink` and the surname in its branch ink, then years and the branch. A spouse is a second entry under the first with ⚭ before it.
+- An entry is the given name in `ink` and the surname in its branch ink, then years and the branch. A middle dot stands between the years and the branch, held to the years by a no-break space, because dates told in words would run into the branch; the same dot parts years, a note and a branch wherever they share a line. A spouse is a second entry under the first with ⚭ before it.
 - Couples stand on the left of a brace, their child at its tip. On the right the tip is at the couple and every child has an arm.
 - Lines: `rule` 1.1 px; adoption and guardianship 1.8 px dashed 5 4; a version of the parents that contradicts the main one 1.4 px dotted 1.4 3.6; the direct line `ink` 2.6 px, and the names on it are 700. The arm to a child on the line is dark, its neighbours stay thin. If the centre is not on the direct line, there is no dark line on the screen. Under the tree a legend explains the lines that are on it.
 - Brace: `web/app/brace.ts`, corners of 11 px, less when the arms are short.
@@ -193,6 +193,7 @@ Under the strip a legend explains the cap, the dashes and the "?". Adoption is a
 
 - **Start, sign-in, invitation**: two halves. Left, on `surface`, the blank pedigree: lines without names, braces, the direct line. Right, the words and one filled button. Nothing about the family is shown before a sign-in except what the invitation itself says.
 - **Empty family**: the blank pedigree without a fill, then two ways: the first person (a name, or the mark that it is unknown) and a file.
+- **Icon**: a small blank pedigree on `paper`, square: a thin line and a thick one joined by a brace to a thick line. In a dark browser it uses the dark tokens. It is `/favicon.svg`; `/favicon.ico` redirects there.
 - **Example**: where the installation allows it, the start page opens an invented family. A row above the header carries the mark in an outlined label, one sentence and a link to leave. The row is on every screen of the example; in the sheet of the map on the phone the mark stands beside the heading.
 
 ## States

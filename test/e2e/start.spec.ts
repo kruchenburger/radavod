@@ -109,6 +109,26 @@ test("the language and the theme survive a reload", async ({ page }) => {
   expect(await theme(page)).toBe("light");
 });
 
+test.describe("a dark browser", () => {
+  test.use({ colorScheme: "dark" });
+
+  test("gets the dark theme until the visitor picks one", async ({ page }) => {
+    await page.goto("/");
+    expect(await theme(page)).toBe("dark");
+    await page.getByText("Light", { exact: true }).click();
+    await page.reload();
+    expect(await theme(page)).toBe("light");
+  });
+});
+
+test("has an icon, under the old address too", async ({ page, request }) => {
+  await page.goto("/");
+  await expect(page.locator('link[rel="icon"]')).toHaveAttribute("href", "/favicon.svg");
+  const icon = await request.get("/favicon.ico");
+  expect(icon.status()).toBe(200);
+  expect(icon.headers()["content-type"]).toContain("image/svg+xml");
+});
+
 test("the Worker answers behind the page", async ({ page, request }) => {
   await page.goto("/");
   const health = await request.get("/health");

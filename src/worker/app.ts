@@ -25,6 +25,9 @@ app.get("/config", (c) => {
   return c.json(config, 200, { "cache-control": "no-store" });
 });
 
+// Browsers and readers ask for the icon here whatever the page says; the icon is a drawing.
+app.get("/favicon.ico", (c) => c.redirect("/favicon.svg", 301));
+
 // The app reads the address itself; every screen is the same page. The tree itself is a file.
 app.on("GET", ["/sample", "/sample/*"], (c) => {
   const url = new URL(c.req.url);

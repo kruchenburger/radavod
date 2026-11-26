@@ -3,7 +3,7 @@ import type { Entry, Model } from "./around-model";
 import { kinOf } from "./kin";
 import { step } from "./lanes";
 import { flow, nameLines, type Run } from "./text";
-import type { CardText, Line, Measure, Wording } from "./types";
+import type { CardText, Line, Measure, TextStyle, Wording } from "./types";
 
 /** Sizes of the view around a person, those of docs/design.md. The screen may change any of them. */
 export type AroundMetrics = {
@@ -218,10 +218,13 @@ export function nameRuns({ given, surname }: CardText, isDirect: boolean): [Run,
   ];
 }
 
-export function detailRuns({ years, branch }: CardText): Run[] {
+/** Between the parts of a line about a person: dates in words run on into a name otherwise. */
+export const dot = "·";
+
+export function detailRuns({ years, branch }: CardText, style: TextStyle = "detail"): Run[] {
   return [
-    { text: years, part: "years", style: "detail" },
-    { text: branch, part: "branch", style: "detail" },
+    { text: branch.trim() === "" ? years : `${years}\u00a0${dot}`, part: "years", style },
+    { text: branch, part: "branch", style },
   ];
 }
 
