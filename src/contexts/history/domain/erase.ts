@@ -101,12 +101,18 @@ export function withoutPerson(
 ): Patch[] {
   return patches
     .filter(({ aggregate }) => !isOf(aggregate, id))
-    .map(({ aggregate, path, before, after }) => ({
-      aggregate,
-      path: pathWithout(path, id, link),
-      before: scrubbed(before, id, words, link),
-      after: scrubbed(after, id, words, link),
-    }));
+    .map(({ aggregate, path, before, after }) => {
+      // The order of a list names its things: a thing named by them is a link named by them.
+      const clean = path.endsWith("/")
+        ? (value: unknown) => inTexts(value, (text) => markOf(text, id, link))
+        : (value: unknown) => scrubbed(value, id, words, link);
+      return {
+        aggregate,
+        path: pathWithout(path, id, link),
+        before: clean(before),
+        after: clean(after),
+      };
+    });
 }
 
 /**

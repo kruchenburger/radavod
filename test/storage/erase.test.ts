@@ -430,9 +430,39 @@ describe("an erased person", () => {
         "hypothesis",
         "one-source",
       ]);
+      // An edit of a link to somebody erased cannot be told any more.
+      expect(tree.run((c) => undo(c, last))).toMatchObject({ error: { code: "irreversible" } });
       accepted(tree.run((c) => restoreTo(c, last)));
       tree.read((c) => expect(c.kinship.get(person("kid"))?.parents).toHaveLength(2));
       expect(found(tree.rows(), [person("ada"), person("bob")])).toEqual([]);
+    }));
+
+  it("keeps the order of the links of a child in the past", () =>
+    inTree(async (tree) => {
+      tree.do((c) => {
+        for (const who of ["ada", "bob", "kid"]) addPerson(c, who);
+        addParent(c, "kid", "ada", { id: person("ada") });
+        addParent(c, "kid", "bob", { id: person("bob") });
+      });
+      const before = tree.read((c) => c.history.last());
+      // Her link is not the last one: the entry says the order too.
+      accepted(tree.run((c) => trash(c, person("ada"), act)));
+      accepted(await erase(tree, "ada"));
+      const past = (await versionsOf(tree.storage, tree.work).at(before)) as Record<
+        string,
+        { parents: Record<string, string>[] }
+      >;
+      expect(past[`person/${person("kid")}`]?.parents.map(({ parent }) => parent)).toEqual([
+        "unknown",
+        person("bob"),
+      ]);
+      accepted(tree.run((c) => restoreTo(c, before)));
+      tree.read((c) =>
+        expect(c.kinship.get(person("kid"))?.parents.map(({ parent }) => parent)).toEqual([
+          "unknown",
+          person("bob"),
+        ]),
+      );
     }));
 
   it("leaves no citation of a link to her, whoever of the two was in the trash", async () => {

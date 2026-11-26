@@ -8,7 +8,7 @@ export type Patch = { aggregate: string; path: string; before: unknown; after: u
 export type State = { readonly [aggregate: string]: unknown };
 
 import { isOfLists } from "../kernel/change";
-import { ERASED, ERASED_IN_WORDS } from "../kernel/id";
+import { ERASED, ERASED_IN_WORDS, isErasedMark } from "../kernel/id";
 
 export { ERASED, isOfLists };
 
@@ -95,8 +95,11 @@ export function withoutErased(aggregate: string, value: unknown): unknown {
       return { ...fields, events: eventsWithoutErased(fields.events) };
     case "trash":
       return trashWithoutErased(fields);
-    case "cited":
-      return { ...fields, citations: citationsWithoutErased(fields.citations) };
+    case "cited": {
+      // An aggregate of lists with nothing in it is not there.
+      const citations = citationsWithoutErased(fields.citations);
+      return citations.length === 0 ? null : { ...fields, citations };
+    }
     default:
       return value;
   }
@@ -109,13 +112,11 @@ export function withoutErased(aggregate: string, value: unknown): unknown {
  */
 function linksWithoutErased(links: unknown): Thing[] {
   const all = thingsOf(links);
-  const isMarked = (id: string) =>
-    id === ERASED || id.startsWith(`${ERASED}-`) || id.includes(ERASED_IN_WORDS);
-  const taken = new Set(all.map(({ id }) => id).filter((id) => !isMarked(id)));
+  const taken = new Set(all.map(({ id }) => id).filter((id) => !isErasedMark(id)));
   return all.map((link) => {
     if (link.parent !== ERASED) return link;
     let { id } = link;
-    if (isMarked(id)) {
+    if (isErasedMark(id)) {
       id = "unknown";
       for (let n = 2; taken.has(id); n++) id = `unknown-${n}`;
       taken.add(id);
