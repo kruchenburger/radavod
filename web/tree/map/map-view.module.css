@@ -137,18 +137,22 @@
   touch-action: none;
 }
 
-.stripCanvas {
+/* The picture under the names of the branches; the frame is placed in shares of it. */
+.picture {
   position: absolute;
   inset: 1.5rem 0 0;
+}
+
+.stripCanvas {
+  position: absolute;
+  inset: 0;
   width: 100%;
-  height: calc(100% - 1.5rem);
+  height: 100%;
 }
 
 .mark {
   position: absolute;
   box-sizing: border-box;
-  margin-top: 1.5rem;
-  max-height: calc(100% - 1.5rem);
   border: 2px solid var(--ink);
   pointer-events: none;
 }
@@ -197,11 +201,7 @@
     display: none;
   }
 
-  .stripCanvas,
-  .mark {
-    top: 0;
-    margin-top: 0;
-    height: 100%;
-    max-height: 100%;
+  .picture {
+    inset: 0;
   }
 }

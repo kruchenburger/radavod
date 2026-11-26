@@ -74,6 +74,11 @@ export function MapView(props: MapViewProps) {
     [map, colors],
   );
 
+  // From the thirteenth branch on the inks repeat, and the head gets a double rule.
+  const double = useMemo(
+    () => new Set(snapshot.branches.slice(12).map(({ id }) => id)),
+    [snapshot],
+  );
   const view = useRef<View | null>(null);
   const state = useRef({ map, size, drawing, colors, onRest });
   state.current = { map, size, drawing, colors, onRest };
@@ -220,7 +225,17 @@ export function MapView(props: MapViewProps) {
 
   return (
     <div className={classes.frame}>
-      <Whole {...props} ref={mark} goTo={goTo} view={view} size={size} />
+      <Whole
+        {...props}
+        ref={mark}
+        goTo={goTo}
+        view={view}
+        size={size}
+        glide={request}
+        settle={() => {
+          if (view.current !== null) rest(view.current);
+        }}
+      />
       <div
         ref={root}
         className={classes.window}
@@ -241,13 +256,13 @@ export function MapView(props: MapViewProps) {
           </div>
         )}
         <div ref={heads} className={classes.heads} aria-hidden="true">
-          {map.pages.map(({ branch, people }, i) => (
+          {map.pages.map(({ branch, people }) => (
             <div
-              key={branch ?? `none ${i}`}
+              key={branch ?? "none"}
               className={classes.page}
               style={{ color: words.ink(branch) }}
             >
-              <span className={classes.title} data-double={i >= 12 || undefined}>
+              <span className={classes.title} data-double={double.has(branch ?? "") || undefined}>
                 <span>
                   <b>{words.page(branch)}</b> <i>{people}</i>
                 </span>
@@ -274,10 +289,20 @@ type MovingProps = {
  * the ink of the branch, the direct line, and a frame where the window is. A press or a drag moves
  * the window there; the names of the branches are links to their pages.
  */
-function Whole(props: MapViewProps & MovingProps & { ref: React.Ref<HTMLDivElement> }) {
-  const { ref, map, words, snapshot, chosen, hrefOfPage, goTo, view, size } = props;
+function Whole(
+  props: MapViewProps &
+    MovingProps & {
+      ref: React.Ref<HTMLDivElement>;
+      /** Moves the window and leaves the address alone, while a finger drags. */
+      glide: (view: View) => void;
+      /** The drag is over: the address follows. */
+      settle: () => void;
+    },
+) {
+  const { ref, map, words, snapshot, chosen, hrefOfPage, view, size, glide, settle } = props;
   const { t } = useLanguage();
   const box = useRef<HTMLDivElement>(null);
+  const picture = useRef<HTMLDivElement>(null);
   const canvas = useRef<HTMLCanvasElement>(null);
   const [width, setWidth] = useState(0);
   const colorScheme = useComputedColorScheme("light");
@@ -314,16 +339,22 @@ function Whole(props: MapViewProps & MovingProps & { ref: React.Ref<HTMLDivEleme
       (width * dots) / Math.max(1, map.width),
       (height * dots) / Math.max(1, map.height),
     ];
-    paintWhole(brush, drawing, { size: { w: element.width, h: element.height }, scale, colors });
+    paintWhole(brush, drawing, {
+      size: { w: element.width, h: element.height, dots },
+      scale,
+      colors,
+    });
   }, [drawing, colors, width, map]);
 
+  // A place on the picture of the strip is a place on the canvas.
   const to = (event: PointerEvent<HTMLElement>): void => {
-    const element = box.current;
+    const element = picture.current;
     if (element === null || size === null) return;
     const { left, top, width: across, height: down } = element.getBoundingClientRect();
-    const x = ((event.clientX - left) / across) * map.width;
-    const y = ((event.clientY - top) / down) * map.height;
-    goTo({ x, y, k: view.current?.k ?? 1 }, false);
+    const share = (value: number) => Math.min(1, Math.max(0, value));
+    const x = share((event.clientX - left) / across) * map.width;
+    const y = share((event.clientY - top) / down) * map.height;
+    glide({ x, y, k: view.current?.k ?? 1 });
   };
   return (
     <div className={classes.whole}>
@@ -332,16 +363,19 @@ function Whole(props: MapViewProps & MovingProps & { ref: React.Ref<HTMLDivEleme
         className={classes.strip}
         data-whole
         onPointerDown={(event) => {
-          if ((event.target as Element).closest("a") !== null) return;
+          if (event.button !== 0 || (event.target as Element).closest("a") !== null) return;
           event.currentTarget.setPointerCapture(event.pointerId);
           to(event);
         }}
         onPointerMove={(event) => {
           if (event.currentTarget.hasPointerCapture(event.pointerId)) to(event);
         }}
+        onLostPointerCapture={settle}
       >
-        <canvas ref={canvas} className={classes.stripCanvas} aria-hidden="true" />
-        <div ref={ref} className={classes.mark} aria-hidden="true" data-mark />
+        <div ref={picture} className={classes.picture}>
+          <canvas ref={canvas} className={classes.stripCanvas} aria-hidden="true" />
+          <div ref={ref} className={classes.mark} aria-hidden="true" data-mark />
+        </div>
         <nav className={classes.branches} aria-label={t("map.whole")}>
           {map.pages.map(({ branch, people, x, w }) => (
             <Link

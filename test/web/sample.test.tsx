@@ -681,7 +681,7 @@ describe("the search", () => {
 
 describe("all branches", () => {
   const window_ = () => screen.getByRole("group", { name: "Все ветви" });
-  const whole = () => screen.getByRole("navigation", { name: "Вся семья" });
+  const whole = () => screen.getByRole("navigation", { name: "Ветви всей семьи" });
   const stop = () => window_().querySelector<HTMLElement>('a[tabindex="0"]') as HTMLElement;
 
   it("open on the person the example begins with, names near the window as links", async () => {

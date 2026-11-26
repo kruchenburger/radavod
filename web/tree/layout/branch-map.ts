@@ -25,7 +25,7 @@ export type MapMetrics = {
   head: number;
 };
 
-export const mapMetrics: MapMetrics = {
+const mapMetrics: MapMetrics = {
   step: 8,
   apart: 8,
   w: 208,
@@ -77,11 +77,17 @@ export type BranchMap = Omit<Layout, "cards"> & {
   joins: { x: number; y: number; h: number }[];
 };
 
-/** A title wider than this does not make its page wider. */
+/** A title wider than this does not make its page wider; the screen cuts it. */
 const widestHead = 360;
 
-/** Stands for a place along a gutter before the heights of the gaps are known. */
+/**
+ * Stands for a place along a gutter before the heights of the gaps are known: gap after gap, so
+ * that the lanes of a gutter are dealt out in the order of the gaps they join.
+ */
 const far = 1e6;
+
+/** Lines that come to one person come one under another, as shares of the row. */
+const arrivals = { column: [0.34, -0.34, 0.17, -0.17], couple: [0, 0.34, -0.34, 0.17, -0.17] };
 
 /**
  * One wide canvas: a page for every branch, all pages side by side in the order the direct line
@@ -180,6 +186,9 @@ export function branchMap(snapshot: TreeSnapshot, options: MapOptions): BranchMa
   for (const { from, to, family } of model.links) {
     fromAbove.set(`${rowOf(to.node)} ${exitOf(from.node, family)}`, family);
   }
+  /** The family whose line comes down into a column. */
+  const familyAbove = (node: MapNode): string | undefined =>
+    model.links.find(({ to }) => to.node === node)?.family;
   const entryOf = (node: MapNode, family: string | undefined): number => {
     const own = node.isList ? nodeX(node) - tick : nodeX(node) + axis;
     const holder = fromAbove.get(`${rowOf(node)} ${own}`);
@@ -191,7 +200,12 @@ export function branchMap(snapshot: TreeSnapshot, options: MapOptions): BranchMa
     track.touch(family, entryOf(to.node, family));
   }
   const startOf = ({ start, crossing }: (typeof wires)[number]): number =>
-    start.node.isList ? entryOf(start.node, undefined) : slot(start.node, crossing.family);
+    start.node.isList
+      ? entryOf(start.node, familyAbove(start.node))
+      : slot(start.node, crossing.family);
+  // The direct line goes on down from its reference into the gap under the row: nothing comes up
+  // there in its place.
+  for (const wire of wires) fromAbove.set(`${wire.gapFrom} ${startOf(wire)}`, wire.crossing.family);
   for (const wire of wires) {
     const { crossing, end, gapFrom, gapTo, gutter } = wire;
     const target = slot(end.node, crossing.family);
@@ -277,7 +291,7 @@ export function branchMap(snapshot: TreeSnapshot, options: MapOptions): BranchMa
     const target = slot(end.node, family);
     const count = arrived.get(crossing.to) ?? 0;
     arrived.set(crossing.to, count + 1);
-    const places = end.node.isList ? [0.34, -0.34, 0.17, -0.17] : [0, 0.34, -0.34, 0.17, -0.17];
+    const places = end.node.isList ? arrivals.column : arrivals.couple;
     const inRow = rowY(end) + line * (places[count % places.length] ?? 0);
     const points: Point[] = [
       [corner(start.node).x, rowY(start)],

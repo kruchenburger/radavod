@@ -36,7 +36,7 @@ export type BranchPage = {
 };
 
 /** A piece of the direct line from a reference to the person it names. */
-export type PageCrossing = { reference: string; to: string };
+type PageCrossing = { reference: string; to: string };
 
 export type BranchPages = { pages: BranchPage[]; crossings: PageCrossing[] };
 
@@ -199,7 +199,11 @@ type Sizes = {
 };
 
 /**
- * Where the direct line runs between pages. It leaves a reference on the side of the page it goes
+ * Where the direct line runs between the pages by branch. The canvas has its own way
+ * (`branch-map.ts`): its rows are the same on every page, so the line keeps to the gaps between
+ * them; these pages are outlines of their own lengths, so the line goes over a rail above them.
+ *
+ * It leaves a reference on the side of the page it goes
  * to and enters the person always from the left, where the outline is. Into the next page it
  * crosses the gutter between; within a page it runs in the gutter on the left; further it goes up
  * to the rail over the pages, along it, and down the gutter left of the page. No piece of it runs

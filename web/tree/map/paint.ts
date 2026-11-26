@@ -149,7 +149,7 @@ export function paintWhole(
     size,
     scale,
     colors,
-  }: { size: { w: number; h: number }; scale: [number, number]; colors: Paint },
+  }: { size: { w: number; h: number; dots: number }; scale: [number, number]; colors: Paint },
 ): void {
   const [sx, sy] = scale;
   brush.setTransform(1, 0, 0, 1, 0, 0);
@@ -162,9 +162,17 @@ export function paintWhole(
     brush.fillStyle = ink;
     brush.fill(path);
   }
+  // The line is laid on the scale and stroked on the dots, so it is as wide across as down.
+  brush.setTransform(1, 0, 0, 1, 0, 0);
   brush.lineJoin = "round";
   brush.setLineDash([]);
   brush.strokeStyle = colors.ink;
-  brush.lineWidth = 2 / Math.min(sx, sy);
-  for (const stroke of strokes) if (stroke.kind === "direct") brush.stroke(stroke.path);
+  brush.lineWidth = size.dots * 2;
+  const matrix = { a: sx, b: 0, c: 0, d: sy, e: 0, f: 0 };
+  for (const stroke of strokes) {
+    if (stroke.kind !== "direct") continue;
+    const scaled = new Path2D();
+    scaled.addPath(stroke.path, matrix);
+    brush.stroke(scaled);
+  }
 }

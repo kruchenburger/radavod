@@ -98,7 +98,7 @@ export const ru = {
 
   "map.keyboard": "С клавиатуры.",
   "map.modes": "Показать как",
-  "map.asMap": "Полотно",
+  "map.asCanvas": "Полотно",
   "map.asFan": "Веер",
   "fan.open": "Веер предков",
   "fan.pair": "{one} и {other}",
@@ -112,7 +112,7 @@ export const ru = {
   "fan.none": "Предки неизвестны: {name}",
   "map.keys":
     "Стрелки ведут по родству: вверх к родителю, вниз к ребёнку, влево и вправо по ряду. Enter открывает человека.",
-  "map.whole": "Вся семья",
+  "map.whole": "Ветви всей семьи",
   "map.noBranch": "Без ветви",
   "map.see": "{name}, см.",
   "map.seeParents": "Родители, см.",

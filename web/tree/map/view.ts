@@ -152,14 +152,9 @@ export function windowOnWhole(
   h: number;
 } {
   const [left, top] = pointAt(view, window, 0, 0);
+  const [right, bottom] = pointAt(view, window, window.w, window.h);
   const share = (value: number, length: number) =>
     Math.min(1, Math.max(0, value / Math.max(1, length)));
-  const x = share(left, map.width);
-  const y = share(top, map.height);
-  return {
-    x,
-    y,
-    w: Math.min(1 - x, window.w / view.k / Math.max(1, map.width)),
-    h: Math.min(1 - y, window.h / view.k / Math.max(1, map.height)),
-  };
+  const [x, y] = [share(left, map.width), share(top, map.height)];
+  return { x, y, w: share(right, map.width) - x, h: share(bottom, map.height) - y };
 }

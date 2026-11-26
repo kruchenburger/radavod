@@ -74,7 +74,11 @@ it("draws the strip of the whole: every page, every person a bar, only the direc
   const map = mapOf();
   const drawing = drawingOf(map, colors, ({ w }) => w);
   const { own, calls } = brush();
-  paintWhole(own as never, drawing, { size: { w: 1000, h: 60 }, scale: [0.05, 0.05], colors });
+  paintWhole(own as never, drawing, {
+    size: { w: 1000, h: 60, dots: 1 },
+    scale: [0.05, 0.08],
+    colors,
+  });
   expect(calls.filter(({ what }) => what === "page")).toHaveLength(map.pages.length);
   const pieces = drawing.bars.reduce(
     (sum, { path }) => sum + (path as unknown as FakePath).pieces,
@@ -84,6 +88,8 @@ it("draws the strip of the whole: every page, every person a bar, only the direc
   const lines = calls.filter(({ what }) => what === "line");
   expect(lines.length).toBeGreaterThan(0);
   expect(lines.every(({ color }) => color === "ink")).toBe(true);
+  // As wide across as down, whatever the two scales of the strip.
+  expect(lines.every(({ width }) => width === 2)).toBe(true);
 });
 
 it("draws the direct line last and dark, and an adoption in dashes", () => {

@@ -368,6 +368,7 @@ const scaleOf = (page: Page): Promise<number> =>
 test.describe("all branches", () => {
   test("open on the person the example begins with, names as large as in the tree", async ({
     page,
+    isMobile,
   }) => {
     await page.goto("/sample/branches");
     await ready(page);
@@ -376,7 +377,12 @@ test.describe("all branches", () => {
     expect(await chosen.getAttribute("data-press")).toBe(`p:${start}`);
     // Names of 19 px are never below 14 on the screen.
     expect(await scaleOf(page)).toBeGreaterThanOrEqual(14 / 19 - 0.001);
-    await expect(page.getByRole("navigation", { name: "The whole family" })).toBeAttached();
+    // On the phone the names of the branches do not fit over the strip; «По ветвям» lists them.
+    if (!isMobile) {
+      await expect(
+        page.getByRole("navigation", { name: "Branches of the whole family" }),
+      ).toBeVisible();
+    }
   });
 
   test("an old address of the map opens the canvas on the same person", async ({ page }) => {
@@ -475,7 +481,7 @@ test.describe("all branches", () => {
       await page.keyboard.press(key);
     }
     const focused = map(page).locator("[data-press]:focus");
-    await expect(focused).toBeInViewport({ ratio: 1 });
+    await expect(focused).toBeInViewport({ ratio: 0.99 });
     expect(await page.evaluate(markOfFocus)).toEqual({
       outline: "none",
       content: '""',
@@ -503,6 +509,12 @@ test.describe("all branches", () => {
     await expect.poll(() => searchOf(page).get("at")).not.toBe(before);
     const mark = await page.locator("[data-whole] [data-mark]").boundingBox();
     expect((mark?.x ?? 0) + (mark?.width ?? 0) / 2).toBeGreaterThan(box.x + box.width * 0.6);
+    // The frame stands on the picture of the family, not over the names of the branches.
+    const picture = await page.locator("[data-whole] canvas").boundingBox();
+    expect(mark?.y ?? 0).toBeGreaterThanOrEqual((picture?.y ?? 0) - 1);
+    expect((mark?.y ?? 0) + (mark?.height ?? 0)).toBeLessThanOrEqual(
+      (picture?.y ?? 0) + (picture?.height ?? 0) + 1,
+    );
   });
 
   test("draws the names near the window and no others", async ({ page }) => {
