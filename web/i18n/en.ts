@@ -243,7 +243,7 @@ export const en = {
   "invite.withdrawn": "Invitation withdrawn",
   "invite.recoveryWithdrawn": "Recovery link withdrawn",
   "invite.recoverySpent": "{name}: recovery link, used {date}",
-  "invite.none": "No active invitations.",
+  "invite.none": "No active links.",
   "log.title": "Sign-in log",
   "log.signIn": "{name} signed in, {country}",
   "log.recovery": "Recovery link for {name}, made by {by}",
@@ -273,7 +273,7 @@ export const en = {
   "error.passkey-refused": "The passkey wasn't created. Try again or use another browser.",
   "error.sign-in-refused": "That passkey didn't work. Ask a keeper for a recovery link.",
   "error.passkey-failed":
-    "Couldn't sign in with your passkey. Press the button again or use another device.",
+    "Couldn't sign in with your passkey. Press the button again or use another phone or computer.",
   "error.step-over": "That took too long. Press the button again.",
   "error.cancelled": "The passkey window closed. Press the button again.",
   "error.bad-request": "The site couldn't read that request. Reload the page and try again.",

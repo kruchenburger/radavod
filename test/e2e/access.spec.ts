@@ -100,7 +100,7 @@ test.describe("a family from its first keeper", () => {
     );
 
     await keeper.reload();
-    await expect(keeper.getByText(/Eve, signed in/u)).toBeVisible();
+    await expect(keeper.getByText(/Eve signed in/u)).toBeVisible();
 
     await relative.getByRole("link", { name: "Account" }).click();
     await expectAccessible(relative);

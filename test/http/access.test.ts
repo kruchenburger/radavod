@@ -182,6 +182,18 @@ describe("signing in", () => {
     expect((await keeper.call("GET", "/api/session", { origin: null })).status).toBe(200);
   });
 
+  it("says the same of a passkey turned off as of a wrong one", async () => {
+    const { family, keeper, editor } = await Family.withRoles();
+    const own = await editor.json<{ credentials: { id: string }[] }>("GET", "/api/account");
+    const [credential] = own.body.credentials;
+    expect((await keeper.call("POST", `/api/credentials/${credential?.id}/revoke`)).status).toBe(
+      204,
+    );
+    const again = family.browser();
+    Object.assign(again, { passkey: editor.passkey });
+    expect(await again.signIn()).toEqual({ status: 401, body: { error: "sign-in-refused" } });
+  });
+
   it("refuses a passkey that counts back, as a copy of it would", async () => {
     const family = new Family();
     const ann = family.browser();

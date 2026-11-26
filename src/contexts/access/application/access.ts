@@ -4,6 +4,7 @@ import type { Result } from "../../../kernel/result";
 import {
   addCredential,
   addPasskey,
+  mayLinkBrowser,
   provers,
   type Credential,
   type CredentialError,
@@ -132,8 +133,8 @@ export interface Access {
   account(id: MemberId): Result<Account, AccessError>;
   /** The members as a member may see them: names for all, credentials and invitations for keepers. */
   roster(by: MemberId): Result<Roster, AccessError>;
-  /** What a live invitation is, without spending it. */
-  inspect(hash: string, now: number): Result<Invitation, AccessError>;
+  /** What a live invitation is, without spending it, and whether whom it lets in may link a browser. */
+  inspect(hash: string, now: number): Result<Invitation & { canLink: boolean }, AccessError>;
   /** Begins a step of signing in. */
   openChallenge(input: NewChallenge, now: number): void;
   /** Ends a step of signing in: it is answered once, whatever the answer. */
@@ -261,7 +262,12 @@ export function accessOver(store: AccessStore): Access {
         },
       };
     },
-    inspect: (hash, now) => liveInvitation(store, hash, now),
+    inspect(hash, now) {
+      const live = liveInvitation(store, hash, now);
+      return live.ok
+        ? { ok: true, value: { ...live.value, canLink: mayLinkBrowser(live.value.role) } }
+        : live;
+    },
     openChallenge: (input, now) => store.save(openChallenge(input, now)),
     takeChallenge(hash, purpose, now) {
       const { change, taken } = takeChallenge(store, hash, purpose, now);

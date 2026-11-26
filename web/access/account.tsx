@@ -5,10 +5,11 @@ import { type AccountAnswer, accountAnswer, type SessionAnswer } from "../../src
 import { useLanguage } from "../app/language";
 import { go } from "../app/router";
 import { call, canUsePasskeys, makePasskey, type Refusal, sessionQuery } from "./api";
-import { LabelInput } from "./entry";
+import { isInApp, LabelInput, NoPasskeys } from "./entry";
 import { asRefusal } from "./errors";
 import { SignedIn } from "./frame";
-import { Confirm, CredentialLine, Problem, read, Section, Title } from "./members";
+import { Confirm, CredentialLine, Problem, Section, Title } from "./members";
+import { read } from "./session";
 import classes from "./members.module.css";
 
 const accountKey = ["account"];
@@ -57,11 +58,8 @@ function Details({ account, session }: { account: AccountAnswer; session: Sessio
             />
           ))}
         </ul>
-        {canAddPasskey && canUsePasskeys() ? (
-          <AddPasskey />
-        ) : (
-          <p className={classes.meta}>{t("account.addNeedsLink")}</p>
-        )}
+        {!canAddPasskey && <p className={classes.meta}>{t("account.addNeedsLink")}</p>}
+        {canAddPasskey && (canUsePasskeys() && !isInApp() ? <AddPasskey /> : <NoPasskeys />)}
       </Section>
       <Section title={t("account.data")}>
         <p>{t("account.downloadAbout")}</p>
@@ -127,7 +125,8 @@ function Leave({ session }: { session: SessionAnswer }) {
   const leave = async (method: "POST" | "DELETE", path: string) => {
     setAsked(null);
     const done = await call(method, path);
-    if (!done.ok) return setRefusal(done.error);
+    // A session that is over already has left.
+    if (!done.ok && done.error.code !== "unauthorized") return setRefusal(done.error);
     client.setQueryData(sessionQuery.queryKey, null);
     go("/", "replace");
   };

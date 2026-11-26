@@ -47,9 +47,14 @@ app.on("GET", ["/sample", "/sample/*"], (c) => {
 });
 
 // The pages of signing in are one page of the app, which reads the address itself.
-app.on("GET", [...ACCESS_PAGES], (c) =>
-  c.env.ASSETS.fetch(new Request(new URL("/", c.req.url), c.req.raw)),
-);
+app.on("GET", [...ACCESS_PAGES], async (c) => {
+  const page = await c.env.ASSETS.fetch(new Request(new URL("/", c.req.url), c.req.raw));
+  const framed = new Response(page.body, page);
+  // A page where a keeper presses buttons is never shown inside another site.
+  framed.headers.set("content-security-policy", "frame-ancestors 'none'");
+  framed.headers.set("x-frame-options", "DENY");
+  return framed;
+});
 
 /** Anything but "on" is off, a typo too: the example never opens by chance. */
 function hasSample({ SAMPLE }: Pick<Env, "SAMPLE">): boolean {

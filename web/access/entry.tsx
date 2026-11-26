@@ -174,19 +174,21 @@ function Invitation({ secret, invitation }: { secret: string; invitation: Invita
  * A browser that cannot use passkeys: the link goes to a real one, whole. Where the clipboard is
  * closed too, the link stands in a field to copy by hand.
  */
-function NoPasskeys({ text }: { text: string }) {
+export function NoPasskeys({ text }: { text?: string }) {
   const { t } = useLanguage();
+  const said = text ?? t(isInApp() ? "passkey.inApp" : "passkey.noBrowser");
   const [state, setState] = useState<"copied" | "by-hand" | null>(null);
   const link = window.location.href;
   return (
     <div className={classes.form}>
       <p role="alert" className={classes.problem}>
-        {text}
+        {said}
       </p>
       <Button
         size="md"
         onClick={() =>
-          void navigator.clipboard.writeText(link).then(
+          // An old browser has no clipboard at all.
+          void (navigator.clipboard?.writeText(link) ?? Promise.reject(new Error("none"))).then(
             () => setState("copied"),
             () => setState("by-hand"),
           )
@@ -334,7 +336,7 @@ export function LabelInput({
 }
 
 /** Messengers open links in a browser of their own, which often cannot make passkeys. */
-function isInApp(): boolean {
+export function isInApp(): boolean {
   return /Telegram|WhatsApp|Instagram|FBAN|FBAV|Line\/|Viber|VKClient|MicroMessenger/u.test(
     navigator.userAgent,
   );

@@ -12,6 +12,7 @@ import {
 import { useArrival } from "../app/arrival";
 import { useLanguage } from "../app/language";
 import { call, linkOf, type Refusal } from "./api";
+import { read } from "./session";
 import { asRefusal, textOf } from "./errors";
 import { SignedIn } from "./frame";
 import classes from "./members.module.css";
@@ -22,13 +23,6 @@ type Invitation = NonNullable<RosterAnswer["invitations"]>[number];
 export type Credential = AccountAnswer["credentials"][number];
 
 const rosterKey = ["roster"];
-
-/** Asks the server and reads the answer by its schema; a refusal is thrown as it came. */
-export async function read<T>(path: string, schema: { parse: (value: unknown) => T }): Promise<T> {
-  const answer = await call("GET", path);
-  if (!answer.ok) throw answer.error;
-  return schema.parse(answer.value);
-}
 
 /** The members of the family: names for everybody, and for a keeper everything a keeper does. */
 export function Members() {
@@ -270,11 +264,11 @@ export function Confirm({
     <div className={classes.confirm} role="group" aria-label={action}>
       <p>{cost}</p>
       <div className={classes.buttons}>
-        {/* The step asked for is where the keys are now. */}
-        <Button size="md" onClick={onConfirm} autoFocus>
+        <Button size="md" onClick={onConfirm}>
           {action}
         </Button>
-        <Button size="md" variant="outline" onClick={onCancel}>
+        {/* The keys start at the way back: two presses of Enter must not erase anything. */}
+        <Button size="md" variant="outline" onClick={onCancel} autoFocus>
           {t("account.cancel")}
         </Button>
       </div>

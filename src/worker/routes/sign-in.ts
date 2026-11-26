@@ -1,5 +1,4 @@
 import type { Hono } from "hono";
-import { mayLinkBrowser } from "../../contexts/access";
 import {
   answerInput,
   bindInput,
@@ -70,13 +69,8 @@ export function signInRoutes(app: Hono<Api>): void {
     const access = accessOf(c);
     const found = await access.inspect(await hashOf(input.secret), Date.now());
     if (!found.ok) return refused(c, found.error);
-    const { kind, role } = found.value;
-    const answer: InvitationAnswer = {
-      kind,
-      role,
-      family: await access.family(),
-      canLink: mayLinkBrowser(role),
-    };
+    const { kind, role, canLink } = found.value;
+    const answer: InvitationAnswer = { kind, role, family: await access.family(), canLink };
     return c.json(answer);
   });
 
@@ -138,7 +132,8 @@ export function signInRoutes(app: Hono<Api>): void {
     // Which passkey is unknown, which signature is wrong and which count went back look the same.
     if (credential === null || counter === null) return signInRefused(c);
     const done = await signedIn(c, credential.id, counter);
-    return done.status === 401 ? signInRefused(c) : done;
+    // A passkey turned off, of a member whose sign-in is off, or that counts back: one refusal.
+    return done.ok || done.status === 429 ? done : signInRefused(c);
   });
 
   // A reader whose passkey does not work binds this browser instead, once.

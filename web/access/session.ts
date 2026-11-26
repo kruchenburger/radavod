@@ -40,6 +40,13 @@ export async function call<T = unknown>(
   };
 }
 
+/** Asks the server and reads the answer by its schema; a refusal is thrown as it came. */
+export async function read<T>(path: string, schema: { parse: (value: unknown) => T }): Promise<T> {
+  const answer = await call("GET", path);
+  if (!answer.ok) throw answer.error;
+  return schema.parse(answer.value);
+}
+
 /** Who is signed in, null when nobody. Asked whenever the app opens: it gives the cookie again. */
 export const sessionQuery = queryOptions({
   queryKey: ["session"],

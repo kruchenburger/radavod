@@ -102,7 +102,7 @@ export class FamilyAccess extends DurableObject<Env> {
   }
 
   /** What a live invitation is, without spending it. */
-  inspect(hash: string, now: number): Result<Invitation, AccessError> {
+  inspect(hash: string, now: number): Result<Invitation & { canLink: boolean }, AccessError> {
     return this.#access().inspect(hash, now);
   }
 

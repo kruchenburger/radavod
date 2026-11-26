@@ -52,3 +52,12 @@ it.each(["/", "/people", "/apix", "/health/more", "//api/people"])(
 it("denies API requests before any other route can answer", () => {
   expect(app.routes[0]).toMatchObject({ method: "ALL", path: "/api/*" });
 });
+
+it.each(["/setup", "/join", "/sign-in", "/family", "/account"])(
+  "serves the app at %s, never inside another site",
+  async (path) => {
+    const res = await exports.default.fetch(`https://x${path}`);
+    expect(res.headers.get("content-security-policy")).toBe("frame-ancestors 'none'");
+    expect(res.headers.get("x-frame-options")).toBe("DENY");
+  },
+);
