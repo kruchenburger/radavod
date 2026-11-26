@@ -21,6 +21,7 @@ The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), and
 - The rules of access: roles and what each may do, invitations, recovery links, passkeys, a bound device for a reader, sliding sessions, and a keeper who can always sign in. They are kept in the object of sign-in with a sign-in log and limits of tries; nothing serves them over HTTP yet.
 - Signing in over HTTP: setting a family up with a code, invitations and recovery links, passkeys, a bound device for a reader, sessions in a cookie, and the routes of members, each admitting the roles of the table. No screen uses them yet.
 - The screens of signing in: the first run, an invitation with a passkey or a linked browser, a recovery link, sign-in, the members of the family with invitations and the sign-in log, and one's own account.
+- The import of a family table: a keeper chooses a CSV file, sees everybody it adds, the unions, parents, births, deaths and sources, and every problem with its row, then adds it all to a tree without people as one entry of the edit history.
 - Guards for the architecture, the texts, licenses and a real family's data. The last one reads every commit of a pull request and, with the hook turned on, every commit before a push.
 - Checks on every pull request: browser tests, accessibility, secrets and known vulnerabilities.
 

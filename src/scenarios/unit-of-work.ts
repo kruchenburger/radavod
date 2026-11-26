@@ -34,7 +34,7 @@ export type History = Pick<Journal, "last" | "entry" | "entries" | "entriesOf"> 
 
 /** What can be asked without a change. */
 export type Reading = {
-  kinship: Pick<Kinship, "get" | "union" | "branch" | "relatives">;
+  kinship: Pick<Kinship, "get" | "union" | "branch" | "relatives" | "someone">;
   places: Pick<Places, "get" | "nameOn" | "affiliationOn">;
   evidence: Pick<Evidence, "source" | "citationsOf" | "countFor">;
   life: Pick<Life, "event" | "eventsOf" | "main" | "countAt" | "warnings">;

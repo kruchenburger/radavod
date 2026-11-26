@@ -1,10 +1,12 @@
 import { Hono } from "hono";
 import { ACCESS_PAGES } from "../shared/access";
+import { EXCHANGE_PAGES } from "../shared/exchange";
 import type { Config } from "../shared/config";
 import type { Health } from "../shared/health";
 import { parseSamplePath, SAMPLE_FILE } from "../shared/sample-path";
 import { type Api, gate } from "./auth";
 import type { Env } from "./env";
+import { exchangeRoutes } from "./routes/exchange";
 import { memberRoutes } from "./routes/members";
 import { signInRoutes } from "./routes/sign-in";
 import { FAMILY_ID, stubFor } from "./stub";
@@ -16,6 +18,7 @@ export const app = new Hono<Api>();
 app.use("/api/*", gate);
 signInRoutes(app);
 memberRoutes(app);
+exchangeRoutes(app);
 // Whatever else a member asks of `/api` is not there yet.
 app.all("/api/*", (c) => c.json({ error: "not-found" }, 404));
 
@@ -46,8 +49,8 @@ app.on("GET", ["/sample", "/sample/*"], (c) => {
   return c.env.ASSETS.fetch(new Request(new URL("/", url), c.req.raw));
 });
 
-// The pages of signing in are one page of the app, which reads the address itself.
-app.on("GET", [...ACCESS_PAGES], async (c) => {
+// The pages of signing in and of a member are one page of the app, which reads the address itself.
+app.on("GET", [...ACCESS_PAGES, ...EXCHANGE_PAGES], async (c) => {
   const page = await c.env.ASSETS.fetch(new Request(new URL("/", c.req.url), c.req.raw));
   const framed = new Response(page.body, page);
   // A page where a keeper presses buttons is never shown inside another site.

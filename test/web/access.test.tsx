@@ -22,6 +22,7 @@ const ann = {
   person: null,
   family: "Oaks",
   via: "passkey",
+  mayImport: true,
 };
 
 type Route = { status?: number; body?: unknown; headers?: Record<string, string> };

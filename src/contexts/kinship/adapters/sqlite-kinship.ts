@@ -201,6 +201,17 @@ class SqliteKinship implements KinshipStore, Kept {
     return this.current(kind, id);
   }
 
+  someone(): boolean {
+    // One row more than are known is one nobody changed yet, if the table has it.
+    const found = this.#sql
+      .exec<RawRow & { id: PersonId }>(
+        "SELECT id, version, data FROM kinship_person LIMIT ?",
+        this.#people.known + 1,
+      )
+      .toArray();
+    return this.#people.among(found).length > 0;
+  }
+
   everything() {
     type Row<Id> = RawRow & { id: Id };
     const people = this.#sql.exec<Row<PersonId>>("SELECT id, version, data FROM kinship_person");

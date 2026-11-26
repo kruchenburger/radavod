@@ -108,9 +108,11 @@ export class Family {
   constructor(more: Partial<Env> = {}) {
     const name = `family ${crypto.randomUUID()}`;
     const access = env.ACCESS.getByName(name);
+    const tree = env.TREE.getByName(name);
     this.env = {
       ...(env as unknown as Env),
       ACCESS: { getByName: () => access } as unknown as Env["ACCESS"],
+      TREE: { getByName: () => tree } as unknown as Env["TREE"],
       ...more,
     };
   }

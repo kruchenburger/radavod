@@ -55,6 +55,10 @@ export class MemoryKinship implements KinshipStore {
     return { people: of(this.people.keys()), unions: of(this.unions.keys()) };
   }
 
+  someone(): boolean {
+    return this.people.size > 0;
+  }
+
   save(change: Change): void {
     this.saves++;
     for (const write of structuredClone(change)) {

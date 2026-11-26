@@ -75,6 +75,8 @@ export interface Kinship {
   branch(id: BranchId): Branch | null;
   /** Everybody a link ties to a person: parents, partners, children. */
   relatives(id: PersonId): PersonId[];
+  /** Whether anybody is in the tree. */
+  someone(): boolean;
   /** Stores what the rules make of a command. One that is refused or changes nothing is not. */
   apply(command: KinshipCommand): Result<Change, KinshipError>;
   /** Puts aggregates as they were, with what follows from them. */
@@ -91,6 +93,7 @@ export function kinshipOver(store: KinshipStore): Kinship {
     union: (id) => store.union(id),
     branch: (id) => store.branch(id),
     relatives: (id) => relativesOf(store, id),
+    someone: () => store.someone(),
     apply: (command) => saved(resultOf(store, command)),
     putBack: (targets) => saved(putFamilyBack(store, targets)),
   };

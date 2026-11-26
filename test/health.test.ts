@@ -53,7 +53,7 @@ it("denies API requests before any other route can answer", () => {
   expect(app.routes[0]).toMatchObject({ method: "ALL", path: "/api/*" });
 });
 
-it.each(["/setup", "/join", "/sign-in", "/family", "/account"])(
+it.each(["/setup", "/join", "/sign-in", "/family", "/account", "/import"])(
   "serves the app at %s, never inside another site",
   async (path) => {
     const res = await exports.default.fetch(`https://x${path}`);

@@ -135,6 +135,7 @@ export async function sessionAnswerOf(c: ApiContext, signed: Signed): Promise<Se
     person,
     family,
     via,
+    mayImport: can(role, "exchange"),
   };
 }
 
@@ -143,7 +144,7 @@ export function countryOf(c: ApiContext): unknown {
   return (c.req.raw as { cf?: { country?: unknown } }).cf?.country ?? null;
 }
 
-const statuses: Record<string, 400 | 401 | 403 | 404 | 409 | 410 | 429> = {
+const statuses: Record<string, 400 | 401 | 403 | 404 | 409 | 410 | 413 | 429> = {
   forbidden: 403,
   "set-up": 403,
   missing: 404,
@@ -160,6 +161,8 @@ const statuses: Record<string, 400 | 401 | 403 | 404 | 409 | 410 | 429> = {
   "one-device": 409,
   "rate-limited": 429,
   "step-over": 410,
+  "tree-not-empty": 409,
+  "too-large": 413,
 };
 
 /** A refusal as an answer: its code, and when a limit lets the next try in. */
