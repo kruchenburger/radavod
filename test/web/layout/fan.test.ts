@@ -12,6 +12,7 @@ import {
   firstCell,
   sharesOf,
 } from "../../../web/tree/layout/fan";
+import { kinOf } from "../../../web/tree/layout/kin";
 import { bigSnapshot } from "./big";
 import { cases } from "./cases";
 import { type FamilySpec, familyOf, measure, wordingOf } from "./family";
@@ -57,6 +58,12 @@ function expectSound(fan: Fan): void {
 }
 
 const wide = { metrics: fanMetrics.wide };
+
+/** The first partner of a person: in the invented family, the couple where the branches meet. */
+const partnerOf = (snapshot: TreeSnapshot, id: string): string =>
+  kinOf(snapshot)
+    .unions(id)
+    .find(({ other }) => other !== null)?.other ?? id;
 
 const family: FamilySpec = {
   people: [
@@ -232,7 +239,7 @@ describe("the fan of ancestors", () => {
 
   it("draws the couple of the invented family where all branches meet", () => {
     const { snapshot: invented, line } = sampleOf(generateFamily(1, 300));
-    const fan = fanOf(invented, [line, "p140"], { ...wide, lineOf: line });
+    const fan = fanOf(invented, [line, partnerOf(invented, line)], { ...wide, lineOf: line });
     expectSound(fan);
     const branches = new Set(
       fan.cells.flatMap(
@@ -256,7 +263,7 @@ describe("the words of a cell", () => {
 
   it("fit their cell, whatever form they take", () => {
     for (const metrics of [fanMetrics.wide, fanMetrics.narrow]) {
-      const fan = fanOf(invented, [line, "p140"], { metrics, lineOf: line });
+      const fan = fanOf(invented, [line, partnerOf(invented, line)], { metrics, lineOf: line });
       for (const cell of fan.cells) {
         const person = invented.people.find(({ id }) => id === cell.person);
         if (person === undefined) continue;
@@ -280,7 +287,7 @@ describe("the words of a cell", () => {
 
 describe("the keys on the fan", () => {
   const { snapshot: invented, line } = sampleOf(generateFamily(1, 300));
-  const fan = fanOf(invented, [line, "p140"], { ...wide, lineOf: line });
+  const fan = fanOf(invented, [line, partnerOf(invented, line)], { ...wide, lineOf: line });
   const move = fanKeys(fan);
 
   it("go up to a parent on the direct line, down to the child, along the ring", () => {
