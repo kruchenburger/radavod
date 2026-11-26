@@ -6,7 +6,7 @@ import type { AccessReader } from "./member";
  * reads it. They are the domain's own, as the roles are; the browser keeps a copy of the keys.
  */
 export const NICKNAME_ADJECTIVES = [
-  "rabid",
+  "wild",
   "brave",
   "cheerful",
   "sleepy",

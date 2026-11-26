@@ -3,7 +3,7 @@
  * lists of the access domain, as `roleSchema` repeats its roles; a test keeps the two equal.
  */
 export const NICKNAME_ADJECTIVES = [
-  "rabid",
+  "wild",
   "brave",
   "cheerful",
   "sleepy",

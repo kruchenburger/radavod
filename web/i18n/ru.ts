@@ -347,8 +347,8 @@ export const ru = {
   "account.renamed": "Теперь ваше имя: {name}",
   "error.name-required": "Напишите имя.",
   // The words of nicknames: an adjective in the gender of the creature, then the creature.
-  "nickname.adjective.rabid.m": "Бешеный",
-  "nickname.adjective.rabid.f": "Бешеная",
+  "nickname.adjective.wild.m": "Бешеный",
+  "nickname.adjective.wild.f": "Бешеная",
   "nickname.adjective.brave.m": "Храбрый",
   "nickname.adjective.brave.f": "Храбрая",
   "nickname.adjective.cheerful.m": "Весёлый",

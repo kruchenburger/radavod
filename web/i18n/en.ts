@@ -328,8 +328,8 @@ export const en = {
   "account.renamed": "Your name is now {name}",
   "error.name-required": "Write a name.",
   // The words of nicknames: an adjective in the gender of the creature, then the creature.
-  "nickname.adjective.rabid.m": "Rabid",
-  "nickname.adjective.rabid.f": "Rabid",
+  "nickname.adjective.wild.m": "Wild",
+  "nickname.adjective.wild.f": "Wild",
   "nickname.adjective.brave.m": "Brave",
   "nickname.adjective.brave.f": "Brave",
   "nickname.adjective.cheerful.m": "Cheerful",

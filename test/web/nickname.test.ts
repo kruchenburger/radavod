@@ -32,10 +32,10 @@ describe("a nickname", () => {
       if (/[ая]$/.test(creature)) expect(adjective).toMatch(feminine);
       if (/[^аяь]$/.test(creature)) expect(adjective).toMatch(masculine);
     }
-    expect(nameOf(tr, { name: "", nickname: { adjective: "rabid", creature: "owl" } })).toBe(
+    expect(nameOf(tr, { name: "", nickname: { adjective: "wild", creature: "owl" } })).toBe(
       "Бешеная Сова",
     );
-    expect(nameOf(tr, { name: "", nickname: { adjective: "rabid", creature: "hedgehog" } })).toBe(
+    expect(nameOf(tr, { name: "", nickname: { adjective: "wild", creature: "hedgehog" } })).toBe(
       "Бешеный Ёж",
     );
     expect(nameOf(tr, { name: "", nickname: { adjective: "sly", creature: "lynx" } })).toBe(
@@ -57,13 +57,13 @@ describe("a nickname", () => {
 
   it("gives way to a name, and to words the page does not know", () => {
     const tr = (key: Key, params?: Params) => t("en", key, params);
-    const nickname = { adjective: "rabid", creature: "dinosaur" };
-    expect(nameOf(tr, { name: "", nickname })).toBe("Rabid Dinosaur");
+    const nickname = { adjective: "wild", creature: "dinosaur" };
+    expect(nameOf(tr, { name: "", nickname })).toBe("Wild Dinosaur");
     expect(nameOf(tr, { name: "Anna", nickname })).toBe("Anna");
     expect(nameOf(tr, { name: "", nickname: { adjective: "perky", creature: "tiger" } })).toBe(
       "Peppy Tiger",
     );
     expect(nameOf(tr, { name: "", nickname: { adjective: "new", creature: "owl" } })).toBe("");
-    expect(nameOf(tr, { name: "", nickname: { adjective: "rabid", creature: "new" } })).toBe("");
+    expect(nameOf(tr, { name: "", nickname: { adjective: "wild", creature: "new" } })).toBe("");
   });
 });

@@ -260,7 +260,7 @@ describe("an invitation", () => {
         family: "Oaks",
         canLink: false,
         name: null,
-        nickname: { adjective: "rabid", creature: "owl" },
+        nickname: { adjective: "wild", creature: "owl" },
         nameOptional: true,
       }),
       "POST /api/passkey/register/options": { body: { flow: "f", options: {} } },
@@ -519,7 +519,7 @@ describe("the members", () => {
             {
               id: dino,
               name: "",
-              nickname: { adjective: "rabid", creature: "owl" },
+              nickname: { adjective: "wild", creature: "owl" },
               role: "reader",
               version: 1,
               revokedAt: null,
@@ -682,7 +682,7 @@ describe("one's own account", () => {
   });
 
   it("asks a member called by a nickname to write a name, and calls them by it", async () => {
-    const nickname = { adjective: "rabid", creature: "owl" };
+    const nickname = { adjective: "wild", creature: "owl" };
     const asked = serve({
       "GET /api/session": { body: { ...ann, name: "", nickname, role: "reader" } },
       "GET /api/account": {
