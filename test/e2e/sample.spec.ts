@@ -569,8 +569,13 @@ test.describe("the pages of branches", () => {
     await page.keyboard.press("Tab");
     const focused = page.locator("[data-page] a:focus");
     await expect(focused).toBeInViewport();
-    const outline = await page.evaluate("getComputedStyle(document.activeElement).outlineStyle");
-    expect(outline).toBe("solid");
+    expect(await page.evaluate(markOfFocus)).toEqual({
+      outline: "none",
+      content: '""',
+      tint: true,
+      bar: true,
+      under: "-1",
+    });
     const href = (await focused.getAttribute("href")) ?? "";
     await page.keyboard.press("Enter");
     await expect(page).toHaveURL(href);

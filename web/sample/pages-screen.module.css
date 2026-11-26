@@ -105,6 +105,8 @@
   scroll-margin-inline: calc(var(--gutter) / 2);
   padding-bottom: 1.125rem;
   background-color: var(--surface);
+  /* Keeps the tint of the focused name over the page and under the lines of the outline. */
+  isolation: isolate;
 }
 
 .page h2 {
@@ -218,6 +220,40 @@ a.reference:hover b {
 
 .name[data-unnamed] {
   font-style: italic;
+}
+
+/*
+ * The name or reference the keys stand on gets a tint and a bar in the `action` colour before it,
+ * as in the tree. Both lie under the lines and the text, so nothing is covered, clipped or moved.
+ */
+.name,
+a.reference {
+  position: relative;
+}
+
+.name:focus-visible,
+a.reference:focus-visible {
+  outline: none;
+}
+
+.name:focus-visible::before,
+a.reference:focus-visible::before {
+  content: "";
+  position: absolute;
+  inset: -0.25rem -0.375rem -0.25rem -0.5rem;
+  z-index: -1;
+  border-left: 3px solid var(--action);
+  border-radius: 3px;
+  background-color: var(--hover);
+}
+
+/* Where the system paints its own colours, a tint is lost: the plain ring comes back. */
+@media (forced-colors: active) {
+  .name:focus-visible,
+  a.reference:focus-visible {
+    outline: 2px solid CanvasText;
+    outline-offset: 2px;
+  }
 }
 
 .line[data-direct] .name {

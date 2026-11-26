@@ -191,7 +191,7 @@ Every branch is a page of its own, the pages side by side in one row that scroll
 - **Between pages only the direct line is drawn**, on a window wider than a phone. It leaves its reference on the side of the page it goes to and always comes in from the left, where the outline is. Into the next page it crosses the gutter between them; within a page it runs in the gutter on the left; further it goes up to a rail over the pages, along it and down the gutter left of its page. Lines in one gutter keep 8 px apart. The pages stand in the order the direct line goes through them, beginning with the page of the person the line begins with, so that most of it crosses one gutter only.
 - The chosen person is set in `paper` on `ink`, and the pages open with that person in the window. Pressing a name chooses the person; pressing a reference chooses the person it names, on their page.
 - On the phone a name is a target 44 px high, and the line of a family turns at the middle of it.
-- The names are links reached by Tab, not entries walked by the arrow keys, so the focus is the ring of a link (see States), not the tint of the tree.
+- A name or a reference with the focus has the tint and the bar of the tree (see States), under the lines of the outline.
 
 ## The person card
 
@@ -225,7 +225,7 @@ Under the strip a legend explains the cap, the dashes and the "?". Adoption is a
 ## States
 
 - Focus: 2 px `action` outline, 2 px away, 3 px on the map. Never removed, never clipped.
-- Focus on an entry of the tree, reached by the arrow keys on any width: no outline. A tint of `hover` under the entry, 4 px beyond it above and below, 6 px to the right and 8 px to the left, corners of 3 px, with a 3 px bar of `action` on its left edge. It lies under the lines and the text, so it covers, clips and moves nothing, and the sheet keeps room for it beside the outer columns; the bar keeps 3:1 against `paper`, `surface` and `hover` in both themes. Only the keys show it (`:focus-visible`), never a press of the mouse. Where the system forces its own colours, the plain outline comes back. The map keeps its own.
+- Focus on an entry of the tree, reached by the arrow keys on any width, and on a name or a reference of the pages by branch, reached by Tab: no outline. A tint of `hover` under the entry, 4 px beyond it above and below, 6 px to the right and 8 px to the left, corners of 3 px, with a 3 px bar of `action` on its left edge. It lies under the lines and the text, so it covers, clips and moves nothing, and the sheet keeps room for it beside the outer columns; the bar keeps 3:1 against `paper`, `surface` and `hover` in both themes. Only the keys show it (`:focus-visible`), never a press of the mouse. Where the system forces its own colours, the plain outline comes back. The map keeps its own.
 - Backspace: one step back inside the app on every screen, the person before in the centre or the screen before, so the tree can be walked by the keys alone. Never while somebody types (a field, a list to choose from, editable text, a composition in progress), never with a modifier, never for a key a screen already took. On the first page of a visit, or one reached from another site, it does nothing: it never leaves the site. The hint under the tree names it.
 - Hover: `hover` under a control, an underline for a name.
 - Filled button for the one main action of a screen, outlined for the rest. Disabled is `muted` text and a sentence that says why.
